@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+
+          <!--
+            Exclude source-generated code. System.Text.Json's generator emits
+            several thousand lines of *.g.cs, which swamps the hand-written SDK
+            and makes the headline number meaningless: 78.8% with it, 86.4%
+            without. Those lines belong to Microsoft's generator, are exercised
+            indirectly by every model test, and can never be driven to 100%
+            deliberately — so counting them would put the coverage target
+            permanently out of reach for the wrong reason.
+          -->
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <Exclude>[*]*.g</Exclude>
+
+          <!-- Test projects measure the SDK, not themselves. -->
+          <ExcludeByFile>**/*.g.cs,**/obj/**,**/TcgDex.CSharpSdk.Tests/**,**/TcgDex.CSharpSdk.IntegrationTests/**,**/TcgDex.CSharpSdk.AotSmokeTest/**</ExcludeByFile>
+
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>true</UseSourceLink>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
