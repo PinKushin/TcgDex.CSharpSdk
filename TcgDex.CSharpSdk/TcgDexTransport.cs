@@ -76,6 +76,28 @@ internal sealed class TcgDexTransport
         return Deserialize<T>(body, uri);
     }
 
+    /// <summary>
+    /// Fetches a resource that must exist, such as one of the enumeration
+    /// endpoints.
+    /// </summary>
+    /// <typeparam name="T">The model to deserialize into.</typeparam>
+    /// <param name="relativePath">Path below the language segment.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The deserialized resource.</returns>
+    /// <exception cref="TcgDexApiException">
+    /// The request failed, or the resource was absent when the endpoint is
+    /// expected always to answer.
+    /// </exception>
+    internal async Task<T> GetRequiredAsync<T>(string relativePath, CancellationToken cancellationToken)
+        where T : class
+    {
+        var result = await GetAsync<T>(relativePath, cancellationToken).ConfigureAwait(false);
+
+        return result ?? throw new TcgDexApiException(
+            $"The TCGdex API returned no content for '{relativePath}', which is " +
+            "expected always to be available.");
+    }
+
     private async Task<HttpResponseMessage> SendAsync(Uri uri, CancellationToken cancellationToken)
     {
         try
