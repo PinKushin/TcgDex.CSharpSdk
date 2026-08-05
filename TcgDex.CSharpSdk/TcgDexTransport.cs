@@ -1,0 +1,173 @@
+namespace TcgDex;
+
+using System.Net;
+using TcgDex.Models;
+using TcgDex.Serialization;
+
+/// <summary>
+/// Issues requests against the REST API and turns responses into models or a
+/// single, predictable exception type.
+/// </summary>
+/// <remarks>
+/// <para>
+/// One error contract applies everywhere: a genuinely missing resource yields
+/// <see langword="null"/>, and anything else throws
+/// <see cref="TcgDexApiException"/>. The previous SDK split these arbitrarily —
+/// single-item getters swallowed failures and returned null while list methods
+/// propagated raw <see cref="HttpRequestException"/> — so identical failures
+/// surfaced differently depending on which method was called.
+/// </para>
+/// <para>
+/// All deserialization goes through <see cref="TcgDexJsonContext"/>, so the
+/// SDK stays free of reflection and remains AOT- and trim-safe.
+/// </para>
+/// </remarks>
+internal sealed class TcgDexTransport
+{
+    private readonly HttpClient _httpClient;
+    private readonly Uri _languageBase;
+
+    internal TcgDexTransport(HttpClient httpClient, TcgDexOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        ArgumentNullException.ThrowIfNull(options);
+
+        options.Validate();
+
+        _httpClient = httpClient;
+
+        // The trailing slash is what makes the resource path append to the
+        // language segment rather than replace it.
+        _languageBase = new Uri(options.BaseAddress, options.Language + "/");
+    }
+
+    /// <summary>
+    /// Fetches and deserializes a resource, returning <see langword="null"/>
+    /// when it does not exist.
+    /// </summary>
+    /// <typeparam name="T">The model to deserialize into.</typeparam>
+    /// <param name="relativePath">
+    /// Path below the language segment, query string included — for example
+    /// <c>cards/swsh3-136</c> or <c>cards?name=eq:Furret</c>.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The deserialized resource, or <see langword="null"/> if absent.</returns>
+    /// <exception cref="TcgDexApiException">
+    /// The request failed for any reason other than the resource being missing.
+    /// </exception>
+    internal async Task<T?> GetAsync<T>(string relativePath, CancellationToken cancellationToken)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(relativePath);
+
+        var uri = new Uri(_languageBase, relativePath);
+
+        using var response = await SendAsync(uri, cancellationToken).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return await HandleFailureAsync<T>(uri, response, cancellationToken).ConfigureAwait(false);
+        }
+
+        var body = await response.Content
+            .ReadAsStringAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Deserialize<T>(body, uri);
+    }
+
+    private async Task<HttpResponseMessage> SendAsync(Uri uri, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+
+            return await _httpClient
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new TcgDexApiException($"The request to '{uri}' could not be completed.", ex);
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Cancellation requested by the caller is theirs to observe; this
+            // branch is specifically a client-side timeout, which is a fault.
+            throw new TcgDexApiException($"The request to '{uri}' timed out.", ex);
+        }
+    }
+
+    /// <summary>
+    /// Decides whether a non-success response is an absent resource or a fault.
+    /// </summary>
+    /// <remarks>
+    /// The API answers both "no such card" and "no such language" with
+    /// <c>404</c>, so the status code alone is not enough — the problem
+    /// document's <c>type</c> is the discriminator. Treating a language typo as
+    /// "not found" would hide a caller mistake behind an empty result.
+    /// </remarks>
+    private static async Task<T?> HandleFailureAsync<T>(
+        Uri uri,
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+        where T : class
+    {
+        var problem = await ReadProblemAsync(response, cancellationToken).ConfigureAwait(false);
+
+        if (response.StatusCode == HttpStatusCode.NotFound && problem?.IsLanguageError != true)
+        {
+            return null;
+        }
+
+        var description = problem?.Describe() ?? response.ReasonPhrase ?? "no detail supplied";
+
+        throw new TcgDexApiException(
+            $"The TCGdex API returned {(int)response.StatusCode} for '{uri}': {description}",
+            response.StatusCode,
+            problem);
+    }
+
+    private static async Task<TcgDexProblem?> ReadProblemAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var body = await response.Content
+                .ReadAsStringAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            return string.IsNullOrWhiteSpace(body)
+                ? null
+                : JsonSerializer.Deserialize(body, TcgDexJsonContext.Default.TcgDexProblem);
+        }
+        catch (JsonException)
+        {
+            // An unparseable error body must not mask the underlying failure —
+            // the caller still gets a TcgDexApiException, just without detail.
+            return null;
+        }
+    }
+
+    private static T? Deserialize<T>(string body, Uri uri)
+        where T : class
+    {
+        try
+        {
+            var typeInfo = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
+            return JsonSerializer.Deserialize(body, typeInfo);
+        }
+        catch (JsonException ex)
+        {
+            // Callers should need to catch only one exception type, so a
+            // malformed body (an HTML error page from a proxy, say) is reported
+            // as an API failure rather than leaking JsonException.
+            throw new TcgDexApiException(
+                $"The response from '{uri}' was not valid JSON for {typeof(T).Name}.",
+                HttpStatusCode.OK,
+                problem: null,
+                innerException: ex);
+        }
+    }
+}

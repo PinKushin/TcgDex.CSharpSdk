@@ -129,6 +129,25 @@ comes from the shared framework.
 
 ---
 
+## Transport tests are mutation-checked, not just green
+
+A test that passes on first write proves nothing until you have seen it fail.
+The URL assertions were verified by reintroducing the exact defect the previous
+SDK shipped — wrapping the query string in an invented `?q=` parameter — and
+confirming that `GetAsync_PreservesQueryStringVerbatim` failed, and that it was
+the only failure.
+
+That defect passed the old suite because its mock handler ignored the `request`
+argument entirely, so no test ever observed a URL.
+`Http/RecordingHandler.cs` exists to make that class of blind spot impossible:
+it records every request, exposes the URI for assertion, and fails loudly with
+the offending method and URL when the code makes an unexpected extra call.
+
+Worth repeating for any new area: if a test has never been red, confirm it can
+be.
+
+---
+
 ## Test fixtures are recorded live responses, not hand-written JSON
 
 Every file in `TcgDex.CSharpSdk.Tests/Fixtures/` was captured from the live API
