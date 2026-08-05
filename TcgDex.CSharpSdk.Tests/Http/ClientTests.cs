@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using TcgDex;
+using TcgDex.Querying;
 
 /// <summary>
 /// The public client surface: that each resource hits the path the API
@@ -88,6 +89,39 @@ public sealed class ClientTests
 
         handler.SingleRequestUri.ShouldBe("https://api.tcgdex.net/v2/en/cards");
         cards.ShouldNotBeEmpty();
+    }
+
+    [Test]
+    public async Task Cards_ListAsync_WithQuery_SendsFiltersAsTopLevelParameters()
+    {
+        // End-to-end proof that a typed predicate becomes the exact URL the API
+        // documents — the one assertion the previous SDK never made.
+        var handler = new RecordingHandler()
+            .RespondWithJsonFile(HttpStatusCode.OK, "list-cards-brief.json");
+
+        var query = new CardQuery()
+            .Where(c => c.Name == "Furret")
+            .Where(c => c.Hp > 100)
+            .OrderByDescending(c => c.Name)
+            .Page(2, 50);
+
+        await CreateClient(handler).Cards.ListAsync(query, CancellationToken.None);
+
+        handler.SingleRequestUri.ShouldBe(
+            "https://api.tcgdex.net/v2/en/cards" +
+            "?name=eq:Furret&hp=gt:100&sort:field=name&sort:order=DESC" +
+            "&pagination:page=2&pagination:itemsPerPage=50");
+    }
+
+    [Test]
+    public async Task Cards_ListAsync_WithEmptyQuery_OmitsTheQuestionMark()
+    {
+        var handler = new RecordingHandler()
+            .RespondWithJsonFile(HttpStatusCode.OK, "list-cards-brief.json");
+
+        await CreateClient(handler).Cards.ListAsync(new CardQuery(), CancellationToken.None);
+
+        handler.SingleRequestUri.ShouldBe("https://api.tcgdex.net/v2/en/cards");
     }
 
     [Test]

@@ -37,6 +37,17 @@ internal sealed class CardResource(TcgDexTransport transport)
 
     public Task<IReadOnlyList<CardBrief>> ListAsync(CancellationToken cancellationToken = default)
         => Transport.GetRequiredAsync<IReadOnlyList<CardBrief>>("cards", cancellationToken);
+
+    public Task<IReadOnlyList<CardBrief>> ListAsync(
+        Querying.CardQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        return Transport.GetRequiredAsync<IReadOnlyList<CardBrief>>(
+            query.ToRelativePath(),
+            cancellationToken);
+    }
 }
 
 /// <inheritdoc cref="ISetResource" />

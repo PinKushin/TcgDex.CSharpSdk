@@ -1,0 +1,109 @@
+namespace TcgDex.Querying;
+
+/// <summary>
+/// The comparison operators the TCGdex API accepts in a filter.
+/// </summary>
+/// <remarks>
+/// This is the complete set, verified against the live service. There is no
+/// operator for anything else, which is why predicates that do not map onto one
+/// of these are rejected rather than approximated.
+/// </remarks>
+public enum QueryOperator
+{
+    /// <summary>Loose substring match — the API's default when no prefix is given.</summary>
+    Like,
+
+    /// <summary>Loose substring exclusion (<c>not:</c>).</summary>
+    NotLike,
+
+    /// <summary>Exact match (<c>eq:</c>).</summary>
+    Equal,
+
+    /// <summary>Exact exclusion (<c>neq:</c>).</summary>
+    NotEqual,
+
+    /// <summary>Greater than (<c>gt:</c>).</summary>
+    GreaterThan,
+
+    /// <summary>Greater than or equal (<c>gte:</c>).</summary>
+    GreaterThanOrEqual,
+
+    /// <summary>Less than (<c>lt:</c>).</summary>
+    LessThan,
+
+    /// <summary>Less than or equal (<c>lte:</c>).</summary>
+    LessThanOrEqual,
+
+    /// <summary>Field is absent (<c>null:</c>).</summary>
+    Null,
+
+    /// <summary>Field is present (<c>notnull:</c>).</summary>
+    NotNull,
+}
+
+/// <summary>
+/// A single filter: one field, one operator, and the values it matches.
+/// </summary>
+/// <param name="Field">The API field name, for example <c>hp</c>.</param>
+/// <param name="Operator">The comparison to apply.</param>
+/// <param name="Values">
+/// The values to match. More than one means OR, which the API supports only
+/// within a single field.
+/// </param>
+internal sealed record QueryFilter(string Field, QueryOperator Operator, IReadOnlyList<string> Values)
+{
+    /// <summary>
+    /// Renders the filter as a <c>field=operator:value</c> query parameter.
+    /// </summary>
+    /// <returns>The encoded parameter.</returns>
+    internal string Render()
+    {
+        var prefix = Operator switch
+        {
+            QueryOperator.Equal => "eq:",
+            QueryOperator.NotEqual => "neq:",
+            QueryOperator.GreaterThan => "gt:",
+            QueryOperator.GreaterThanOrEqual => "gte:",
+            QueryOperator.LessThan => "lt:",
+            QueryOperator.LessThanOrEqual => "lte:",
+            QueryOperator.NotLike => "not:",
+            QueryOperator.Null => "null:",
+            QueryOperator.NotNull => "notnull:",
+            _ => string.Empty,
+        };
+
+        if (Operator is QueryOperator.Null or QueryOperator.NotNull)
+        {
+            return $"{Field}={prefix}";
+        }
+
+        // Values are escaped, but the operator prefix, the `|` that separates
+        // OR alternatives, and any `*` wildcard are structural and stay literal.
+        var values = string.Join("|", Values.Select(EscapeValue));
+
+        return $"{Field}={prefix}{values}";
+    }
+
+    private static string EscapeValue(string value)
+    {
+        var trailingWildcard = value.EndsWith('*');
+        var leadingWildcard = value.StartsWith('*');
+
+        var core = value;
+        if (leadingWildcard)
+        {
+            core = core[1..];
+        }
+
+        if (trailingWildcard)
+        {
+            core = core[..^1];
+        }
+
+        var escaped = Uri.EscapeDataString(core);
+
+        return (leadingWildcard ? "*" : string.Empty)
+             + escaped
+             + (trailingWildcard ? "*" : string.Empty);
+    }
+}

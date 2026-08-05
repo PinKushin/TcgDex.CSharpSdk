@@ -21,6 +21,19 @@ public interface ICardResource
     /// and trainerType require fetching the full card.
     /// </remarks>
     Task<IReadOnlyList<CardBrief>> ListAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Lists the cards matching a query.</summary>
+    /// <param name="query">Filters, sorting and pagination.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The matching cards, as briefs.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="query"/> is null.</exception>
+    /// <remarks>
+    /// The API reports no total count, so a page shorter than the requested size
+    /// is the only signal that the results are exhausted.
+    /// </remarks>
+    Task<IReadOnlyList<CardBrief>> ListAsync(
+        Querying.CardQuery query,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

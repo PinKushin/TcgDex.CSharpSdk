@@ -129,6 +129,42 @@ comes from the shared framework.
 
 ---
 
+## The query builder walks expression trees, never compiles them
+
+`Expression.Compile()` emits IL at runtime, which Native AOT cannot do. Since
+the SDK is built to stay AOT-compatible, `ExpressionTranslator` inspects the
+tree structurally and reads captured variables straight off their compiler-
+generated closure with `FieldInfo.GetValue`. That is a metadata read rather than
+code generation, so it survives AOT — and it is cheaper than compiling, because
+no codegen happens at all.
+
+Verified rather than assumed: no `.Compile(`, `Reflection.Emit`,
+`Activator.CreateInstance` or `MakeGenericType` anywhere in the SDK, and the
+trim/AOT analyzers report no `IL2xxx`/`IL3xxx` warnings.
+
+### Why not `IQueryable<Card>`
+
+The API supports exactly ten operators. An `IQueryable` implementation would
+have to throw for most of LINQ — `Select` projections, `Join`, `GroupBy`,
+`Any`, arbitrary `Where` bodies — which is a partial interface implementation
+that fails at runtime rather than at the call site. A dedicated builder makes
+the supported surface explicit and keeps every rejection a precise, actionable
+message naming the offending expression.
+
+One consequence worth knowing: `||` is only representable **within a single
+field** (`name=eq:Furret|Pikachu`). An OR across two fields has no encoding, so
+it throws rather than silently dropping half the predicate and returning
+plausible-looking wrong data.
+
+### Generated query strings are checked against the live API
+
+The exact string the builder produces was replayed against the real service —
+the combined filter/sort/pagination query, a value containing an escaped `&`,
+the `fu*` wildcard, and `not:` — all return correct results. Unit assertions
+alone would only prove the builder is self-consistent.
+
+---
+
 ## Transport tests are mutation-checked, not just green
 
 A test that passes on first write proves nothing until you have seen it fail.
