@@ -1,0 +1,1 @@
+{"type":"https://tcgdex.dev/errors/language-invalid","title":"The chosen language is not available in the database","status":404,"endpoint":"/zz/cards/swsh3-136","method":"GET","lang":"zz","details":"You must use one of the following languages (en, fr, es, es-mx, it, pt, pt-br, pt-pt, de, nl, pl, ru, ja, ko, zh-tw, id, th, zh-cn) while you used \"zz\""}

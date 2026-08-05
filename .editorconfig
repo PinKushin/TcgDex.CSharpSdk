@@ -1,0 +1,80 @@
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+
+[*.{json,yml,yaml,md}]
+indent_size = 2
+
+[*.{csproj,props,targets}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# --- namespaces & usings ---------------------------------------------------
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+# Unused usings are an error: GlobalUsings.cs is the single place namespaces
+# are declared, so a stray file-level using is either a duplicate (CS8933) or dead.
+dotnet_diagnostic.IDE0005.severity = warning
+
+# --- nullability ------------------------------------------------------------
+# Null-forgiving (`!`) suppresses the compiler's proof without supplying one.
+# These stay at error so a possible-null never slips through silently.
+dotnet_diagnostic.CS8600.severity = error
+dotnet_diagnostic.CS8602.severity = error
+dotnet_diagnostic.CS8603.severity = error
+dotnet_diagnostic.CS8604.severity = error
+dotnet_diagnostic.CS8618.severity = error
+dotnet_diagnostic.CS8625.severity = error
+
+# --- correctness ------------------------------------------------------------
+dotnet_diagnostic.CA2007.severity = warning   # ConfigureAwait on awaited task
+dotnet_diagnostic.CA1062.severity = warning   # validate public arguments
+dotnet_diagnostic.CA1863.severity = none      # CompositeFormat: noise for this codebase
+
+# --- language style ---------------------------------------------------------
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_prefer_braces = true:warning
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
+dotnet_style_readonly_field = true:warning
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+
+# --- naming: private fields are _camelCase ---------------------------------
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel.required_prefix = _
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+
+# --- formatting trivia: suggestion only, never build-breaking --------------
+dotnet_diagnostic.IDE0055.severity = suggestion
+
+# Model types deliberately mirror the wrapped API's vocabulary so that this
+# SDK's surface maps one-to-one onto the TCGdex documentation. `Set` collides
+# with a VB.NET keyword (CA1716); renaming it to something like `CardSet` would
+# break that correspondence for every reader comparing the SDK against the API
+# reference. This is a considered trade-off, scoped to the models only — CA1716
+# still applies everywhere else.
+[**/Models/*.cs]
+dotnet_diagnostic.CA1716.severity = none
+
+# Note: test-project analyzer exclusions (CA1707 for the
+# {Method}_{Scenario}_{Expected} naming convention, CS1591, CA1062) live in the
+# test .csproj files rather than here. A directory glob in this file does not
+# reliably match the test project folders, so putting them here would look
+# configured while silently doing nothing.

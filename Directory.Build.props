@@ -1,0 +1,29 @@
+<Project>
+
+  <!-- Settings shared by every project in the solution. -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Strict null analysis: reference types are non-nullable by default and a
+         possible null is a compile error. Nullability is opt-in via `string?`. -->
+    <Nullable>enable</Nullable>
+
+    <!-- Namespaces are declared explicitly in each project's GlobalUsings.cs
+         rather than injected invisibly by the SDK. -->
+    <ImplicitUsings>disable</ImplicitUsings>
+
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Required for IDE0005 (unused usings) to run during build, not just in
+         the IDE. Test projects suppress the resulting CS1591. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+
+    <Deterministic>true</Deterministic>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+</Project>
