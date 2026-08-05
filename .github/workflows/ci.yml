@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, Monday 06:17 UTC. Off the hour to avoid the scheduling spike that
+    # makes on-the-hour runs queue.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  # Fast, hermetic, and the gate for every push and pull request.
+  build-and-test:
+    name: Build and unit test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      # -warnaserror is the point: the repo's zero-warning policy is enforced
+      # here rather than left to local discipline.
+      - name: Build
+        run: dotnet build --configuration Release --no-restore -warnaserror
+
+      - name: Unit tests
+        run: >
+          dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj
+          --configuration Release --no-build
+          --logger "trx;LogFileName=unit-tests.trx"
+          --collect:"XPlat Code Coverage"
+
+      - name: Verify the package builds
+        run: dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj --configuration Release --no-build --output ./artifacts
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: "**/TestResults/**"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: ./artifacts/*.nupkg
+
+  # Proves the AOT-compatibility claim. Runs on Windows because that is where
+  # the SDK is developed, and the linker quirks are platform-specific.
+  aot-smoke-test:
+    name: Native AOT smoke test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # windows-latest ships the MSVC toolchain, but vswhere.exe is not on PATH
+      # by default and the ILCompiler targets invoke it unqualified.
+      - name: Put vswhere on PATH
+        shell: pwsh
+        run: Add-Content $env:GITHUB_PATH "C:\Program Files (x86)\Microsoft Visual Studio\Installer"
+
+      - name: Publish with Native AOT
+        run: dotnet publish TcgDex.CSharpSdk.AotSmokeTest/TcgDex.CSharpSdk.AotSmokeTest.csproj --configuration Release -r win-x64
+
+      # Runs the native binary. A non-zero exit means reflection or runtime
+      # codegen has crept into the SDK.
+      - name: Run the native binary
+        shell: pwsh
+        run: ./TcgDex.CSharpSdk.AotSmokeTest/bin/Release/net10.0/win-x64/publish/TcgDex.CSharpSdk.AotSmokeTest.exe
+
+  # Hits the real TCGdex API, so it is kept off the per-push path: a third-party
+  # outage must not turn a pull request red. A failure here means the API
+  # changed and the SDK needs attention.
+  live-api:
+    name: Live API contract
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Integration tests
+        run: >
+          dotnet test TcgDex.CSharpSdk.IntegrationTests/TcgDex.CSharpSdk.IntegrationTests.csproj
+          --configuration Release
+          --filter "TestCategory=Integration"
+          --logger "trx;LogFileName=integration-tests.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: "**/TestResults/**"

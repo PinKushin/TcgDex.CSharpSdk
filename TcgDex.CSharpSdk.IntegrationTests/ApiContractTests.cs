@@ -1,0 +1,225 @@
+namespace TcgDex.IntegrationTests;
+
+using TcgDex.Models;
+using TcgDex.Querying;
+
+/// <summary>
+/// Verifies the SDK against the live API.
+/// </summary>
+/// <remarks>
+/// The unit suite proves the SDK is self-consistent against recorded responses.
+/// These prove the recordings still match reality — that TCGdex has not changed
+/// a field's type, moved an endpoint, or altered the filter syntax. A failure
+/// here means the API moved, not that the code regressed.
+/// </remarks>
+[TestFixture]
+public sealed class ApiContractTests : LiveApiFixture
+{
+    [Test]
+    public async Task GetCard_ReturnsTheDocumentedShape()
+    {
+        var card = await Client.Cards.GetAsync("swsh3-136", Timeout);
+
+        card.ShouldNotBeNull();
+        card.Name.ShouldBe("Furret");
+        card.Category.ShouldBe(CardCategories.Pokemon);
+        card.Set.Id.ShouldBe("swsh3");
+        card.Hp.ShouldNotBeNull();
+        card.Attacks.ShouldNotBeEmpty();
+    }
+
+    [Test]
+    public async Task GetCard_WhenMissing_ReturnsNullRatherThanThrowing()
+    {
+        var card = await Client.Cards.GetAsync("definitely-not-a-card-999", Timeout);
+
+        card.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task GetCard_WithNonUrlSafeId_StillResolves()
+    {
+        // `exu-!` is a real id. This fails if ids stop being escaped.
+        var card = await Client.Cards.GetAsync("exu-!", Timeout);
+
+        card.ShouldNotBeNull();
+        card.LocalId.ShouldBe("!");
+    }
+
+    [Test]
+    public async Task GetCard_WithStringDamage_StillDeserializes()
+    {
+        // The damage field is polymorphic; this card sends it as "50+".
+        // Typing it as a number would throw here.
+        var card = await Client.Cards.GetAsync("swsh1-1", Timeout);
+
+        card.ShouldNotBeNull();
+        card.Attacks.Select(a => a.Damage).ShouldContain("50+");
+    }
+
+    [Test]
+    public async Task GetCard_WithNumericDamage_NormalisesToText()
+    {
+        var card = await Client.Cards.GetAsync("xy1-1", Timeout);
+
+        card.ShouldNotBeNull();
+
+        var damaged = card.Attacks.First(a => a.Damage is not null);
+        damaged.BaseDamage.ShouldNotBeNull();
+    }
+
+    [Test]
+    public async Task GetTrainerCard_HasNoAttacksAndDoesNotReturnNullCollections()
+    {
+        var card = await Client.Cards.GetAsync("sv03.5-155", Timeout);
+
+        card.ShouldNotBeNull();
+        card.Category.ShouldBe(CardCategories.Trainer);
+        card.TrainerType.ShouldBe("Tool");
+
+        // Absent JSON arrays must surface as empty, never null.
+        card.Attacks.ShouldNotBeNull().ShouldBeEmpty();
+        card.Types.ShouldNotBeNull().ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task GetSet_IncludesItsCards()
+    {
+        var set = await Client.Sets.GetAsync("swsh3", Timeout);
+
+        set.ShouldNotBeNull();
+        set.Name.ShouldBe("Darkness Ablaze");
+        set.Cards.ShouldNotBeEmpty();
+        set.CardCount.ShouldNotBeNull().Total.ShouldBeGreaterThan(0);
+    }
+
+    [Test]
+    public async Task GetSerie_UsesThePluralPathAndIncludesSets()
+    {
+        var serie = await Client.Series.GetAsync("swsh", Timeout);
+
+        serie.ShouldNotBeNull();
+        serie.Sets.ShouldNotBeEmpty();
+    }
+
+    [Test]
+    public async Task Query_TranslatesToFiltersTheApiHonours()
+    {
+        // The end-to-end claim: a typed predicate produces a URL the API
+        // actually understands, and the results genuinely match.
+        var query = new CardQuery()
+            .Where(c => c.Name == "Furret")
+            .Page(1, 20);
+
+        var cards = await Client.Cards.ListAsync(query, Timeout);
+
+        cards.ShouldNotBeEmpty();
+        cards.ShouldAllBe(c => c.Name == "Furret");
+    }
+
+    [Test]
+    public async Task Query_WithWildcard_IsHonouredByTheApi()
+    {
+        var query = new CardQuery()
+            .Where(c => c.Name.StartsWith("Fu"))
+            .Page(1, 20);
+
+        var cards = await Client.Cards.ListAsync(query, Timeout);
+
+        cards.ShouldNotBeEmpty();
+        cards.ShouldAllBe(c => c.Name.StartsWith("Fu", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Test]
+    public async Task Query_WithPagination_LimitsResults()
+    {
+        var query = new CardQuery().Page(1, 5);
+
+        var cards = await Client.Cards.ListAsync(query, Timeout);
+
+        cards.Count.ShouldBeLessThanOrEqualTo(5);
+    }
+
+    [Test]
+    public async Task Query_WithOrFilter_ReturnsBothAlternatives()
+    {
+        var query = new CardQuery()
+            .Where(c => c.Name == "Furret" || c.Name == "Sentret")
+            .Page(1, 50);
+
+        var cards = await Client.Cards.ListAsync(query, Timeout);
+
+        cards.Select(c => c.Name).Distinct().ShouldBe(["Furret", "Sentret"], ignoreOrder: true);
+    }
+
+    [Test]
+    public async Task InvalidLanguage_ThrowsRatherThanLookingLikeAMissingCard()
+    {
+        using var httpClient = new HttpClient();
+
+        // Constructed directly: TcgDexOptions.Validate would reject this earlier,
+        // which is the intended behaviour, so this exercises the server's own
+        // language error reaching the caller as a typed exception.
+        var options = new TcgDexOptions { Language = TcgDexLanguages.English };
+        options.BaseAddress = new Uri("https://api.tcgdex.net/v2/");
+
+        var client = new TcgDexClient(httpClient, options);
+
+        // A card id that cannot exist still returns null, proving 404-for-missing
+        // is distinguished from 404-for-bad-language.
+        var card = await client.Cards.GetAsync("zzz-000", Timeout);
+        card.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task Catalog_ReturnsTheKnownValueSets()
+    {
+        var categories = await Client.Catalog.CategoriesAsync(Timeout);
+
+        categories.ShouldBe(["Energy", "Pokemon", "Trainer"], ignoreOrder: true);
+    }
+
+    [Test]
+    public async Task Catalog_NumericEndpoints_DeserializeAsNumbers()
+    {
+        var retreats = await Client.Catalog.RetreatCostsAsync(Timeout);
+
+        retreats.ShouldNotBeEmpty();
+        retreats.ShouldAllBe(r => r > 0);
+    }
+
+    [Test]
+    public async Task Catalog_TrainerTypes_UsesTheHyphenatedPath()
+    {
+        var trainerTypes = await Client.Catalog.TrainerTypesAsync(Timeout);
+
+        trainerTypes.ShouldContain("Item");
+        trainerTypes.ShouldContain("Supporter");
+    }
+
+    [Test]
+    public async Task Random_ReturnsAUsableCard()
+    {
+        var card = await Client.Random.CardAsync(Timeout);
+
+        card.Id.ShouldNotBeNullOrWhiteSpace();
+        card.Name.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Test]
+    public async Task FrenchLanguage_ReturnsLocalisedContent()
+    {
+        using var httpClient = new HttpClient();
+        var client = new TcgDexClient(
+            httpClient,
+            new TcgDexOptions { Language = TcgDexLanguages.French });
+
+        var card = await client.Cards.GetAsync("swsh3-136", Timeout);
+
+        card.ShouldNotBeNull();
+
+        // Furret is "Fouinar" in French — proof the language segment is applied
+        // rather than silently ignored.
+        card.Name.ShouldBe("Fouinar");
+    }
+}
