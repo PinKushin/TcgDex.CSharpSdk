@@ -41,12 +41,15 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore -warnaserror
 
+      # --settings is not optional: without it the source-generated *.g.cs files
+      # swamp the hand-written SDK and the coverage number means nothing.
       - name: Unit tests
         run: >
           dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj
           --configuration Release --no-build
           --logger "trx;LogFileName=unit-tests.trx"
           --collect:"XPlat Code Coverage"
+          --settings coverlet.runsettings
 
       - name: Verify the package builds
         run: dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj --configuration Release --no-build --output ./artifacts
