@@ -129,6 +129,31 @@ comes from the shared framework.
 
 ---
 
+## Native AOT publish needs `vswhere.exe` on PATH
+
+Publishing the smoke test failed at the final link step with:
+
+> `error MSB3073: The command ""'vswhere.exe' is not recognized as an internal or external command,;operable program or batch file.;F:\VisualStudio2026\...\link.exe" ...` exited with code 123`
+
+The MSVC linker was present; the ILCompiler targets shell out to `vswhere.exe`
+unqualified to locate it, and the failure message got concatenated into the
+link command. `vswhere.exe` ships at a fixed location that is **not** on PATH by
+default:
+
+```
+C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe
+```
+
+Prepend that directory to PATH and the publish succeeds, or run from a Visual
+Studio Developer prompt where it is already set. Worth knowing that this happens
+regardless of which drive Visual Studio is installed on — here it is on `F:`,
+while `vswhere` remains on `C:`.
+
+Verified result: a 3.02 MB self-contained native binary with no managed DLLs
+beside it, and all six smoke checks passing.
+
+---
+
 ## The query builder walks expression trees, never compiles them
 
 `Expression.Compile()` emits IL at runtime, which Native AOT cannot do. Since
