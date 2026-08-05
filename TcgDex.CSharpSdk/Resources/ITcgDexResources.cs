@@ -34,6 +34,37 @@ public interface ICardResource
     Task<IReadOnlyList<CardBrief>> ListAsync(
         Querying.CardQuery query,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Searches for cards and returns each one <em>fully detailed</em> in a
+    /// single request, using GraphQL.
+    /// </summary>
+    /// <param name="filter">Equality filters. GraphQL supports no other kind.</param>
+    /// <param name="page">Optional 1-based page number.</param>
+    /// <param name="itemsPerPage">Optional page size.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The matching cards, fully populated.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="filter"/> is null.</exception>
+    /// <exception cref="TcgDexApiException">The query failed or the server reported errors.</exception>
+    /// <remarks>
+    /// <para>
+    /// Use this to avoid N+1: <see cref="ListAsync(Querying.CardQuery, CancellationToken)"/>
+    /// returns briefs, so fetching full detail for a 12-card result costs 13
+    /// requests against REST versus 1 here.
+    /// </para>
+    /// <para>
+    /// Three limits come with it, all imposed by the GraphQL endpoint rather
+    /// than by this SDK: results are <b>always English</b> regardless of the
+    /// configured language, filters are <b>equality-only</b>, and
+    /// <see cref="Card.Pricing"/> is <b>never populated</b>. When any of those
+    /// matter, use the REST path instead.
+    /// </para>
+    /// </remarks>
+    Task<IReadOnlyList<Card>> SearchDetailedAsync(
+        Querying.CardFilter filter,
+        int? page = null,
+        int? itemsPerPage = null,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

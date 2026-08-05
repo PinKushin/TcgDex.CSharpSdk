@@ -94,6 +94,33 @@ Anything the API cannot express is rejected with a message naming the offending
 expression — never approximated into a filter that would quietly return the
 wrong cards.
 
+### Full card detail in one request
+
+`ListAsync` returns briefs, so getting full detail for a result set costs one
+call per card. When you need the detail, `SearchDetailedAsync` fetches it in a
+single request over GraphQL:
+
+```csharp
+var cards = await tcgdex.Cards.SearchDetailedAsync(
+    new CardFilter { Name = "Furret" },
+    cancellationToken: ct);
+
+// 12 fully populated cards — hp, types, attacks, weaknesses, set — in one hop.
+// The REST equivalent is 13 round trips.
+```
+
+Three limits come with it, all imposed by the TCGdex GraphQL endpoint rather
+than by this SDK:
+
+| | REST | `SearchDetailedAsync` |
+|---|---|---|
+| Languages | all 18 | **English only** |
+| Filters | all ten operators | **equality only** |
+| `Pricing` | populated | **never populated** |
+
+So reach for it when you want breadth cheaply, and stay on REST when you need
+a language, a range filter, or prices.
+
 ## What you can read
 
 ```csharp

@@ -28,6 +28,26 @@ internal sealed class RecordingHandler : HttpMessageHandler
     /// <summary>Every request the handler has seen, in order.</summary>
     internal List<HttpRequestMessage> Requests { get; } = [];
 
+    /// <summary>
+    /// The body of each request, captured while it was being sent.
+    /// </summary>
+    /// <remarks>
+    /// Request content is disposed once the call completes, so reading it
+    /// afterwards throws <see cref="ObjectDisposedException"/>. Capturing here
+    /// is the only point at which the body is reliably readable.
+    /// </remarks>
+    internal List<string> RequestBodies { get; } = [];
+
+    /// <summary>The body of the single request received.</summary>
+    internal string SingleRequestBody
+    {
+        get
+        {
+            RequestBodies.Count.ShouldBe(1, "expected exactly one HTTP request");
+            return RequestBodies[0];
+        }
+    }
+
     /// <summary>The single request received, failing if there was not exactly one.</summary>
     internal HttpRequestMessage SingleRequest
     {
@@ -60,13 +80,18 @@ internal sealed class RecordingHandler : HttpMessageHandler
         return this;
     }
 
-    protected override Task<HttpResponseMessage> SendAsync(
+    protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         Requests.Add(request);
+
+        RequestBodies.Add(request.Content is null
+            ? string.Empty
+            : await request.Content.ReadAsStringAsync(cancellationToken));
+
         cancellationToken.ThrowIfCancellationRequested();
 
         if (_responses.Count == 0)
@@ -78,6 +103,6 @@ internal sealed class RecordingHandler : HttpMessageHandler
                 "or fix the code making an unexpected extra call.");
         }
 
-        return Task.FromResult(_responses.Dequeue()(request));
+        return _responses.Dequeue()(request);
     }
 }

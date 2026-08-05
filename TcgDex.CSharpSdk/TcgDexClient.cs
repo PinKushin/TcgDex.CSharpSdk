@@ -45,9 +45,11 @@ public sealed class TcgDexClient : ITcgDexClient
     /// </remarks>
     public TcgDexClient(HttpClient httpClient, TcgDexOptions? options = null)
     {
-        var transport = new TcgDexTransport(httpClient, options ?? new TcgDexOptions());
+        var resolved = options ?? new TcgDexOptions();
+        var transport = new TcgDexTransport(httpClient, resolved);
+        var graphQl = new GraphQlTransport(httpClient, resolved);
 
-        Cards = new CardResource(transport);
+        Cards = new CardResource(transport, graphQl);
         Sets = new SetResource(transport);
         Series = new SerieResource(transport);
         Random = new RandomResource(transport);

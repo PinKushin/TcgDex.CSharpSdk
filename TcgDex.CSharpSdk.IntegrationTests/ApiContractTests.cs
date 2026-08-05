@@ -172,6 +172,68 @@ public sealed class ApiContractTests : LiveApiFixture
     }
 
     [Test]
+    public async Task SearchDetailed_ReturnsFullCardsInOneRoundTrip()
+    {
+        // The whole justification for the GraphQL path: REST would need one call
+        // per card to get this much detail.
+        var cards = await Client.Cards.SearchDetailedAsync(
+            new CardFilter { Name = "Furret" },
+            cancellationToken: Timeout);
+
+        cards.ShouldNotBeEmpty();
+        cards.ShouldAllBe(c => c.Name == "Furret");
+
+        var furret = cards.First(c => c.Id == "swsh3-136");
+        furret.Hp.ShouldBe(110);
+        furret.Types.ShouldBe(["Colorless"]);
+        furret.Attacks.ShouldNotBeEmpty();
+        furret.Set.Name.ShouldBe("Darkness Ablaze");
+    }
+
+    [Test]
+    public async Task SearchDetailed_WithPagination_LimitsResults()
+    {
+        var cards = await Client.Cards.SearchDetailedAsync(
+            new CardFilter { Category = CardCategories.Pokemon },
+            page: 1,
+            itemsPerPage: 5,
+            cancellationToken: Timeout);
+
+        cards.Count.ShouldBeLessThanOrEqualTo(5);
+        cards.ShouldAllBe(c => c.Category == CardCategories.Pokemon);
+    }
+
+    [Test]
+    public async Task SearchDetailed_DoesNotPopulatePricing()
+    {
+        // Documented limitation rather than a defect: the GraphQL schema has no
+        // pricing field. This test exists so the limitation is noticed if the
+        // schema ever gains one.
+        var cards = await Client.Cards.SearchDetailedAsync(
+            new CardFilter { Id = "swsh3-136" },
+            cancellationToken: Timeout);
+
+        cards.ShouldHaveSingleItem().Pricing.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task SearchDetailed_IgnoresLanguageAndAlwaysAnswersInEnglish()
+    {
+        // Also a documented limitation. REST returns "Fouinar" for this card in
+        // French; GraphQL has no language support at all.
+        using var httpClient = new HttpClient();
+        var client = new TcgDexClient(
+            httpClient,
+            new TcgDexOptions { Language = TcgDexLanguages.French });
+
+        var cards = await client.Cards.SearchDetailedAsync(
+            new CardFilter { Id = "swsh3-136" },
+            cancellationToken: Timeout);
+
+        cards.ShouldHaveSingleItem().Name.ShouldBe("Furret");
+    }
+
+    [Test]
     public async Task Catalog_ReturnsTheKnownValueSets()
     {
         var categories = await Client.Catalog.CategoriesAsync(Timeout);

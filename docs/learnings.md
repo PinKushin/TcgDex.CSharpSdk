@@ -129,6 +129,50 @@ comes from the shared framework.
 
 ---
 
+## GraphQL's win is the flat card search, not nested fetch
+
+The obvious assumption — that GraphQL avoids N+1 by fetching a set together with
+its cards — is **wrong here**. Probing `set(id:"swsh3"){ cards { hp types
+attacks } }` returns all 201 cards with `hp`, `types` and `attacks` **null**,
+even for cards that plainly have them. The nested resolver is shallow: it
+populates only `id`, `name` and the other non-nullable fields.
+
+The real win is the flat query. `cards(filters:{…})` *does* return full detail
+per card:
+
+| Goal | REST | GraphQL |
+|---|---|---|
+| 12 cards, full detail | 1 list call + 12 detail calls = **13** | **1** |
+
+That is what `SearchDetailedAsync` uses. Everything else in GraphQL is a
+downgrade — see [`docs/api-info.md`](api-info.md) §7 for the language, filter
+and pricing limits.
+
+### `Card.rarity` is non-nullable in the schema but null in the data
+
+Selecting `rarity` inside `set { cards { … } }` fails with
+`Cannot return null for non-nullable field Card.rarity`, and the server nulls
+the entire card entry rather than just that field. On the flat
+`cards(filters:)` query it is safe, which is why the SDK selects it there.
+
+Because any entry can be nulled this way, the transport drops null entries
+rather than handing back a list the caller must null-check element by element.
+
+### GraphQL reports failure with HTTP 200
+
+A failed query still returns 200 with an `errors` array. Status codes are not a
+usable success signal on this endpoint; the SDK checks `errors` first.
+
+### Assert on the decoded query, not the wire bytes
+
+`System.Text.Json` escapes `"` as `"` by default, so asserting on the raw
+request body tests the serializer's escaping rather than the query being built.
+The tests parse the body and assert against the GraphQL document itself. The
+`"` form is valid JSON and the live endpoint accepts it, which the
+integration tests confirm.
+
+---
+
 ## Native AOT publish needs `vswhere.exe` on PATH
 
 Publishing the smoke test failed at the final link step with:
