@@ -1,0 +1,32 @@
+{
+  "$comment": [
+    "Where each recorded fixture came from, relative to https://api.tcgdex.net/v2/.",
+    "",
+    "Every offline test in this repository rests on these recordings still",
+    "matching the live API. FixtureDriftTests re-fetches each entry on the weekly",
+    "schedule and compares the response *shape* — key names and types, not values",
+    "— so a field being removed or retyped fails loudly instead of silently",
+    "invalidating the whole offline suite.",
+    "",
+    "Refresh them all with scripts/Update-Fixtures.ps1."
+  ],
+
+  "fixtures": {
+    "card-pokemon-full.json": "en/cards/swsh3-136",
+    "card-trainer.json": "en/cards/sv03.5-155",
+    "card-energy.json": "en/cards/base1-102",
+    "card-damage-string.json": "en/cards/swsh1-1",
+    "card-damage-int.json": "en/cards/xy1-1",
+    "card-with-boosters.json": "en/cards/A4-139",
+    "card-with-resistances.json": "en/cards/pl1-1",
+    "card-pricing-holofoil.json": "en/cards/base1-4",
+    "card-missing-image.json": "en/cards/exu-%21",
+    "set-full.json": "en/sets/swsh3",
+    "serie-full.json": "en/series/swsh",
+    "list-cards-brief.json": "en/cards?name=eq:Furret",
+    "list-categories.json": "en/categories",
+    "list-retreats-int.json": "en/retreats",
+    "error-not-found.json": "en/cards/nope-999",
+    "error-bad-language.json": "zz/cards/swsh3-136"
+  }
+}
