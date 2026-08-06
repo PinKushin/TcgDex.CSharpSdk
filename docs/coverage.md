@@ -191,6 +191,34 @@ number.
 unreachable, record why here — as the ones below are — rather than moving the
 number.
 
+## Verifying the integration without hitting the API
+
+Nearly all of it already is offline. The unit suite does not test mocks of the
+SDK's own code — it deserializes **recorded live responses** through the SDK's
+own serializer context, and asserts the exact request URI of every call. So
+"does the SDK integrate correctly" is answered without a network call, which is
+why the offline suite is far larger than the live one.
+
+The one thing offline tests structurally cannot do is notice when **TCGdex**
+changes. A frozen recording never disagrees with itself, so a renamed field
+would leave every offline test green while the SDK silently broke.
+
+`FixtureDriftTests` closes that. It re-fetches each recording and compares the
+response **shape** — key paths and types, not values — failing with a precise
+message such as `removed: 'set.cardCount.official' was Number, now absent`.
+
+Shape rather than bytes, deliberately: refreshing the fixtures today changes 7
+of 16 files byte-for-byte and **none** of them in shape, because prices and
+`updated` timestamps move constantly. A byte-diff check would fail daily and
+teach everyone to ignore it.
+
+Removals and type changes fail the run; new fields are reported without failing,
+since the API growing a field is worth knowing but is not a breakage.
+
+`scripts/Update-Fixtures.ps1` refreshes the recordings — to be run *after*
+adjusting the SDK to a reported change, never before, since a refresh makes the
+check pass whether or not the models were updated.
+
 ## What coverage does not tell you
 
 100% line coverage means every line ran, not that behaviour is correct. A suite

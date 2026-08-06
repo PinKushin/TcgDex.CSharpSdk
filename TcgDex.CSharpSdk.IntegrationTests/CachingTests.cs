@@ -45,8 +45,13 @@ public sealed class CachingTests : LiveApiFixture
     public async Task TheApiHonoursIfNoneMatch()
     {
         // The load-bearing fact: an unchanged resource costs a 304 and no body.
+        //
+        // Asserted against the rarity list rather than a card. A card embeds
+        // pricing that TCGdex updates server-side, so its ETag can legitimately
+        // change between two reads and a 200 would be the correct answer — which
+        // is a property of the data, not of conditional-request support.
         using var http = new HttpClient();
-        var uri = new Uri("https://api.tcgdex.net/v2/en/cards/swsh3-136");
+        var uri = new Uri("https://api.tcgdex.net/v2/en/rarities");
 
         using var first = await http.GetAsync(uri, Timeout);
         var etag = first.Headers.ETag.ShouldNotBeNull();
@@ -83,8 +88,12 @@ public sealed class CachingTests : LiveApiFixture
     [Test]
     public async Task WhenFreshnessExpires_TheApiRevalidatesRatherThanResending()
     {
-        // A zero freshness window forces revalidation on every read, which is
-        // what makes the 304 path observable against the real service.
+        // Deliberately a catalog endpoint rather than a card. A card carries
+        // market pricing, which TCGdex updates server-side; if an update lands
+        // between the two reads the ETag changes and a 200 is the *correct*
+        // answer, which made an earlier version of this test intermittently
+        // fail for a reason that was never a defect. The rarity list has no
+        // volatile data, so its ETag is stable across two immediate requests.
         var options = new TcgDexCacheOptions
         {
             DefaultTimeToLive = TimeSpan.Zero,
@@ -96,12 +105,36 @@ public sealed class CachingTests : LiveApiFixture
 
         using (http)
         {
-            await client.Cards.GetAsync("swsh3-136", Timeout);
-            var second = await client.Cards.GetAsync("swsh3-136", Timeout);
+            var first = await client.Catalog.RaritiesAsync(Timeout);
+            var second = await client.Catalog.RaritiesAsync(Timeout);
 
-            second.ShouldNotBeNull().Name.ShouldBe("Furret");
+            second.ShouldBe(first);
             cache.Revalidations.ShouldBe(1, "the second read should have been a 304");
             cache.Misses.ShouldBe(1, "only the first read should have downloaded a body");
+        }
+    }
+
+    [Test]
+    public async Task AVolatileResource_IsStillServedCorrectlyWhetherItRevalidatesOrRefetches()
+    {
+        // The companion to the test above: for a resource whose content can
+        // change between reads, the SDK must return the right answer either way.
+        // Only the outcome is asserted, because which path the server chooses is
+        // the server's business.
+        var options = new TcgDexCacheOptions { PricingTimeToLive = TimeSpan.Zero };
+        var (client, cache, http) = CreateCachingClient(options);
+
+        using (http)
+        {
+            var first = await client.Cards.GetAsync("swsh3-136", Timeout);
+            var second = await client.Cards.GetAsync("swsh3-136", Timeout);
+
+            first.ShouldNotBeNull().Name.ShouldBe("Furret");
+            second.ShouldNotBeNull().Name.ShouldBe("Furret");
+
+            // Whichever path was taken, the entry was not served stale.
+            (cache.Revalidations + cache.Misses).ShouldBe(2);
+            cache.FreshHits.ShouldBe(0, "a zero freshness window must never serve without asking");
         }
     }
 
