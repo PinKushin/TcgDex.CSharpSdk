@@ -24,7 +24,7 @@
     Minimum acceptable line-coverage percentage.
 
 .EXAMPLE
-    ./scripts/Check-Coverage.ps1 -ResultsDirectory ./TestResults -Threshold 98
+    ./scripts/Check-Coverage.ps1 -ResultsDirectory ./TestResults -Threshold 99.5
 #>
 [CmdletBinding()]
 param(
@@ -33,7 +33,7 @@ param(
 
     [Parameter()]
     [ValidateRange(0, 100)]
-    [double] $Threshold = 98
+    [double] $Threshold = 99.5
 )
 
 $ErrorActionPreference = 'Stop'

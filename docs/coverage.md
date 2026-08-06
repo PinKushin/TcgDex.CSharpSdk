@@ -2,13 +2,13 @@
 
 **Goal: reach and hold ~100% line coverage of hand-written SDK code.**
 
-**Current: 98.9% (699/707 lines).** 8 uncovered lines remain, all in one file and
-all unreachable by construction — see [Why not 100%](#why-not-100) below.
+**Current: 99.76% (815/817 lines).** 2 uncovered lines remain, both provably
+unreachable — see [Why not 100%](#why-not-100) below.
 
 | | Coverage | Uncovered | Unit tests | Integration tests |
 |---|---|---|---|---|
 | Baseline (`f45e496`) | 83.2% | 93 lines / 10 files | 113 | 22 |
-| Now | **98.9%** | 8 lines / 1 file | **249** | **120** |
+| Now | **99.76%** | 2 lines / 1 file | **316** | **129** |
 
 ---
 
@@ -50,17 +50,40 @@ test quality. `coverlet.runsettings` excludes them by attribute and by path.
 
 ## Why not 100%
 
-The 8 remaining lines are all `_ => throw Unsupported(node)` switch defaults in
-`ExpressionTranslator.cs` (lines 90, 137, 149, 203, 284, 293, 294, 321).
+Two lines: the `ReadMember` fallback in `ExpressionTranslator.cs` (293–294),
+which throws when a `MemberExpression` carries a member that is neither a field
+nor a property.
 
-They are unreachable **by construction**: the C# compiler cannot produce those
-node shapes inside a valid `Expression<Func<Card, bool>>`. A predicate that
-would reach them does not compile in the first place.
+That is **provably** unreachable rather than merely hard to reach.
+`Expression.MakeMemberAccess` rejects any other member kind with an
+`ArgumentException`, so no expression tree — whether written in C# or built by
+hand — can carry one. Verified directly rather than assumed.
 
-They are kept rather than deleted because removing them breaks switch
-exhaustiveness and would turn a future unhandled node type into a silent wrong
-answer instead of a clear exception. That trade — 8 defensive lines against a
-class of silent misbehaviour — is the right one.
+The fallback stays because removing it makes the switch non-exhaustive, and the
+compiler then requires *some* default anyway. A clear exception beats whatever
+the alternative would be.
+
+### The other defensive branches are tested, not excused
+
+Six lines that were previously written off as unreachable turned out not to be.
+They were unreachable only through `CardQuery`, whose model happens to have no
+boolean property and no custom methods — an accident of the current model, not a
+property of the translator.
+
+`TranslatorDefensiveTests` drives the internal `ExpressionTranslator` with a
+synthetic model that has those shapes, covering:
+
+- an `||` operand that is neither a comparison nor a method call
+- bitwise `&` and `^` where a comparison was expected
+- an unmapped one-argument method on a property, which looks exactly like
+  `Contains` to a shape check
+- a relational comparison against `null`, built by hand because C# rejects it as
+  always-false
+- a method call or array index used as the compared value
+
+This matters beyond the number: those paths are what a future `SetQuery` or
+`SerieQuery` would hit, and they now have asserted behaviour rather than an
+assumption.
 
 **Two things were deleted rather than tested**, because they turned out to be
 genuinely dead:
@@ -102,7 +125,7 @@ Coverage that is measured but not enforced drifts, so CI gates on it:
 ```yaml
 - name: Coverage threshold
   shell: pwsh
-  run: ./scripts/Check-Coverage.ps1 -ResultsDirectory ./TestResults -Threshold 98
+  run: ./scripts/Check-Coverage.ps1 -ResultsDirectory ./TestResults -Threshold 99.5
 ```
 
 Run the identical check locally:
@@ -125,16 +148,19 @@ rather than only reporting that the total moved.
 The script excludes generated files exactly as the runsettings does, so the gate
 measures the same thing the report does.
 
-### Why 98 and not 100
+### Why 99.5 and not 100
 
-The ceiling is **99.0%** — the 8 unreachable lines below are 0.98% of the total,
-and no test can reach them. A gate at 100 could never pass; a gate at 99.0 would
-sit exactly on the current value and break the moment a single defensive branch
-is added anywhere.
+The ceiling is **99.76%** — the two provably unreachable lines are 0.24% of the
+total. A gate at 100 could never pass.
 
-98 leaves room for that while still failing on any real regression: dropping a
-genuinely tested file to zero would cost far more than two points. Raise it if
-the unreachable set ever shrinks.
+99.5 sits just under the ceiling, leaving those two lines of headroom and
+essentially nothing else. That is deliberate: it was 98 while the unreachable set
+was larger, and it moved up once tests closed the gap. The gate is a ratchet, not
+a target.
+
+**Do not lower it to make a build pass.** If a line is genuinely unreachable,
+prove it and record why here — as the two above are — rather than moving the
+number.
 
 **Do not lower the gate to make a build pass.** If a line is genuinely
 unreachable, record why here — as the ones below are — rather than moving the
