@@ -26,7 +26,7 @@ There is **no** `/v2/{lang}` index endpoint — it returns 404.
 
 ### Languages
 
-18 supported, confirmed from the API's own error payload:
+18 accepted, confirmed from the API's own error payload:
 
 ```
 en  fr  es  es-mx  it  pt  pt-br  pt-pt  de  nl  pl  ru  ja  ko  zh-tw  id  th  zh-cn
@@ -34,6 +34,27 @@ en  fr  es  es-mx  it  pt  pt-br  pt-pt  de  nl  pl  ru  ja  ko  zh-tw  id  th  
 
 An unsupported code returns HTTP 404 with `type: .../errors/language-invalid` and a `details`
 string enumerating the valid set.
+
+**Accepted is not the same as populated.** Four languages route successfully but have no card
+data, returning HTTP 200 with empty arrays rather than an error:
+
+| Language | Cards | Catalogs | Sets |
+|---|---|---|---|
+| `pt-pt` | none | empty | 0 |
+| `nl` | none | empty | 3 |
+| `pl` | none | empty | 2 |
+| `ru` | none | empty | 9 |
+
+The other 14 serve full data. A client must treat an empty result as valid rather than as a
+failure.
+
+**Card ids are not universal across languages.** Each language is backed by its own card pool:
+`swsh3-136` is a Western card and returns 404 in `ja`, `ko`, `th`, `id`, `zh-cn` and `pt-br`,
+whose databases contain different sets entirely. To work in an arbitrary language, take ids from
+that language's own list endpoint rather than assuming a shared id resolves.
+
+Names are genuinely localised where the pool is shared — `swsh3-136` is *Furret* in `en`,
+*Fouinar* in `fr`, and *Wiesenior* in `de`.
 
 ---
 

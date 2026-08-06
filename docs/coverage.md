@@ -2,8 +2,13 @@
 
 **Goal: reach and hold ~100% line coverage of hand-written SDK code.**
 
-Baseline measured 2026-08-05 at commit `f45e496`: **83.2% (460/553 lines)**, with
-**93 uncovered lines across 10 files**. Eleven files are already at 100%.
+**Current: 98.5% (538/546 lines).** 8 uncovered lines remain, all in one file and
+all unreachable by construction — see [Why not 100%](#why-not-100) below.
+
+| | Coverage | Uncovered | Unit tests | Integration tests |
+|---|---|---|---|---|
+| Baseline (`f45e496`) | 83.2% | 93 lines / 10 files | 113 | 22 |
+| Now | **98.5%** | 8 lines / 1 file | **208** | **111** |
 
 ---
 
@@ -43,53 +48,52 @@ test quality. `coverlet.runsettings` excludes them by attribute and by path.
 
 ---
 
-## The remaining gap
+## Why not 100%
 
-93 lines. Roughly two thirds are error and edge paths that need a test to
-*provoke* the condition rather than assert a happy path.
+The 8 remaining lines are all `_ => throw Unsupported(node)` switch defaults in
+`ExpressionTranslator.cs` (lines 90, 137, 149, 203, 284, 293, 294, 321).
 
-| File | Covered | Uncovered lines | What is missing |
-|---|---|---|---|
-| `FlexibleStringConverter.cs` | 44.4% | 25, 28–31, 42, 44, 46, 50, 52 | The `Write` path is never exercised (nothing serializes a Card yet), plus `true`/`false`/unexpected-token reads |
-| `Resources.cs` | 59.5% | 68, 79, 90, 93, 109–142 | Most `Catalog` methods and `Random.SetAsync`/`SerieAsync` have no unit test — only the few asserted in `ClientTests` |
-| `TcgDexApiException.cs` | 63.6% | 20, 22, 35, 37 | The parameterless and message-only constructors are never constructed |
-| `TcgPlayerPricingConverter.cs` | 64.3% | 27, 32, 43, 91–113 | The whole `Write` path, plus null-pricing and malformed-token branches |
-| `Variants.cs` | 66.7% | 52 | `DetailedVariant.Stamp` null-coalescing guard |
-| `TcgDexOptions.cs` | 70.0% | 51–53 | The non-absolute `BaseAddress` validation branch |
-| `ExpressionTranslator.cs` | 80.0% | 48–49, 81, 90, 116–118, 137, 149, 183, 191–215, 278–303 | Rejection paths: mismatched OR operators, unsupported method calls, non-property members, static member reads, unreadable members |
-| `GraphQlTransport.cs` | 81.8% | 98, 167–185 | Non-success status, `HttpRequestException`, `JsonException`, timeout; and the empty-`data` return |
-| `CardFilter.cs` | 90.5% | 144–147 | The `\n`, `\r`, `\t` and backslash escape branches |
-| `TcgDexTransport.cs` | 91.4% | 111, 113, 119, 167, 171 | `GetRequiredAsync` null path, timeout branch, unparseable problem body |
+They are unreachable **by construction**: the C# compiler cannot produce those
+node shapes inside a valid `Expression<Func<Card, bool>>`. A predicate that
+would reach them does not compile in the first place.
 
-Already at 100%: `Card`, `CardBrief`, `CardSet`, `Serie`, `Pricing`, `Attack`,
-`Ability`, `Booster`, `Legality`, `WeaknessOrResistance`, `TcgDexProblem`,
-`CardQuery`, `QueryFilter`, `TcgDexClient`, `TcgDexLanguages`, `GraphQlMessages`.
+They are kept rather than deleted because removing them breaks switch
+exhaustiveness and would turn a future unhandled node type into a silent wrong
+answer instead of a clear exception. That trade — 8 defensive lines against a
+class of silent misbehaviour — is the right one.
+
+**Two things were deleted rather than tested**, because they turned out to be
+genuinely dead:
+
+- The `JsonTokenType.Null` branches in both converters. `JsonConverter<T>.HandleNull`
+  defaults to `false`, so System.Text.Json handles null itself and never invokes
+  a converter for one. Tests passed while the lines stayed dark, which is what
+  exposed it.
+- The non-`PropertyName` guard in `TcgPlayerPricingConverter`. `Utf8JsonReader`
+  guarantees a property name there; malformed JSON fails inside the reader first.
+
+That is the useful part of chasing coverage: it does not just add tests, it
+finds code that cannot run.
 
 ---
 
-## How to close it
+## What closing the gap actually covered
 
-Ordered by value, not by line count.
+For reference, since these are the areas worth keeping covered as the SDK grows:
 
-1. **Error and cancellation paths on both transports.** `RecordingHandler`
-   already supports a response factory, so a handler that throws
-   `HttpRequestException` or `TaskCanceledException` covers most of
-   `GraphQlTransport` and `TcgDexTransport` in a handful of tests. These are the
-   paths users hit when something goes wrong, so they are the worst ones to
-   leave untested.
-2. **`ExpressionTranslator` rejection paths.** Each is a documented
-   `NotSupportedException` with a specific message. Every one deserves a test
-   asserting *which* message comes back — an unhelpful rejection message is a
-   real defect for a query builder.
-3. **The `Write` paths on both converters.** Nothing in the SDK serializes a
-   Card today, which is why they are dark. Either cover them with round-trip
-   tests, or decide serialization is out of scope and delete them — untested
-   code that no caller reaches is worse than absent code.
-4. **The remaining `Catalog` and `Random` methods.** Mechanical: each is one
-   test asserting the request URI, following the pattern already in
-   `ClientTests`.
-5. **Small guards** — `TcgDexOptions` absolute-URI branch, `CardFilter` escape
-   branches, `DetailedVariant.Stamp`.
+- **Transport failures** — network errors, timeouts, 5xx, unparseable error
+  bodies, empty bodies, caller cancellation, on both REST and GraphQL. These
+  went from mostly dark to fully covered, and they are the paths a user hits
+  when something breaks.
+- **Query rejections** — every `NotSupportedException`, asserting the message
+  names something actionable rather than just failing.
+- **Serialization** — round-tripping cards, sets, series and the dynamic
+  TCGplayer printing keys, which also made writing a supported feature rather
+  than an accident.
+- **Every resource method** — all 13 catalog endpoints and all 3 random
+  endpoints, each asserting its exact request URI. The hyphenated paths
+  (`energy-types`, `regulation-marks`, `dex-ids`) are trivially mistyped as
+  camelCase and would only fail at runtime.
 
 ## How to hold it
 

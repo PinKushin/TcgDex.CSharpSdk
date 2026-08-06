@@ -18,11 +18,14 @@ namespace TcgDex.Serialization;
 /// </remarks>
 public sealed class FlexibleStringConverter : JsonConverter<string?>
 {
+    // No JsonTokenType.Null case: HandleNull defaults to false, so
+    // System.Text.Json deals with null itself and never invokes this converter
+    // for one. A case here would be unreachable.
+
     /// <inheritdoc />
     public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         => reader.TokenType switch
         {
-            JsonTokenType.Null => null,
             JsonTokenType.String => reader.GetString(),
             JsonTokenType.Number => ReadNumber(ref reader),
             JsonTokenType.True => "true",
@@ -41,13 +44,7 @@ public sealed class FlexibleStringConverter : JsonConverter<string?>
     {
         ArgumentNullException.ThrowIfNull(writer);
 
-        if (value is null)
-        {
-            writer.WriteNullValue();
-        }
-        else
-        {
-            writer.WriteStringValue(value);
-        }
+        // Likewise never called with null, so this writes the value directly.
+        writer.WriteStringValue(value);
     }
 }
