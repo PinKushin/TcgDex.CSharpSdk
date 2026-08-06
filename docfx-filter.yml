@@ -1,0 +1,20 @@
+# Controls which types reach the published API reference.
+#
+# Internal types (TcgDexTransport, GraphQlTransport, the resource
+# implementations, the GraphQL wire records) are implementation detail. The
+# reference should document what a consumer can actually call, so that browsing
+# it is a reliable guide to the public surface rather than a tour of the
+# internals.
+apiRules:
+  - exclude:
+      uidRegex: ^TcgDex\.Serialization\.GraphQl
+      type: Type
+
+  - exclude:
+      hasAttribute:
+        uid: System.Runtime.CompilerServices.CompilerGeneratedAttribute
+
+  # Everything public is included by default; this makes that explicit.
+  - include:
+      uidRegex: ^TcgDex
+      type: Namespace

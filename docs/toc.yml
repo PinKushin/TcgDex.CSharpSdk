@@ -1,0 +1,30 @@
+- name: Home
+  href: index.md
+
+- name: Getting started
+  href: getting-started.md
+
+- name: Querying
+  href: querying.md
+
+- name: API reference
+  href: api/
+  homepage: api/index.md
+
+- name: Reference
+  items:
+    - name: TCGdex API notes
+      href: api-info.md
+    - name: Architecture
+      href: architecture.md
+    - name: Learnings
+      href: learnings.md
+
+- name: Project
+  items:
+    - name: Test coverage
+      href: coverage.md
+    - name: Roadmap
+      href: roadmap.md
+    - name: Publishing
+      href: publishing.md
