@@ -95,7 +95,8 @@ public sealed class ClientTests
     public async Task Cards_ListAsync_WithQuery_SendsFiltersAsTopLevelParameters()
     {
         // End-to-end proof that a typed predicate becomes the exact URL the API
-        // documents — the one assertion the previous SDK never made.
+        // documents. This is the assertion that makes the query builder
+        // trustworthy.
         var handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "list-cards-brief.json");
 

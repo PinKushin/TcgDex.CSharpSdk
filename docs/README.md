@@ -42,10 +42,11 @@ quietly degrade the published reference.
 
 ## Two things to know before changing anything
 
-**`api-info.md` is authoritative, not the code.** An earlier version of this SDK
-documented roughly a dozen card fields that do not exist in the API, because the
-docs were written to match the code instead of the service. Verify against a
-live response, not against the model.
+**`api-info.md` is authoritative, not the code.** It is written from live
+responses, so when a model and the reference disagree, the reference wins.
+Verify a change against a real payload rather than against the existing model —
+documentation written to match code instead of the service will happily confirm
+a bug.
 
 **Every collection on a model needs a null-coalescing backing field.**
 `System.Text.Json`'s source generator discards property initializers, so `= []`

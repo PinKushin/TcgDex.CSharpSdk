@@ -8,8 +8,9 @@ using TcgDex.Models;
 /// rather than in production.
 /// </summary>
 /// <remarks>
-/// The specific fixtures were chosen because each one broke the previous
-/// version of this SDK. See docs/api-info.md §9 for why each card is included.
+/// Each fixture was chosen for a shape that is easy to model wrongly —
+/// polymorphic damage, an object array, a missing image. See docs/api-info.md
+/// §9 for what each card covers.
 /// </remarks>
 [TestFixture]
 public sealed class CardContractTests
@@ -173,7 +174,7 @@ public sealed class CardContractTests
     {
         var card = Fixture.Load<Card>("card-with-boosters.json");
 
-        // The previous SDK typed `boosters` as a string, which threw on this card.
+        // `boosters` is an object array. Typing it as a string throws here.
         var booster = card.Boosters.ShouldHaveSingleItem();
         booster.Id.ShouldBe("boo_A4-ho-oh");
         booster.Name.ShouldBe("Ho-Oh");

@@ -11,10 +11,9 @@ using System.Threading.Tasks;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Recording the request is the entire point. The previous version of this SDK
-/// had a mock handler that ignored its <c>request</c> argument, so nothing in
-/// the suite ever asserted a URL — which is how a query parameter the API does
-/// not support (<c>?q=</c>) shipped with passing tests.
+/// Recording the request is the entire point. A mock handler that ignores its
+/// <c>request</c> argument lets a test suite pass while the client calls a
+/// completely wrong URL, because nothing ever observes one.
 /// </para>
 /// <para>
 /// Running out of queued responses fails loudly rather than throwing an opaque

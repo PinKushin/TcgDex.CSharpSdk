@@ -366,8 +366,8 @@ projection and nested fetch.
 
 ## 8. Fields that do NOT exist
 
-Recorded because a previous version of this SDK implemented all of them, and an earlier revision
-of this document described them as real. None appear in any live response or in the GraphQL schema:
+Listed because they are plausible-sounding and easy to assume into a model. None of them appear in
+any live response or in the GraphQL schema:
 
 `cost` · `attack` · `defense` · `artistId` · `artistName` · `artistIdStr` · `effectStr` ·
 `effectText` · `size` (on a card) · `isInDeck` · `type` (the card's type is `category`) · `tagline`

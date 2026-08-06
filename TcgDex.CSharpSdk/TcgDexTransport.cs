@@ -12,10 +12,10 @@ using TcgDex.Serialization;
 /// <para>
 /// One error contract applies everywhere: a genuinely missing resource yields
 /// <see langword="null"/>, and anything else throws
-/// <see cref="TcgDexApiException"/>. The previous SDK split these arbitrarily —
-/// single-item getters swallowed failures and returned null while list methods
-/// propagated raw <see cref="HttpRequestException"/> — so identical failures
-/// surfaced differently depending on which method was called.
+/// <see cref="TcgDexApiException"/>. Splitting this — returning null from
+/// single-item getters while list methods propagate a raw
+/// <see cref="HttpRequestException"/> — would make identical failures surface
+/// differently depending on which method the caller happened to use.
 /// </para>
 /// <para>
 /// All deserialization goes through <see cref="TcgDexJsonContext"/>, so the

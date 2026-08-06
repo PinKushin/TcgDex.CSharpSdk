@@ -41,11 +41,12 @@ Console.WriteLine(card?.Name);   // Furret
 TCGdex publishes official SDKs for Java, JavaScript, Kotlin, PHP, TypeScript and
 Python. There is no C#/.NET one.
 
-An earlier attempt at this SDK was a hard port of the Java client, and it shipped
-roughly a dozen card fields that **do not exist in the API** — along with query
-methods built on top of them. This is a rewrite from the API outward: every model
-field, every endpoint and every filter operator was verified against live
-responses before being written.
+This one is built from the API outward rather than ported from another client:
+every model field, every endpoint and every filter operator was checked against
+live responses before being written, and the test suite keeps it that way. The
+result is a library that reads like .NET — dependency injection, `IReadOnlyList`,
+`CancellationToken` everywhere, nullable reference types — rather than a
+translation of someone else's idioms.
 
 ## What it gives you
 

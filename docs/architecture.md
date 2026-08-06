@@ -51,10 +51,10 @@ A missing resource returns `null`; everything else throws
 timeouts are all folded into that one type, so callers catch one thing rather
 than four.
 
-This exists because the previous SDK split it arbitrarily — single-item getters
-swallowed failures and returned null while list methods propagated raw
-`HttpRequestException`, so identical failures surfaced differently depending on
-which method you happened to call.
+The rule is applied uniformly on purpose. An API client that returns null from
+some methods and throws raw `HttpRequestException` from others makes identical
+failures surface differently depending on which method the caller happened to
+use, and that is impossible to handle cleanly at the call site.
 
 The subtlety: the API returns **404 for an unsupported language too**, so the
 status code alone cannot distinguish that from a missing card. The transport
@@ -117,8 +117,9 @@ caught.
 
 **A new endpoint:** add the method to the resource interface in
 `Resources/ITcgDexResources.cs`, implement it in `Resources/Resources.cs`, and
-add a test asserting the exact request URI. The URI assertion is the point — it
-is what the previous SDK lacked.
+add a test asserting the exact request URI. The URI assertion is the point: a
+test that only checks the response deserializes will pass against a completely
+wrong URL.
 
 **A new model:** add the record, register it in `TcgDexJsonContext`, use a
 null-coalescing backing field for every collection, and add a contract test
