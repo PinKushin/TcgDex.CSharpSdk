@@ -166,6 +166,157 @@ Worth remembering as a general point: a line that stays dark while a test
 covering that scenario passes is evidence the line cannot run, not evidence the
 test is missing.
 
+## Set logos and card artwork are addressed differently
+
+Both are base URLs without an extension, and the fields sit side by side on the
+model — but the URL forms differ:
+
+```
+card artwork  {base}/{quality}.{format}   .../136/high.png    200
+set logo      {base}.{format}             .../logo.png        200
+set logo      {base}/{quality}.{format}   .../logo/high.png   404
+```
+
+Card artwork takes a quality segment; set logos and symbols take none. Applying
+the card pattern to a logo returns 404.
+
+This was assumed away when the image helpers were first written, and the
+integration test that fetched the generated URL is what caught it. A unit test
+asserting the string would have happily confirmed the wrong answer — the URL
+only reveals itself as wrong when something requests it.
+
+`GetImageUrl` therefore takes a quality and `GetLogoUrl` / `GetSymbolUrl` do not,
+so the distinction is enforced by the signature rather than by remembering.
+
+---
+
+## A live test must not assert on data the service is free to change
+
+Two integration tests asserted that a second read returns `304`, using
+`swsh3-136` — a card embedding market pricing that TCGdex updates server-side.
+When an update landed between the two reads, the ETag changed and `200` became
+the *correct* answer, failing the test for something that was never a defect.
+It reproduced roughly one run in three, and only in the full suite, which is the
+worst possible signature: rare enough to look like noise, frequent enough to
+erode trust.
+
+The fix is not a retry. It is to assert against a resource with no volatile data
+— the rarity list — and to cover the volatile case by asserting only what is
+actually guaranteed: the result is correct, and a zero freshness window never
+serves without asking.
+
+**Rule:** a live assertion must be about behaviour the SDK controls, or about a
+resource the service will not change underneath it. Anything else is a
+time bomb.
+
+---
+
+## Line, block and branch coverage answer different questions
+
+| Metric | Question |
+|---|---|
+| **Line** | Did this line run? |
+| **Block** (what Visual Studio reports) | Did this straight-line chunk run? |
+| **Branch** (what coverlet reports) | Did we test **both outcomes** of this condition? |
+
+The first two ask "did it execute". Branch asks something categorically
+stronger, and the gap between them is where bugs hide:
+
+```csharp
+ExpressionType.GreaterThan => flipped ? QueryOperator.LessThan : QueryOperator.GreaterThan,
+```
+
+One test hitting `c.Hp > 100` makes this 100% line-covered and 100%
+block-covered while `flipped` was only ever `false`. `100 < c.Hp` could have
+returned the complement of what the caller asked for with the whole suite green.
+
+Measured here: **99.76% line, 91.90% branch** at the point that was noticed.
+Closing the real gaps took branch coverage to 96.06%. Both are now gated, because
+gating on line coverage alone cannot see this class of defect.
+
+Worth knowing when comparing against another project: Visual Studio's block
+percentage is not comparable to coverlet's branch percentage, and block numbers
+typically read higher.
+
+---
+
+## "Unreachable" is a claim that needs proving
+
+Eight lines were written off as "unreachable by construction". Six of them were
+not — they were unreachable only through `CardQuery`, whose model happens to
+have no boolean property and no custom methods. That is an accident of the
+current model, not a property of the generic translator, and those paths are
+exactly what a future `SetQuery` would hit.
+
+Driving the internal translator with a synthetic model covered all six.
+
+The remaining two are genuinely unreachable, and that was established by
+experiment rather than assertion: `Expression.MakeMemberAccess` rejects any
+member that is neither a `FieldInfo` nor a `PropertyInfo` with an
+`ArgumentException`, so no tree — compiled or hand-built — can carry one.
+
+**Rule:** if a line cannot be tested, demonstrate why. "It cannot happen" is a
+hypothesis until something proves it, and it is wrong more often than it feels.
+
+---
+
+## A gate that cannot fail is not a gate
+
+Every check in this repository was verified in both directions before being
+trusted:
+
+- the coverage gate passes at the current value and fails when the threshold is
+  raised past it, and fails loudly when no coverage report exists at all rather
+  than passing silently on an empty run
+- the fixture drift check was fed a simulated field removal and a simulated type
+  change, and reported each precisely
+- the URL assertions were mutation-checked by reintroducing a defect
+
+This costs minutes and is the difference between a check and a decoration. A
+coverage gate that silently passes on a missing report is the most common way
+one quietly stops gating.
+
+---
+
+## Shouldly defaults that will bite
+
+Two cost real debugging time here:
+
+- **`ShouldContain` / `ShouldNotContain` on strings are case-insensitive by
+  default.** `"itemsPerPage:25".ShouldNotContain("page:")` fails. Pass
+  `Case.Sensitive`, or anchor the match — `"{page:"`.
+- **`ShouldHaveSingleItem` takes no predicate.** `xs.ShouldHaveSingleItem(x => …)`
+  does not compile; write `xs.Where(…).ShouldHaveSingleItem()`.
+
+Also `ShouldBeAssignableTo<T>()` on a `Type` instance tests the `RuntimeType`
+object, not the type it represents. For that, use
+`typeof(IDisposable).IsAssignableFrom(typeof(Foo))`.
+
+---
+
+## Log with the source generator, not string interpolation
+
+`[LoggerMessage]` emits a cached delegate and an `IsEnabled` check per message,
+so a disabled level costs a branch — no formatting, no boxing, no allocation.
+
+`logger.LogDebug($"…{uri}")` formats the string and boxes its arguments *before*
+the level is checked, so it costs something on every call whether or not anyone
+is listening. That is how a library ends up measurably slower with logging
+"off". A test asserts nothing is formatted when the level is disabled.
+
+The generated delegates are also AOT-safe, being built at compile time rather
+than by reflection.
+
+### Do not duplicate what `IHttpClientFactory` already logs
+
+Registered through `AddTcgDex`, it already logs every request and its timing
+under `System.Net.Http.HttpClient`. Logging raw requests again would double the
+noise and disagree on detail. What an SDK should log is what it *decided* —
+cache outcomes, error classification, dropped entries — not what the transport
+already reports.
+
+---
+
 ## GraphQL's win is the flat card search, not nested fetch
 
 The obvious assumption — that GraphQL avoids N+1 by fetching a set together with
