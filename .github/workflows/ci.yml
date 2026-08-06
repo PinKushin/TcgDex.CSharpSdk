@@ -53,13 +53,13 @@ jobs:
           --results-directory ./TestResults
 
       # The XPlat collector reports coverage but cannot gate on it, so the
-      # threshold is enforced here. Set below the current 99.0% to leave room for
-      # the handful of unreachable defensive branches documented in
-      # docs/coverage.md — a real regression still fails, and the script names
-      # the file that caused it.
+      # threshold is enforced here. The ceiling is 99.76%: the two remaining
+      # lines are provably unreachable, since Expression.MakeMemberAccess
+      # rejects any member that is neither a field nor a property. 99.5 leaves
+      # those two lines of headroom and nothing more.
       - name: Coverage threshold
         shell: pwsh
-        run: ./scripts/Check-Coverage.ps1 -ResultsDirectory ./TestResults -Threshold 98
+        run: ./scripts/Check-Coverage.ps1 -ResultsDirectory ./TestResults -Threshold 99.5
 
       - name: Verify the package builds
         run: dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj --configuration Release --no-build --output ./artifacts
