@@ -215,6 +215,14 @@ Some cards genuinely have no artwork, so `Image` can be null.
 
 ## Documentation
 
+**[Full documentation and API reference](https://pinkushin.github.io/TcgDex.CSharpSdk/)**
+
+- [Getting started](https://pinkushin.github.io/TcgDex.CSharpSdk/getting-started.html)
+- [Querying](https://pinkushin.github.io/TcgDex.CSharpSdk/querying.html)
+- [API reference](https://pinkushin.github.io/TcgDex.CSharpSdk/api/)
+
+In this repository:
+
 - [`docs/api-info.md`](docs/api-info.md) — the API reference this SDK is built
   against, verified field by field against live responses.
 - [`docs/learnings.md`](docs/learnings.md) — non-obvious behaviour discovered

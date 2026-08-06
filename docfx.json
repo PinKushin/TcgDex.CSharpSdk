@@ -1,0 +1,64 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/docfx/main/schemas/docfx.schema.json",
+
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "./TcgDex.CSharpSdk",
+          "files": ["TcgDex.CSharpSdk.csproj"]
+        }
+      ],
+      "dest": "docs/api",
+      "outputFormat": "apiPage",
+
+      "//": "The SDK multi-targets; the API surface is identical, so one is enough.",
+      "properties": {
+        "TargetFramework": "net10.0"
+      },
+
+      "//2": "Internal types are implementation detail. The published reference documents what a consumer can actually call.",
+      "filter": "docfx-filter.yml",
+
+      "//3": "One page per type, with its members inline. This SDK is small enough that a page per member is navigation noise rather than help.",
+      "memberLayout": "samePage",
+      "enumSortOrder": "declaringOrder"
+    }
+  ],
+
+  "build": {
+    "content": [
+      {
+        "files": ["**/*.{md,yml}"],
+
+        "//": "README.md is the folder landing page when browsing docs/ on GitHub, not a site page. index.md serves that role here.",
+        "exclude": ["README.md"],
+
+        "src": "docs",
+        "dest": "."
+      }
+    ],
+    "resource": [
+      {
+        "files": ["images/**"],
+        "src": "docs"
+      }
+    ],
+    "output": "_site",
+    "template": ["default", "modern"],
+    "globalMetadata": {
+      "_appName": "TcgDex.CSharpSdk",
+      "_appTitle": "TcgDex.CSharpSdk",
+      "_description": "A .NET SDK for the TCGdex Pokemon TCG API.",
+      "_enableSearch": true,
+      "_appFooter": "TcgDex.CSharpSdk — an unofficial, community-maintained SDK. Not affiliated with TCGdex, Nintendo, Creatures Inc., GAME FREAK inc. or The Pokemon Company.",
+      "_gitContribute": {
+        "repo": "https://github.com/PinKushin/TcgDex.CSharpSdk",
+        "branch": "main"
+      }
+    },
+    "postProcessors": ["ExtractSearchIndex"],
+    "keepFileLink": false,
+    "disableGitFeatures": false
+  }
+}

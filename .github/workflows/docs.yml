@@ -1,0 +1,86 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "docfx.json"
+      - "docfx-filter.yml"
+      - "dotnet-tools.json"
+      - "TcgDex.CSharpSdk/**"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: only the deploy job may write Pages.
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    steps:
+      # DocFX links each API page to its source line, which needs real history.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      # Restores docfx at the version pinned in dotnet-tools.json, so the site
+      # cannot change because a new docfx shipped.
+      - name: Restore tools
+        run: dotnet tool restore
+
+      # The API reference is generated from XML doc comments, so the SDK has to
+      # compile before it can be documented.
+      - name: Build SDK
+        run: dotnet build TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj -c Release -warnaserror
+
+      - name: Generate API metadata
+        run: dotnet docfx metadata docfx.json --warningsAsErrors
+
+      # Warnings here mean broken links or undocumented public members, both of
+      # which are defects in a published reference.
+      - name: Build site
+        run: dotnet docfx build docfx.json --warningsAsErrors
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to Pages
+    # Pull requests build the site to catch breakage, but only main publishes.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
