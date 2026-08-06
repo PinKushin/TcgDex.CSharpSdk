@@ -441,6 +441,40 @@ be.
 
 ---
 
+## Advice about someone else's service is the fastest-rotting kind of doc
+
+`docs/publishing.md` was written from general knowledge of how nuget.org works
+and was wrong in two places within a day of being read:
+
+- It sent the reader to a **Manage Packages → ID Prefix Reservation** page. No
+  such page exists — the user checked `nuget.org/account/Packages` and found
+  nothing. Reservation is an email to `account@nuget.org` reviewed by a person.
+  The step was plausible, which is exactly why it survived writing.
+- It recommended a **365-day API key** as "the maximum". nuget.org caps new keys
+  at 30 days from 2026-08-17 and expires every earlier key on 2026-11-01, having
+  made Trusted Publishing — a GitHub OIDC exchange for a one-hour key — the
+  recommended path.
+
+Nothing in the repo could have caught either. The build does not compile prose,
+and no test asserts against a vendor's UI. The distinction worth carrying: facts
+about *this codebase* are verifiable here and stay true until someone changes
+them, while facts about *another organisation's product* have an expiry date
+nobody tells you about.
+
+So when a doc describes a third party's UI or policy, cite the vendor page it
+came from — a stale claim next to its source can be re-checked in one fetch,
+while an uncited one has to be re-derived from scratch. And when a doc's whole
+purpose is a procedure the user has not performed yet, re-verify it at the
+moment they start, not at the moment it was written.
+
+A related trap sits in the same file: the ID prefix criteria ask whether the
+prefix identifies the *reservation owner*. `TcgDex.` identifies TCGdex, the
+upstream API — so reserving it would likely be rejected, and would block the
+actual maintainers from publishing under their own name. Wrapping someone's API
+does not give you their namespace.
+
+---
+
 ## Test fixtures are recorded live responses, not hand-written JSON
 
 Every file in `TcgDex.CSharpSdk.Tests/Fixtures/` was captured from the live API

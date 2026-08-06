@@ -30,21 +30,63 @@ That is why the pre-flight checklist below matters more than the mechanics.
 
 Sign in at [nuget.org](https://www.nuget.org) with a Microsoft account.
 
-### 2. Reserve the ID prefix (optional but worth it)
+### 2. ID prefix reservation — there is no self-serve page
 
-`TcgDex.` is a prefix you may want to hold if you later publish
-`TcgDex.CSharpSdk.Extensions` or similar. Request it under **Manage Packages →
-ID Prefix Reservation**. Reserved prefixes also get a verified-owner tick on the
-package page.
+Reservation is **not** a button in the account UI. Nothing under
+`nuget.org/account/Packages` offers it. The process is an email to
+**account@nuget.org** giving your nuget.org owner display name and the prefixes
+you want, per
+[the official reference](https://learn.microsoft.com/en-us/nuget/nuget-org/id-prefix-reservation).
+A human reviews it and replies with an acceptance or a rejection reason.
 
-### 3. Create an API key
+**For this package, expect a rejection.** The first published criterion is
+whether the prefix "properly and clearly identify the reservation owner", and
+`TcgDex.` identifies TCGdex — the upstream API — not you. Reserving it would
+also block the TCGdex maintainers from ever publishing under their own name,
+which is the exact confusion the criteria exist to prevent.
 
-**Account → API Keys → Create**:
+The honest options are to skip reservation, or to ask the TCGdex maintainers
+whether they want to reserve `TcgDex.` and delegate a subset to you (the process
+supports delegation). Neither blocks publishing — an unreserved ID publishes
+normally; it just does not carry the reserved-prefix tick.
+
+### 3. Publishing credentials — prefer Trusted Publishing
+
+Long-lived API keys are on their way out, so set this up before writing any
+workflow.
+
+**Trusted Publishing** is the current recommendation. Your workflow requests a
+short-lived OIDC token from GitHub, nuget.org validates it against a policy you
+registered and hands back an API key valid for **one hour**. Nothing long-lived
+is ever stored — there is no secret to leak, rotate, or accidentally commit.
+
+Set it up at **nuget.org → your username → Trusted Publishing**, adding a policy:
 
 | Field | Value |
 |---|---|
-| Key name | something identifiable, e.g. `tcgdex-ci` |
-| Expiry | 365 days (the maximum) |
+| Repository Owner | `PinKushin` |
+| Repository | `TcgDex.CSharpSdk` |
+| Workflow File | `release.yml` — **filename only**, no `.github/workflows/` prefix |
+| Environment | leave empty unless the job declares `environment:` |
+
+Two behaviours worth knowing in advance:
+
+- The feature is **still rolling out gradually**. If the menu item is not there,
+  it is not yet enabled for your account — use the API key fallback below.
+- A policy on a **private** repo starts *temporarily active for 7 days*, because
+  nuget.org needs the repository and owner IDs (which arrive with the first
+  successful publish) to pin the policy. Publish inside that window or the
+  policy goes inactive; you can restart the window any time.
+
+### 4. API key — fallback, and now short-lived by design
+
+Only if Trusted Publishing is unavailable to your account. **Account → API Keys
+→ Create**:
+
+| Field | Value |
+|---|---|
+| Key name | something identifiable, e.g. `tcgdex-release` |
+| Expiry | 30 days — see below |
 | Scopes | **Push** only |
 | Glob pattern | `TcgDex.CSharpSdk*` |
 
@@ -53,13 +95,22 @@ blast radius is one package rather than your whole account.
 
 **Copy the key immediately — it is shown exactly once.**
 
-### 4. Store the key as a GitHub secret
+The 365-day option this document previously recommended is being withdrawn:
 
+- **From 2026-08-17**, new keys are capped at **30 days**; 365 is gone.
+- **On 2026-11-01**, every key created before 2026-08-17 expires, whatever
+  duration it was issued with.
+
+([announcement](https://devblogs.microsoft.com/dotnet/strengthening-nuget-supply-chain-security-reducing-api-key-lifetime/))
+
+So a key-based release pipeline now means re-issuing a secret every month
+indefinitely. That recurring chore is the reason to do the Trusted Publishing
+setup instead — it is a one-time configuration with no expiry to track.
+
+If you do use a key, store it as a GitHub secret named `NUGET_API_KEY`:
 Repository → **Settings → Secrets and variables → Actions → New repository
-secret**, named `NUGET_API_KEY`.
-
-Never put the key in a file, a commit, or a workflow literal. If it ever lands
-in git history, revoke it on nuget.org first — rewriting history does not
+secret**. Never put it in a file, a commit, or a workflow literal. If it ever
+lands in git history, revoke it on nuget.org first — rewriting history does not
 un-leak it, because anyone who cloned still has it.
 
 ---
@@ -109,6 +160,10 @@ Inspect the result before pushing — a `.nupkg` is a zip, so open it and confir
 the DLLs, README and licence are all present and there is nothing that should
 not ship.
 
+A manual push needs a real API key: Trusted Publishing issues its token to a CI
+job, so there is nothing to exchange from your laptop. Treat that key as
+disposable — create it, push, then delete it on nuget.org the same day.
+
 ```bash
 dotnet nuget push ./artifacts/TcgDex.CSharpSdk.0.1.0.nupkg \
   --api-key <YOUR_KEY> \
@@ -118,10 +173,15 @@ dotnet nuget push ./artifacts/TcgDex.CSharpSdk.0.1.0.nupkg \
 The `.snupkg` pushes automatically alongside it. Indexing takes a few minutes
 before the package is installable.
 
+If you would rather never handle a key at all, skip the manual push and let the
+tag-triggered workflow below do the first release too. You lose the chance to
+watch the push happen; you gain having no long-lived credential ever exist.
+
 ### Automated, afterwards
 
 Once the manual run has proven the package, publish on tag push. Add
-`.github/workflows/release.yml`:
+`.github/workflows/release.yml` — and note the filename must match the **Workflow
+File** in the Trusted Publishing policy exactly:
 
 ```yaml
 name: Release
@@ -135,6 +195,9 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # lets this job request the OIDC token; without it, login fails
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -153,13 +216,28 @@ jobs:
           dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj \
             -c Release -o ./artifacts -p:Version="$VERSION"
 
+      # Exchange the OIDC token for a one-hour key. Last step before the push:
+      # request it early and it can expire before the push runs.
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}   # nuget.org profile name, NOT the email
+
       - name: Push
         run: >
           dotnet nuget push "./artifacts/*.nupkg"
-          --api-key ${{ secrets.NUGET_API_KEY }}
+          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 ```
+
+`NUGET_USER` is a repository secret holding your nuget.org **profile name** —
+not your email address, which is the commonest reason `NuGet/login` fails. It is
+not sensitive; it is a secret only so the workflow file stays copy-pasteable.
+
+On an API key instead, drop the `NuGet login` step and the `id-token` permission,
+and use `--api-key ${{ secrets.NUGET_API_KEY }}`.
 
 Release with:
 
@@ -194,3 +272,13 @@ own, and green CI. All three are the point of the checklist above.
   secret. Revocation is what stops the leak; removing the file does not.
 - **Wrong package ID** — unlist it and publish under the right ID. The wrong ID
   stays claimed permanently, so check spelling before the first push.
+- **`NuGet/login` fails to authenticate** — in order of likelihood: `user:` is
+  an email address instead of the profile name; the job is missing
+  `id-token: write`; the policy's **Workflow File** does not match the actual
+  filename, or was entered with the `.github/workflows/` path; the job declares
+  an `environment:` the policy does not.
+- **Publishing worked, then stopped** — check the policy is still active. A
+  private-repo policy that never published inside its 7-day window goes
+  inactive, and an org-owned policy goes inactive if you leave the org.
+- **A push that used to work now 403s** — an API key expired. Every key created
+  before 2026-08-17 dies on 2026-11-01 regardless of its stated duration.

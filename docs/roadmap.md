@@ -25,6 +25,11 @@ Everything else on this list is done. Full first-timer walkthrough in
 reading before the first push: a published version can never be deleted, and the
 package ID is claimed permanently.
 
+Set up **Trusted Publishing** rather than a long-lived API key. nuget.org caps
+new keys at 30 days from 2026-08-17 and expires every pre-existing key on
+2026-11-01, so a key-based pipeline is a monthly chore; the OIDC exchange is
+configured once and never expires.
+
 Ship `0.x` while the API shape can still move. `1.0.0` is a promise not to break
 it.
 
