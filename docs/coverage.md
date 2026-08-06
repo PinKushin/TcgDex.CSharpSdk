@@ -2,13 +2,21 @@
 
 **Goal: reach and hold ~100% line coverage of hand-written SDK code.**
 
-**Current: 99.76% line (815/817) and 96.06% branch (415/432).** Both are gated in
+**Current: 99.76% line (835/837) and 96.24% branch (435/452).** Both are gated in
 CI. The 2 uncovered lines are provably unreachable — see [Why not 100%](#why-not-100) below.
 
 | | Line | Branch | Unit tests | Integration tests |
 |---|---|---|---|---|
 | Baseline (`f45e496`) | 83.2% | — | 113 | 22 |
-| Now | **99.76%** | **96.06%** | **339** | **148** |
+| Now | **99.76%** | **96.24%** | **340** | **148** |
+
+The unit tests run on `net472`, `net8.0` and `net10.0` — 1020 executions of 340
+tests. Coverage is collected from the `net8.0` and `net10.0` runs only: coverlet
+does not instrument the .NET Framework run, so **code compiled solely for
+`netstandard2.0` is invisible to the gate**. That is why such code is kept to a
+minimum and why `HttpContentExtensions` is scoped with `#if NETSTANDARD2_0`
+rather than shipped on every target, where it would be unreachable and would
+read as an uncoverable hole.
 
 ---
 

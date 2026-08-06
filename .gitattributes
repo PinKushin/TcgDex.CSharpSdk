@@ -1,7 +1,22 @@
 ###############################################################################
-# Set default behavior to automatically normalize line endings.
+# LF everywhere, in the repository and in the working tree.
+#
+# `text=auto` alone stores LF but checks out CRLF on Windows, so every tool
+# that writes LF (most of them) triggers "LF will be replaced by CRLF" and the
+# working tree disagrees with the repository. `eol=lf` removes the conversion
+# step entirely.
+#
+# Safe here because nothing in this repository requires CRLF to execute: there
+# are no .bat or .cmd files, and the two .ps1 scripts declare
+# `#Requires -Version 7.0` — PowerShell 7 reads LF without complaint, as do
+# Visual Studio, VS Code and the .NET SDK.
+#
+# If a .bat or .cmd is ever added it MUST be pinned back to CRLF, because the
+# command processor genuinely requires it:
+#     *.bat text eol=crlf
+#     *.cmd text eol=crlf
 ###############################################################################
-* text=auto
+* text=auto eol=lf
 
 ###############################################################################
 # Set default behavior for command prompt diff.
