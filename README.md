@@ -219,14 +219,29 @@ A few shapes are irregular and the SDK smooths them over:
 
 ## Images
 
-`Image`, `Logo` and `Symbol` are base URLs **without a file extension**. Append
-a quality and format:
+`Image`, `Logo` and `Symbol` are base URLs **without a file extension**. The
+helpers build the right form for each:
 
 ```csharp
-var url = $"{card.Image}/high.png";   // or low.webp, high.jpg, ...
+string? art  = card.GetImageUrl(ImageQuality.High, ImageFormat.Png);
+string? logo = card.Set.GetLogoUrl();
+string? sym  = card.Set.GetSymbolUrl(ImageFormat.Webp);
 ```
 
-Some cards genuinely have no artwork, so `Image` can be null.
+They are separate methods because **card artwork takes a quality segment and set
+assets do not**:
+
+```
+https://assets.tcgdex.net/en/swsh/swsh3/136/high.png   card    200
+https://assets.tcgdex.net/en/swsh/swsh3/logo.png       logo    200
+https://assets.tcgdex.net/en/swsh/swsh3/logo/high.png  logo    404
+```
+
+The three fields look alike on the model, so applying the card pattern to a logo
+is an easy mistake — and returns 404.
+
+Each helper returns `null` rather than a broken URL when the asset is absent;
+some cards genuinely have no artwork.
 
 ### Logging and tracing
 

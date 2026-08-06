@@ -1,89 +1,98 @@
 # Roadmap
 
-Current state as of `f45e496` (2026-08-05): the SDK covers the full TCGdex REST
-surface, builds clean on `net8.0` and `net10.0`, and is verified under Native
-AOT. **113 unit tests, 22 integration tests, zero warnings.**
+State at `c9a4e67`: the SDK covers the full TCGdex REST surface, builds clean on
+`net8.0` and `net10.0`, and is verified under Native AOT.
 
-Not published, deliberately.
+| | |
+|---|---|
+| Tests | **339 unit + 129 integration** |
+| Line coverage | **99.76%**, gated at 99.5 |
+| Branch coverage | **96.06%**, gated at 95 |
+| Warnings | zero — compiler, analyzers, DocFX, CI annotations |
+| Docs | published to GitHub Pages on every push to `main` |
+| Package | builds, ~182 KB, both target frameworks |
+
+Not published to NuGet, deliberately.
 
 ---
 
 ## Before 1.0
 
-### 1. Coverage to ~100% — *the current gate*
+### 1. Publish to NuGet — *the only remaining gate*
 
-83.2% of hand-written code, 93 uncovered lines across 10 files. Full gap
-analysis and the order to tackle it in: [`coverage.md`](coverage.md).
+Everything else on this list is done. Full first-timer walkthrough in
+[`publishing.md`](publishing.md), including the two irreversible facts worth
+reading before the first push: a published version can never be deleted, and the
+package ID is claimed permanently.
 
-The headline items are the error and cancellation paths on both transports, and
-the `NotSupportedException` messages in `ExpressionTranslator` — the paths users
-hit when something goes wrong are currently the least tested.
+Ship `0.x` while the API shape can still move. `1.0.0` is a promise not to break
+it.
 
-### 2. More integration tests
+### 2. Submit to tcgdex.dev/sdks
 
-22 is thin for an SDK whose whole job is matching a third-party API. Worth
-adding:
-
-- One card per category across several eras, not just the current fixtures.
-- Every `Catalog` endpoint (only three are covered live today).
-- Both damage forms, resistances, abilities and boosters against live data.
-- Error paths: a real 404, and a genuinely unsupported language.
-- Every language code at least smoke-tested — 18 exist, 2 are exercised.
-- Pagination boundaries: last page, page beyond the end, `itemsPerPage=1`.
-
-These are cheap to write and they are the tests that catch the API changing
-underneath the SDK, which is the failure mode fixtures cannot detect.
-
-### 3. Decide the serialization story
-
-Both JSON converters have uncovered `Write` paths because nothing in the SDK
-serializes a Card. Either cover them with round-trip tests or delete them.
-Untested code no caller reaches is worse than absent code.
-
-### 4. Enforce coverage in CI
-
-Once the gap is closed, add a threshold to the unit-test step so it cannot
-silently regress. Details in [`coverage.md`](coverage.md).
-
-### 5. Publish
-
-Full first-timer walkthrough in [`publishing.md`](publishing.md). Ship `0.x`
-until the API shape has settled; `1.0.0` is a promise not to break it.
-
-### 6. Submit to tcgdex.dev/sdks
-
-No C#/.NET SDK is listed today — Java, JavaScript, Kotlin, PHP, TypeScript and
-Python only. That gap is the reason this project exists. Submit via a pull
+TCGdex lists official SDKs for Java, JavaScript, Kotlin, PHP, TypeScript and
+Python. There is no C#/.NET one, which is the gap this fills. Submit via a pull
 request to [tcgdex/documentation](https://github.com/tcgdex/documentation) once
 published.
 
 ---
 
+## Done
+
+Recorded because the reasoning behind each is worth keeping, and because a
+roadmap that only lists future work hides what the project already decided.
+
+- **Full REST surface** — cards, sets, series, random, and all 13 enumeration
+  endpoints.
+- **Typed query builder** over every operator the API actually has, translating
+  expression trees without ever calling `Expression.Compile()`.
+- **Opt-in GraphQL search** for full card detail in one request instead of one
+  call per card.
+- **Response caching** with ETag revalidation, so a stale entry costs a `304`
+  and zero bytes rather than a re-download. See [`caching.md`](caching.md).
+- **Auto-pagination** via `StreamAsync`, which handles the short-page end signal
+  the missing total count forces on every consumer.
+- **Typed image URLs**, including the asymmetry that card artwork takes a quality
+  segment and set assets do not.
+- **`HttpClient` ownership** made explicit, with `TcgDexClient.Create()` for
+  callers outside a container.
+- **Logging and tracing** through `ILogger` and `ActivitySource`, with no
+  dependency on any telemetry vendor. See [`observability.md`](observability.md).
+- **Coverage gated in CI** on both line and branch, verified to fail as well as
+  pass.
+- **Documentation site** generated from XML docs, so the reference cannot drift
+  from the code.
+
+---
+
 ## Possible later
 
-Not committed to, and none of it should precede the work above.
+Not committed to. Each would need a reason beyond "it would be neat".
 
-- **Response caching.** The API sends `Cache-Control: no-store` with a weak
-  `ETag`, so any caching is a client-side policy decision rather than something
-  to follow from headers. Would meaningfully cut round trips for catalog data,
-  which changes rarely.
-- **Resilience.** `Microsoft.Extensions.Http.Resilience` would add retry and
-  circuit-breaking without hand-rolled `Polly` wiring. Deliberately left out for
-  now: `AddTcgDex` returns `IHttpClientBuilder`, so callers can already attach
-  their own policies, and baking in a retry policy nobody asked for is a way to
-  hammer a free public API.
-- **Auto-pagination.** An `IAsyncEnumerable<CardBrief>` that pages until
-  exhausted. Straightforward, but note the API exposes no total count, so it can
-  only detect the end by receiving a short page.
-- **`SearchDetailedAsync` for sets and series.** Only cards have it today.
-  Worth it only if the same N+1 shape shows up in practice.
-- **Image helpers.** A typed `GetImageUrl(quality, format)` rather than string
-  concatenation.
+- **`SearchDetailedAsync` for sets and series.** Only cards have it. Worth it
+  only if the same N+1 shape shows up in practice for the others.
+- **A distributed cache implementation.** `ITcgDexResponseCache` is already
+  pluggable and documented; shipping a Redis one would mean taking that
+  dependency for everyone.
+- **Response compression tuning.** `Create()` enables automatic decompression;
+  whether it is worth exposing knobs depends on evidence it matters.
+- **Metrics.** `System.Diagnostics.Metrics` counters for cache hit rate and
+  request duration would complement the existing tracing. The tracing already
+  carries duration, so this only pays off for aggregate dashboards.
 
 ## Explicitly not doing
 
-- **`IQueryable<Card>`.** The API has ten operators; an `IQueryable` would throw
-  for most of LINQ. See [`architecture.md`](architecture.md).
+- **`IQueryable<Card>`.** The API has ten operators; an `IQueryable` would have
+  to throw for most of LINQ — a partial implementation failing at runtime rather
+  than at the call site. See [`architecture.md`](architecture.md).
 - **GraphQL as the primary transport.** It cannot serve 17 of the 18 languages,
-  any range filter, or any pricing.
-- **Write operations.** The API is read-only — `GET` only, no auth.
+  any range filter, or any pricing data.
+- **Built-in retry or circuit breaking.** `AddTcgDex` returns
+  `IHttpClientBuilder`, so `.AddStandardResilienceHandler()` already works.
+  Shipping a retry policy nobody asked for is how an SDK ends up hammering a
+  free public API.
+- **A telemetry vendor dependency.** The SDK writes to `ILogger` and
+  `ActivitySource`; choosing the backend belongs to the application. A library
+  that reported to its author's account from a consumer's process would be
+  exfiltrating their data.
+- **Write operations.** The API is read-only — `GET` only, no authentication.

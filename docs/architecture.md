@@ -11,22 +11,35 @@ non-obvious behaviour discovered along the way is in
 ## Layers
 
 ```
-ITcgDexClient                     public entry point
-  ├── Cards / Sets / Series       resource clients, one per endpoint group
+ITcgDexClient                       public entry point
+  ├── Cards / Sets / Series         resource clients, one per endpoint group
   ├── Random / Catalog
   │
-  ├── TcgDexTransport             REST: URL building, error contract      (internal)
-  └── GraphQlTransport            GraphQL: opt-in, one path only          (internal)
+  ├── CardQuery                     expression trees -> REST filter params
+  │
+  ├── TcgDexTransport               REST: URLs, error contract      (internal)
+  └── GraphQlTransport              GraphQL: one opt-in path        (internal)
         │
-        └── TcgDexJsonContext     source-generated serialization
-            GraphQlJsonContext
+        ├── TcgDexCachingHandler    DelegatingHandler, opt-in       (in the HttpClient pipeline)
+        │     └── ITcgDexResponseCache
+        │
+        ├── TcgDexLog               source-generated ILogger messages
+        │   TcgDexActivity          ActivitySource spans
+        │
+        └── TcgDexJsonContext       source-generated serialization
+            GraphQlJsonContext        (internal — wire types stay private)
                 │
-                └── Models        records with required members
+                └── Models          records with required members
 ```
 
 Both transports are `internal`, exposed to the test project via
 `InternalsVisibleTo`. Tests drive them directly because asserting a URL through
 a resource client would test two things at once.
+
+Caching sits in the `HttpClient` pipeline rather than inside the transport, so
+it is transparent to every resource client and composes with any other handler a
+caller adds. Logging and tracing are threaded through both transports and
+default to no-ops, so neither costs anything when unconfigured.
 
 ## Projects
 
