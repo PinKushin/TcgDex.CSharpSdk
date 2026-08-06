@@ -52,14 +52,24 @@ jobs:
           --settings coverlet.runsettings
           --results-directory ./TestResults
 
-      # The XPlat collector reports coverage but cannot gate on it, so the
-      # threshold is enforced here. The ceiling is 99.76%: the two remaining
-      # lines are provably unreachable, since Expression.MakeMemberAccess
-      # rejects any member that is neither a field nor a property. 99.5 leaves
-      # those two lines of headroom and nothing more.
-      - name: Coverage threshold
+      # The XPlat collector reports coverage but cannot gate on it, so both
+      # thresholds are enforced here.
+      #
+      # Line and branch are gated separately because they answer different
+      # questions. A line holding `flipped ? a : b` is fully line-covered the
+      # first time it runs, while half its behaviour has never been tested — so
+      # line coverage alone can sit near 100% with real logic unexercised.
+      #
+      # Line ceiling is 99.76% (two provably unreachable lines); branch sits at
+      # 96.06%, the remainder being null-coalescing defaults and guards made
+      # unreachable by an earlier check.
+      - name: Coverage thresholds
         shell: pwsh
-        run: ./scripts/Check-Coverage.ps1 -ResultsDirectory ./TestResults -Threshold 99.5
+        run: >
+          ./scripts/Check-Coverage.ps1
+          -ResultsDirectory ./TestResults
+          -Threshold 99.5
+          -BranchThreshold 95
 
       - name: Verify the package builds
         run: dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj --configuration Release --no-build --output ./artifacts

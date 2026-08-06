@@ -2,13 +2,13 @@
 
 **Goal: reach and hold ~100% line coverage of hand-written SDK code.**
 
-**Current: 99.76% (815/817 lines).** 2 uncovered lines remain, both provably
-unreachable — see [Why not 100%](#why-not-100) below.
+**Current: 99.76% line (815/817) and 96.06% branch (415/432).** Both are gated in
+CI. The 2 uncovered lines are provably unreachable — see [Why not 100%](#why-not-100) below.
 
-| | Coverage | Uncovered | Unit tests | Integration tests |
+| | Line | Branch | Unit tests | Integration tests |
 |---|---|---|---|---|
-| Baseline (`f45e496`) | 83.2% | 93 lines / 10 files | 113 | 22 |
-| Now | **99.76%** | 2 lines / 1 file | **316** | **129** |
+| Baseline (`f45e496`) | 83.2% | — | 113 | 22 |
+| Now | **99.76%** | **96.06%** | **339** | **129** |
 
 ---
 
@@ -125,7 +125,7 @@ Coverage that is measured but not enforced drifts, so CI gates on it:
 ```yaml
 - name: Coverage threshold
   shell: pwsh
-  run: ./scripts/Check-Coverage.ps1 -ResultsDirectory ./TestResults -Threshold 99.5
+  run: ./scripts/Check-Coverage.ps1 -ResultsDirectory ./TestResults -Threshold 99.5 -BranchThreshold 95
 ```
 
 Run the identical check locally:
@@ -147,6 +147,31 @@ rather than only reporting that the total moved.
 
 The script excludes generated files exactly as the runsettings does, so the gate
 measures the same thing the report does.
+
+### Line and branch are gated separately
+
+They answer different questions:
+
+| Metric | Question |
+|---|---|
+| **Line** | Did this line run? |
+| **Block** (what Visual Studio reports) | Did this straight-line chunk run? |
+| **Branch** | Did we test **both outcomes** of this condition? |
+
+The first two ask "did it execute". Branch asks something categorically
+stronger. A line holding `flipped ? a : b` is fully line-covered and fully
+block-covered the first time it runs — while half its behaviour has never been
+exercised.
+
+That is not hypothetical here. Line coverage sat at 99.76% while branch coverage
+was 91.90%, and the gap included the operand-flipping in
+`ExpressionTranslator`: `100 <= c.Hp` could have emitted the wrong operator with
+the whole suite green. Closing that gap is what took branch coverage to 96.06%.
+
+The branch gate is **95%**. The remaining 17 partial branches are the low-value
+kind — `?? new TcgDexOptions()` defaults, `?? throw` guards made unreachable by
+an earlier check, and `TryParse` failure paths on data the SDK itself stored in
+a valid form. Testing those proves the `??` operator works.
 
 ### Why 99.5 and not 100
 
