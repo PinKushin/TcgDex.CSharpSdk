@@ -267,6 +267,13 @@ dotnet test TcgDex.CSharpSdk.Tests # unit tests, offline
 dotnet test TcgDex.CSharpSdk.IntegrationTests --filter "TestCategory=Integration"
 ```
 
+Coverage is gated in CI and the same check runs locally:
+
+```bash
+dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj   --collect:"XPlat Code Coverage" --settings coverlet.runsettings   --results-directory ./TestResults
+pwsh ./scripts/Check-Coverage.ps1
+```
+
 Unit tests run against recorded API responses in
 `TcgDex.CSharpSdk.Tests/Fixtures`, so they need no network. Integration tests
 hit the live API and run weekly in CI rather than per push, so a TCGdex outage
