@@ -121,6 +121,21 @@ than by this SDK:
 So reach for it when you want breadth cheaply, and stay on REST when you need
 a language, a range filter, or prices.
 
+### Caching
+
+The API sends `no-store`, but it honours `If-None-Match`. Enabling the cache
+means fresh reads skip the network entirely, and stale reads are *revalidated* —
+an unchanged 22 KB set response costs a `304` and **0 bytes** instead of a
+re-download.
+
+```csharp
+builder.Services.AddTcgDexWithCaching();
+```
+
+Errors are never cached, non-`GET` requests bypass it, and concurrent reads of
+the same URL are collapsed into a single request. See
+[Caching](https://pinkushin.github.io/TcgDex.CSharpSdk/caching.html).
+
 ## What you can read
 
 ```csharp
