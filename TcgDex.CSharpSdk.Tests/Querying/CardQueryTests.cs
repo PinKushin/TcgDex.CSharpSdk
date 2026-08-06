@@ -134,6 +134,17 @@ public sealed class CardQueryTests
         => Query().Where(c => c.Name.StartsWith("Big Air")).ToQueryString()
             .ShouldBe("name=Big%20Air*");
 
+    [Test]
+    public void EmptyValue_IsEmittedWithoutBeingMistakenForAWildcard()
+    {
+        // The wildcard detection indexes the first and last character, so an
+        // empty value is the case that would read off the end of the string.
+        // `name=eq:` is what the API is sent — an equality match on the empty
+        // string, which is a query a caller can legitimately build.
+        Query().Where(c => c.Name == string.Empty).ToQueryString()
+            .ShouldBe("name=eq:");
+    }
+
     // ----- captured variables -----
 
     [Test]

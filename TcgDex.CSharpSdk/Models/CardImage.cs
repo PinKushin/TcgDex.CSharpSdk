@@ -55,7 +55,12 @@ public static class ImageUrl
         ImageQuality quality = ImageQuality.High,
         ImageFormat format = ImageFormat.Png)
     {
-        if (string.IsNullOrWhiteSpace(baseUrl))
+        // `is null ||` rather than IsNullOrWhiteSpace alone: the netstandard2.0
+        // reference assembly does not annotate that method with
+        // [NotNullWhen(false)], so without the explicit test the compiler still
+        // considers baseUrl possibly-null below. Spelling it out keeps the
+        // check honest on every target instead of silencing it with `!`.
+        if (baseUrl is null || string.IsNullOrWhiteSpace(baseUrl))
         {
             return null;
         }
@@ -80,7 +85,7 @@ public static class ImageUrl
     /// </remarks>
     public static string? BuildAsset(string? baseUrl, ImageFormat format = ImageFormat.Png)
     {
-        if (string.IsNullOrWhiteSpace(baseUrl))
+        if (baseUrl is null || string.IsNullOrWhiteSpace(baseUrl))
         {
             return null;
         }
@@ -122,7 +127,7 @@ public static class ImageExtensions
         ImageQuality quality = ImageQuality.High,
         ImageFormat format = ImageFormat.Png)
     {
-        ArgumentNullException.ThrowIfNull(card);
+        Guard.NotNull(card);
 
         return ImageUrl.Build(card.Image, quality, format);
     }
@@ -138,7 +143,7 @@ public static class ImageExtensions
         ImageQuality quality = ImageQuality.High,
         ImageFormat format = ImageFormat.Png)
     {
-        ArgumentNullException.ThrowIfNull(card);
+        Guard.NotNull(card);
 
         return ImageUrl.Build(card.Image, quality, format);
     }
@@ -154,7 +159,7 @@ public static class ImageExtensions
     /// </remarks>
     public static string? GetLogoUrl(this SetBrief set, ImageFormat format = ImageFormat.Png)
     {
-        ArgumentNullException.ThrowIfNull(set);
+        Guard.NotNull(set);
 
         return ImageUrl.BuildAsset(set.Logo, format);
     }
@@ -170,7 +175,7 @@ public static class ImageExtensions
     /// </remarks>
     public static string? GetSymbolUrl(this SetBrief set, ImageFormat format = ImageFormat.Png)
     {
-        ArgumentNullException.ThrowIfNull(set);
+        Guard.NotNull(set);
 
         return ImageUrl.BuildAsset(set.Symbol, format);
     }
@@ -182,7 +187,7 @@ public static class ImageExtensions
     /// <exception cref="ArgumentNullException"><paramref name="set"/> is null.</exception>
     public static string? GetLogoUrl(this Set set, ImageFormat format = ImageFormat.Png)
     {
-        ArgumentNullException.ThrowIfNull(set);
+        Guard.NotNull(set);
 
         return ImageUrl.BuildAsset(set.Logo, format);
     }
@@ -194,7 +199,7 @@ public static class ImageExtensions
     /// <exception cref="ArgumentNullException"><paramref name="set"/> is null.</exception>
     public static string? GetSymbolUrl(this Set set, ImageFormat format = ImageFormat.Png)
     {
-        ArgumentNullException.ThrowIfNull(set);
+        Guard.NotNull(set);
 
         return ImageUrl.BuildAsset(set.Symbol, format);
     }

@@ -301,7 +301,11 @@ public sealed class CachingHandlerTests
             .Select(_ => Should.ThrowAsync<HttpRequestException>(() => GetAsync(client))));
 
         Should.NotThrow(() => task.Wait(TimeSpan.FromSeconds(10)));
-        task.IsCompletedSuccessfully.ShouldBeTrue();
+
+        // Task.IsCompletedSuccessfully is .NET Core 2.0+ and absent from .NET
+        // Framework, which this suite also targets. RanToCompletion is the
+        // status that property reports on.
+        task.Status.ShouldBe(TaskStatus.RanToCompletion);
     }
 
     // ----- policy -----

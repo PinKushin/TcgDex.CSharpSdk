@@ -83,8 +83,8 @@ public sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing>
     /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, TcgPlayerPricing value, JsonSerializerOptions options)
     {
-        ArgumentNullException.ThrowIfNull(writer);
-        ArgumentNullException.ThrowIfNull(value);
+        Guard.NotNull(writer);
+        Guard.NotNull(value);
 
         writer.WriteStartObject();
 
@@ -98,10 +98,12 @@ public sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing>
             writer.WriteString(UpdatedProperty, updated);
         }
 
-        foreach (var (printing, price) in value.Printings)
+        // KeyValuePair<,> gained Deconstruct in .NET Core 2.0 but not in
+        // netstandard2.0, so the pair is read through its properties.
+        foreach (var printing in value.Printings)
         {
-            writer.WritePropertyName(printing);
-            JsonSerializer.Serialize(writer, price, PriceTypeInfo(options));
+            writer.WritePropertyName(printing.Key);
+            JsonSerializer.Serialize(writer, printing.Value, PriceTypeInfo(options));
         }
 
         writer.WriteEndObject();
@@ -114,7 +116,7 @@ public sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing>
     /// </summary>
     private static JsonTypeInfo<TcgPlayerPrice> PriceTypeInfo(JsonSerializerOptions options)
     {
-        ArgumentNullException.ThrowIfNull(options);
+        Guard.NotNull(options);
 
         return (JsonTypeInfo<TcgPlayerPrice>)options.GetTypeInfo(typeof(TcgPlayerPrice));
     }

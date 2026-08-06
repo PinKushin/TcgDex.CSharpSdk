@@ -79,7 +79,7 @@ public class TcgDexCacheOptions
     /// </remarks>
     public virtual TimeSpan GetTimeToLive(Uri requestUri)
     {
-        ArgumentNullException.ThrowIfNull(requestUri);
+        Guard.NotNull(requestUri);
 
         var path = requestUri.AbsolutePath;
 

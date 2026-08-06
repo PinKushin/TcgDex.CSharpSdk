@@ -24,7 +24,7 @@ internal static class ExpressionTranslator
 {
     internal static IReadOnlyList<QueryFilter> Translate<T>(Expression<Func<T, bool>> predicate)
     {
-        ArgumentNullException.ThrowIfNull(predicate);
+        Guard.NotNull(predicate);
 
         var filters = new List<QueryFilter>();
         Visit(predicate.Body, predicate.Parameters[0], filters);
@@ -41,7 +41,7 @@ internal static class ExpressionTranslator
     /// </exception>
     internal static string SortFieldName<T, TKey>(Expression<Func<T, TKey>> selector)
     {
-        ArgumentNullException.ThrowIfNull(selector);
+        Guard.NotNull(selector);
 
         if (!TryGetMember(selector.Body, selector.Parameters[0], out var member))
         {

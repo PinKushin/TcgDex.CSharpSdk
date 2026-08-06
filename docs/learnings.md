@@ -121,11 +121,139 @@ reading both. `CA1716` still applies everywhere else in the SDK.
 ## Multi-targeting `net8.0;net10.0` works with only the .NET 10 SDK installed
 
 No separate targeting pack install was needed — the reference assemblies restore
-from NuGet automatically. `net8.0` is the current LTS and `net10.0` is the
-newest, so the package covers both without the consumer needing a specific SDK.
+from NuGet automatically. `net8.0` is the oldest .NET still in support and
+`net10.0` is the current LTS, so those two targets cover every supported runtime:
+.NET 6 and 7 are past end of life, and 9 and 11 consume the `net8.0` asset by
+roll-forward. (`net8.0` itself falls out of support on 2026-11-10, at which
+point the floor becomes `net10.0`.)
 
-`System.Text.Json` is referenced as a package only on `net8.0`; on `net10.0` it
-comes from the shared framework.
+`System.Text.Json` is **not** referenced as a package on either target. Both ship
+it in the shared framework, source generator included, and adding the reference
+back raises `NU1510` on `net8.0` — NuGet's way of saying the framework already
+provides it. Leaving it out is also what keeps consumers on the serviced,
+security-patched copy: they upgrade it by patching .NET rather than by waiting
+for this package to bump a version.
+
+---
+
+## Multi-targeting the library while testing one framework proves half of it
+
+The test projects were `net10.0` only while the SDK shipped `net8.0` and
+`net10.0`, so the `net8.0` assembly was build-verified and never executed. Making
+the unit tests multi-target found two compile errors immediately:
+
+- A test double used `System.Threading.Lock`, which is .NET 9+.
+- Two assertions called Shouldly's `ShouldContainKey`, which binds to
+  `IDictionary<,>`; the properties are `IReadOnlyDictionary<,>`, and only the
+  `net10.0` Shouldly build had an overload that matched. Asserting on `.Keys`
+  works on both and prints the actual key set on failure.
+
+Neither was in the SDK, but neither could have been *found* without running the
+older target — and the difference between targets is more than compiler symbols:
+`System.Text.Json` resolves from a different assembly version, so serializer
+behaviour is genuinely not the same code. If a library multi-targets, its tests
+should too.
+
+---
+
+## Supporting netstandard2.0 cost portability work, not API compromises
+
+Adding `netstandard2.0` reaches Unity and .NET Framework 4.6.1+. The public
+surface, async, and nullability are unchanged — what it cost was 31 call sites
+using BCL APIs that target does not have. The shape of the work, for anyone
+adding a target later:
+
+- **Language features lower onto BCL types.** `init` needs `IsExternalInit`,
+  `required` needs `RequiredMemberAttribute` and `CompilerFeatureRequired`. The
+  compiler only checks those types *exist* — declaring them internally is the
+  supported approach, and 318 of the initial 520 errors were that one gap.
+- **`LangVersion` must be set explicitly.** `netstandard2.0` otherwise defaults
+  to C# 7.3 and nothing modern compiles. Already set repo-wide here.
+- **Prefer a real backport to an `#if`.** `TimeProvider` exists as
+  `Microsoft.Bcl.TimeProvider`, so the cache's clock abstraction stayed one code
+  path. The same for `System.Text.Json`, `IAsyncEnumerable`, and
+  `ActivitySource` — all packages, no forked code.
+- **Guard helpers beat conditional compilation.** `ArgumentNullException.ThrowIfNull`
+  is .NET 6+, and statics cannot be added to a type from outside, so 33 call
+  sites moved to `Guard`. Teach CA1062 about it via
+  `dotnet_code_quality.CA1062.null_check_validation_methods`, or every guarded
+  public method is reported as unvalidated.
+- **The netstandard2.0 BCL has no nullability annotations.** `string.IsNullOrWhiteSpace`
+  lacks `[NotNullWhen(false)]`, so code the modern targets accept produces
+  CS8602 there. Fixed with explicit `is null ||` tests, not `!`.
+- **Only two `#if` blocks survived**, and both are genuine platform differences
+  rather than missing sugar: `SocketsHttpHandler` versus
+  `ServicePoint.ConnectionLeaseTimeout`, and span-based `int.Parse`.
+
+The `#if` count is the metric worth watching. Every one is a place where the
+targets can drift apart and only one of them is tested.
+
+---
+
+## `netstandard2.0` is compiled, never executed — so run the tests on net472
+
+A `netstandard2.0` assembly cannot run on its own; it is a contract. Adding the
+target left the shipped DLL build-verified and never executed — the same trap as
+testing only one target framework, one level deeper.
+
+`net472` in the test project closes it: .NET Framework resolves the
+`netstandard2.0` asset, so the suite runs against exactly the DLL a Unity or
+WinForms consumer receives. It immediately found four things the compiler had
+not: `HttpStatusCode.TooManyRequests`, `DateTimeOffset.UnixEpoch`,
+`Task.IsCompletedSuccessfully`, and `ValueTask.FromResult` are all absent from
+.NET Framework.
+
+It also answers "how do we test the compiler shims?" — you don't, directly.
+`IsExternalInit` and `RequiredMemberAttribute` have no behaviour and no caller;
+a test asserting one exists would restate the compiler's own requirement. What
+needs proving is that `init` and `required` *work* there, and 340 tests
+deserializing into models built entirely from them prove exactly that.
+
+Caveat worth recording: coverlet does not collect coverage from the `net472`
+run, so netstandard2.0-only code is invisible to the coverage gate. That is why
+`HttpContentExtensions` is wrapped in `#if NETSTANDARD2_0` — on modern targets
+the instance methods win overload resolution and it would be shipped code that
+nothing can reach, showing up as an uncoverable hole.
+
+---
+
+## Security analyzers are opt-in, and worth turning on
+
+`AnalysisLevel=latest-recommended` leaves most of the CA3xxx injection and
+CA5xxx cryptography rules **off**. `<AnalysisModeSecurity>All</AnalysisModeSecurity>`
+enables the category, and with `TreatWarningsAsErrors` a finding fails the build.
+
+`<NuGetAudit>` with `NuGetAuditMode=all` and `NuGetAuditLevel=low` fails
+*restore* on a dependency with a known advisory, transitive ones included — the
+check that matters most here, since the netstandard2.0 target pulls a 8.0.x
+graph the modern targets get in-box and service automatically.
+
+Both were verified in the failing direction, per the rule above. Restoring
+`System.Text.Json` 8.0.0 produced `NU1903` for two advisories — the same ones
+that motivated pinning 8.0.6. A deliberate `SHA1.Create()` produced `CA5350`.
+
+The limit is worth recording alongside: a deliberate `new Random().Next()` in
+the same probe was **not** flagged. These rules match known-dangerous API
+patterns, not weak logic. They are a floor, not an audit.
+
+---
+
+## A library's dependency versions are a floor for every consumer
+
+Central Package Management made it easy to pin one version of
+`Microsoft.Extensions.*` for all targets, and the `net8.0` build was asking for
+`10.0.10`. That works — those packages support `net8.0` — but it forces a .NET 8
+app to drag its whole `Microsoft.Extensions` graph to 10.0.x, and collides with
+an ASP.NET Core 8 app that pins `8.0.x`.
+
+A library should request the **lowest** version that satisfies it, per target,
+because NuGet resolves upwards on its own: a consumer already on 10.0.x still
+gets 10.0.x. `Directory.Packages.props` now conditions its `PackageVersion`
+items on `$(TargetFramework)`.
+
+Caught by reading the generated `.nuspec` out of the packed `.nupkg` rather than
+by any build failure — dependency versions are baked into a published version
+permanently, so the `.nuspec` is worth reading once before the first push.
 
 ---
 

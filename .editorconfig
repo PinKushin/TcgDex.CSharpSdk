@@ -64,6 +64,13 @@ dotnet_naming_style.underscore_camel.capitalization = camel_case
 # --- formatting trivia: suggestion only, never build-breaking --------------
 dotnet_diagnostic.IDE0055.severity = suggestion
 
+# CA1062 recognises the BCL's ArgumentNullException.ThrowIfNull by name. The
+# SDK also targets netstandard2.0, which has no such method, so the checks go
+# through Guard instead — see Compatibility/Guard.cs. Without this line the
+# analyzer cannot see that a parameter has been validated and reports every
+# guarded public method as unvalidated.
+dotnet_code_quality.CA1062.null_check_validation_methods = NotNull|NotNullOrWhiteSpace
+
 # Model types deliberately mirror the wrapped API's vocabulary so that this
 # SDK's surface maps one-to-one onto the TCGdex documentation. `Set` collides
 # with a VB.NET keyword (CA1716); renaming it to something like `CardSet` would
@@ -72,6 +79,7 @@ dotnet_diagnostic.IDE0055.severity = suggestion
 # still applies everywhere else.
 [**/Models/*.cs]
 dotnet_diagnostic.CA1716.severity = none
+
 
 # Note: test-project analyzer exclusions (CA1707 for the
 # {Method}_{Scenario}_{Expected} naming convention, CS1591, CA1062) live in the

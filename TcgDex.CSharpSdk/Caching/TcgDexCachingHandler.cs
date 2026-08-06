@@ -59,7 +59,7 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         TcgDexCacheOptions? options = null,
         TimeProvider? timeProvider = null)
     {
-        ArgumentNullException.ThrowIfNull(cache);
+        Guard.NotNull(cache);
 
         _cache = cache;
         _options = options ?? new TcgDexCacheOptions();
@@ -85,7 +85,7 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        Guard.NotNull(request);
 
         if (request.Method != HttpMethod.Get || request.RequestUri is null)
         {

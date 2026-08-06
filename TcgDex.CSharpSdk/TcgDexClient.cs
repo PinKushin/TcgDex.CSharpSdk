@@ -50,6 +50,17 @@ public interface ITcgDexClient
 public sealed class TcgDexClient : ITcgDexClient, IDisposable
 {
     /// <summary>
+    /// How long a pooled connection may be reused before it is recycled so the
+    /// next request re-resolves DNS.
+    /// </summary>
+    /// <remarks>
+    /// Enforced through <c>SocketsHttpHandler.PooledConnectionLifetime</c> on
+    /// modern targets and through <c>ServicePoint.ConnectionLeaseTimeout</c> on
+    /// netstandard2.0. Different mechanism, same guarantee, one interval.
+    /// </remarks>
+    private static readonly TimeSpan ConnectionRecycleInterval = TimeSpan.FromMinutes(2);
+
+    /// <summary>
     /// The client to dispose on <see cref="Dispose"/>, or <see langword="null"/>
     /// when the caller supplied their own and therefore still owns it.
     /// </summary>
@@ -179,11 +190,31 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
 
         // Connections are recycled on this interval so DNS changes are picked
         // up. A long-lived HttpClient over the default handler never does this.
+#if NETSTANDARD2_0
+        // SocketsHttpHandler is .NET Core 2.1+, so on .NET Framework the same
+        // guarantee comes from the mechanism that platform actually has:
+        // ConnectionLeaseTimeout closes a connection after the interval and
+        // forces the next request to re-resolve DNS. Set on the ServicePoint
+        // for the base address, which is the only host this client talks to.
+        // On other runtimes that reach this code path the call is a harmless
+        // no-op.
+        System.Net.ServicePointManager
+            .FindServicePoint(resolved.BaseAddress)
+            .ConnectionLeaseTimeout = (int)ConnectionRecycleInterval.TotalMilliseconds;
+
+        // DecompressionMethods.All is .NET 5+, and Brotli is not available
+        // here — these two are what netstandard2.0 can offer.
+        HttpMessageHandler handler = new HttpClientHandler
+        {
+            AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate,
+        };
+#else
         HttpMessageHandler handler = new SocketsHttpHandler
         {
-            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            PooledConnectionLifetime = ConnectionRecycleInterval,
             AutomaticDecompression = System.Net.DecompressionMethods.All,
         };
+#endif
 
         if (configureCache is not null)
         {

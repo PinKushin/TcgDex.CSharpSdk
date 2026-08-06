@@ -124,7 +124,11 @@ Everything here is already true except the last two:
 - [x] `README.md` embedded — this is the package page body
 - [x] `RepositoryUrl` + SourceLink, so debuggers can step into the source
 - [x] `IncludeSymbols` with `snupkg`, so symbols publish alongside
-- [x] Builds clean with `-warnaserror`, both `net8.0` and `net10.0`
+- [x] Builds clean with `-warnaserror` on `netstandard2.0`, `net8.0` and `net10.0`
+- [x] `.nuspec` read out of the packed `.nupkg` — dependency versions and the
+      recorded commit are permanent once published
+- [x] README links absolute, since the package page renders it standalone
+- [x] Security analyzers and `NuGetAudit` enabled, both verified failing
 - [ ] **Test coverage at target** — the current gate, see [`coverage.md`](coverage.md)
 - [ ] **Version decided** — currently `0.1.0`
 

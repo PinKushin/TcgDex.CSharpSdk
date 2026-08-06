@@ -35,7 +35,7 @@ internal sealed class RecordingLogger(LogLevel minimum) : ILogger, ILoggerProvid
         Exception? exception,
         Func<TState, Exception?, string> formatter)
     {
-        ArgumentNullException.ThrowIfNull(formatter);
+        Guard.NotNull(formatter);
 
         FormatterInvocations++;
         Entries.Add(new LogEntry(logLevel, eventId.Id, formatter(state, exception), exception));
