@@ -131,7 +131,7 @@ public sealed class SerializationTests
         var pricing = Deserialize<TcgPlayerPricing>(
             """{"unit":"USD","normal":null,"holofoil":{"marketPrice":1.5}}""");
 
-        pricing.Printings.ShouldNotContainKey("normal");
+        pricing.Printings.Keys.ShouldNotContain("normal");
         pricing["holofoil"].ShouldNotBeNull().MarketPrice.ShouldBe(1.5m);
     }
 

@@ -35,7 +35,10 @@ internal sealed class FakeTimeProvider : TimeProvider
 internal sealed class CountingHandler : HttpMessageHandler
 {
     private readonly ConcurrentQueue<Func<HttpRequestMessage, Task<HttpResponseMessage>>> _responses = new();
-    private readonly Lock _gate = new();
+    // object, not System.Threading.Lock: Lock is .NET 9+, and this project now
+    // also builds for net8.0. The lock is uncontended bookkeeping in a test
+    // double, so Lock's faster path buys nothing here.
+    private readonly object _gate = new();
 
     /// <summary>Requests that reached this handler, in order.</summary>
     internal List<HttpRequestMessage> Requests { get; } = [];

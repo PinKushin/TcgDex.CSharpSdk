@@ -121,11 +121,57 @@ reading both. `CA1716` still applies everywhere else in the SDK.
 ## Multi-targeting `net8.0;net10.0` works with only the .NET 10 SDK installed
 
 No separate targeting pack install was needed — the reference assemblies restore
-from NuGet automatically. `net8.0` is the current LTS and `net10.0` is the
-newest, so the package covers both without the consumer needing a specific SDK.
+from NuGet automatically. `net8.0` is the oldest .NET still in support and
+`net10.0` is the current LTS, so those two targets cover every supported runtime:
+.NET 6 and 7 are past end of life, and 9 and 11 consume the `net8.0` asset by
+roll-forward. (`net8.0` itself falls out of support on 2026-11-10, at which
+point the floor becomes `net10.0`.)
 
-`System.Text.Json` is referenced as a package only on `net8.0`; on `net10.0` it
-comes from the shared framework.
+`System.Text.Json` is **not** referenced as a package on either target. Both ship
+it in the shared framework, source generator included, and adding the reference
+back raises `NU1510` on `net8.0` — NuGet's way of saying the framework already
+provides it. Leaving it out is also what keeps consumers on the serviced,
+security-patched copy: they upgrade it by patching .NET rather than by waiting
+for this package to bump a version.
+
+---
+
+## Multi-targeting the library while testing one framework proves half of it
+
+The test projects were `net10.0` only while the SDK shipped `net8.0` and
+`net10.0`, so the `net8.0` assembly was build-verified and never executed. Making
+the unit tests multi-target found two compile errors immediately:
+
+- A test double used `System.Threading.Lock`, which is .NET 9+.
+- Two assertions called Shouldly's `ShouldContainKey`, which binds to
+  `IDictionary<,>`; the properties are `IReadOnlyDictionary<,>`, and only the
+  `net10.0` Shouldly build had an overload that matched. Asserting on `.Keys`
+  works on both and prints the actual key set on failure.
+
+Neither was in the SDK, but neither could have been *found* without running the
+older target — and the difference between targets is more than compiler symbols:
+`System.Text.Json` resolves from a different assembly version, so serializer
+behaviour is genuinely not the same code. If a library multi-targets, its tests
+should too.
+
+---
+
+## A library's dependency versions are a floor for every consumer
+
+Central Package Management made it easy to pin one version of
+`Microsoft.Extensions.*` for all targets, and the `net8.0` build was asking for
+`10.0.10`. That works — those packages support `net8.0` — but it forces a .NET 8
+app to drag its whole `Microsoft.Extensions` graph to 10.0.x, and collides with
+an ASP.NET Core 8 app that pins `8.0.x`.
+
+A library should request the **lowest** version that satisfies it, per target,
+because NuGet resolves upwards on its own: a consumer already on 10.0.x still
+gets 10.0.x. `Directory.Packages.props` now conditions its `PackageVersion`
+items on `$(TargetFramework)`.
+
+Caught by reading the generated `.nuspec` out of the packed `.nupkg` rather than
+by any build failure — dependency versions are baked into a published version
+permanently, so the `.nuspec` is worth reading once before the first push.
 
 ---
 

@@ -55,7 +55,7 @@ public sealed class PricingContractTests
 
         var tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
 
-        tcgplayer.Printings.ShouldContainKey("holofoil");
+        tcgplayer.Printings.Keys.ShouldContain("holofoil");
         tcgplayer["holofoil"].ShouldNotBeNull().MarketPrice.ShouldNotBeNull();
     }
 

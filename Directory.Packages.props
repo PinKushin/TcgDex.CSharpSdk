@@ -5,12 +5,25 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
-  <!-- Runtime dependencies of the SDK. -->
-  <ItemGroup>
+  <!-- Runtime dependencies of the SDK, pinned per target framework.
+
+       A library's dependency versions become a floor for every consumer, so
+       each target asks for the lowest version that satisfies it rather than the
+       newest that exists. A net8.0 app taking a dependency on 10.0.x of these
+       would be forced to upgrade its whole Microsoft.Extensions graph — and
+       would hit version conflicts against an ASP.NET Core 8 app that pins 8.0.x.
+       NuGet resolves upwards on its own, so a consumer already on 10.0.x still
+       gets 10.0.x. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.10" />
-    <PackageVersion Include="System.Text.Json" Version="10.0.10" />
   </ItemGroup>
 
   <!-- Test-only dependencies. -->

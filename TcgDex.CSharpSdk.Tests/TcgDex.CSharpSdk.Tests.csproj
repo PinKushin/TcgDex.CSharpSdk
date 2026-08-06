@@ -1,7 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <!-- Matches the SDK's targets. The two differ in more than compiler
+         symbols: on net10.0 System.Text.Json comes from the shared framework,
+         on net8.0 from a package at a different major version. Testing only
+         net10.0 would leave the shipped net8.0 assembly build-verified but
+         never executed. -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <RootNamespace>TcgDex.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
