@@ -65,6 +65,32 @@ public interface ICardResource
         int? page = null,
         int? itemsPerPage = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Streams every card matching a query, fetching pages as they are consumed.
+    /// </summary>
+    /// <param name="query">Filters and sorting. Any page set on it is ignored.</param>
+    /// <param name="pageSize">How many results to fetch per request.</param>
+    /// <param name="cancellationToken">Stops enumeration and cancels the in-flight request.</param>
+    /// <returns>An async sequence over every match.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="query"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="pageSize"/> is less than one.</exception>
+    /// <remarks>
+    /// <para>
+    /// The API reports no total count and sends no pagination headers, so the
+    /// end of the results can only be detected by receiving a page shorter than
+    /// requested. Hand-rolling that loop is easy to get subtly wrong; this does
+    /// it once.
+    /// </para>
+    /// <para>
+    /// Pages are fetched lazily, so breaking out of the loop early stops the
+    /// requests. Nothing is buffered beyond the current page.
+    /// </para>
+    /// </remarks>
+    IAsyncEnumerable<CardBrief> StreamAsync(
+        Querying.CardQuery query,
+        int pageSize = 100,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

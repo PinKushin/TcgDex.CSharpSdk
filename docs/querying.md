@@ -87,6 +87,28 @@ new CardQuery()
 number of pages cannot be known up front. Read pages until one comes back
 shorter than you asked for:
 
+`StreamAsync` does that loop for you, fetching pages lazily as you consume them:
+
+```csharp
+await foreach (var card in tcgdex.Cards.StreamAsync(
+    new CardQuery().Where(c => c.Category == "Pokemon"),
+    pageSize: 100,
+    cancellationToken))
+{
+    // ...
+}
+```
+
+Breaking out stops the requests — nothing is buffered beyond the current page,
+so taking the first five results costs one request rather than downloading
+twenty thousand cards.
+
+One unavoidable cost: when the final page is *exactly* full, one extra empty
+request is needed to discover there is nothing more. With no total count, a full
+page is indistinguishable from "there is more".
+
+By hand, the same loop is:
+
 ```csharp
 const int PageSize = 100;
 
