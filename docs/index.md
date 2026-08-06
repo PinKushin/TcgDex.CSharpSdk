@@ -29,6 +29,7 @@ Console.WriteLine(card?.Name);   // Furret
 |---|---|
 | **[Getting started](getting-started.md)** | Install, configure, and make your first calls. |
 | **[Querying](querying.md)** | Every filter operator, with the query string each one produces. |
+| **[Caching](caching.md)** | Cut round trips, and payloads, with ETag revalidation. |
 | **[API reference](api/TcgDex.yml)** | Generated from the source. Every public type and member. |
 | **[API notes](api-info.md)** | The TCGdex API itself, verified field by field against live responses. |
 | **[Architecture](architecture.md)** | How the SDK is built, and how to extend it. |
@@ -59,5 +60,7 @@ translation of someone else's idioms.
   method you called.
 - **18 languages**, validated at registration rather than failing later as a
   confusing 404.
+- **Opt-in caching** — serves fresh data with no network, and revalidates
+  with `If-None-Match` so unchanged data costs 0 bytes instead of a re-download.
 - **Trim- and AOT-safe** — verified in CI by publishing a native binary and
   running it, not merely asserted.

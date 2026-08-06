@@ -3,6 +3,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 using System;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using TcgDex;
+using TcgDex.Caching;
 
 /// <summary>
 /// Registers the TCGdex client with a dependency-injection container.
@@ -55,5 +56,55 @@ public static class TcgDexServiceCollectionExtensions
             (httpClient, provider) => new TcgDexClient(
                 httpClient,
                 provider.GetRequiredService<TcgDexOptions>()));
+    }
+
+    /// <summary>
+    /// Registers <see cref="ITcgDexClient"/> with response caching enabled.
+    /// </summary>
+    /// <param name="services">The container to add to.</param>
+    /// <param name="configure">Optional client configuration.</param>
+    /// <param name="configureCache">Optional cache policy.</param>
+    /// <returns>
+    /// The <see cref="IHttpClientBuilder"/> for the underlying client, so callers
+    /// can attach further handlers.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="services"/> is null.</exception>
+    /// <remarks>
+    /// <para>
+    /// Caching is opt-in because the API sends <c>Cache-Control: no-store</c>, so
+    /// enabling it is a decision about your own tolerance for stale data rather
+    /// than something the service asks for.
+    /// </para>
+    /// <para>
+    /// It is worth enabling: the API honours <c>If-None-Match</c>, so once an
+    /// entry falls out of its freshness window it is revalidated rather than
+    /// re-fetched. An unchanged 22 KB set response then costs a <c>304</c> and
+    /// zero bytes of body.
+    /// </para>
+    /// <para>
+    /// Register your own <see cref="ITcgDexResponseCache"/> before calling this
+    /// to back the cache with something shared or persistent; otherwise a bounded
+    /// in-process cache is used.
+    /// </para>
+    /// </remarks>
+    public static IHttpClientBuilder AddTcgDexWithCaching(
+        this IServiceCollection services,
+        Action<TcgDexOptions>? configure = null,
+        Action<TcgDexCacheOptions>? configureCache = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        var cacheOptions = new TcgDexCacheOptions();
+        configureCache?.Invoke(cacheOptions);
+
+        services.TryAddSingleton(cacheOptions);
+        services.TryAddSingleton<ITcgDexResponseCache>(
+            _ => new MemoryTcgDexResponseCache(cacheOptions.MaxEntries));
+
+        return services
+            .AddTcgDex(configure)
+            .AddHttpMessageHandler(provider => new TcgDexCachingHandler(
+                provider.GetRequiredService<ITcgDexResponseCache>(),
+                provider.GetRequiredService<TcgDexCacheOptions>()));
     }
 }

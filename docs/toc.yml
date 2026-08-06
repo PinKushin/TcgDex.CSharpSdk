@@ -7,6 +7,9 @@
 - name: Querying
   href: querying.md
 
+- name: Caching
+  href: caching.md
+
 - name: API reference
   href: api/
   homepage: api/index.md

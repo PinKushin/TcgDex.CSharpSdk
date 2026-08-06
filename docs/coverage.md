@@ -2,13 +2,13 @@
 
 **Goal: reach and hold ~100% line coverage of hand-written SDK code.**
 
-**Current: 98.5% (538/546 lines).** 8 uncovered lines remain, all in one file and
+**Current: 98.9% (699/707 lines).** 8 uncovered lines remain, all in one file and
 all unreachable by construction — see [Why not 100%](#why-not-100) below.
 
 | | Coverage | Uncovered | Unit tests | Integration tests |
 |---|---|---|---|---|
 | Baseline (`f45e496`) | 83.2% | 93 lines / 10 files | 113 | 22 |
-| Now | **98.5%** | 8 lines / 1 file | **208** | **111** |
+| Now | **98.9%** | 8 lines / 1 file | **249** | **120** |
 
 ---
 
