@@ -59,7 +59,7 @@ public sealed class CardShapeTests : LiveApiFixture
     [Test]
     public async Task Boosters_DeserializeAsObjects()
     {
-        // Typed as a string by the previous SDK, which threw on this card.
+        // An object array. Typing it as a string throws on this card.
         var card = await Client.Cards.GetAsync("A4-139", Timeout);
 
         var booster = card.ShouldNotBeNull().Boosters.ShouldHaveSingleItem();

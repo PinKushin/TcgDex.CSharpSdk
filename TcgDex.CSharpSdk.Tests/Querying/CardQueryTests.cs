@@ -8,8 +8,8 @@ using TcgDex.Querying;
 /// <remarks>
 /// These assert the exact query string, because that string is the contract with
 /// the API and every one of these operators was verified against the live
-/// service. Asserting anything weaker is how the previous SDK shipped a `?q=`
-/// parameter that does not exist.
+/// service. Asserting anything weaker would let a filter the API cannot parse
+/// ship with a green suite.
 /// </remarks>
 [TestFixture]
 public sealed class CardQueryTests
@@ -187,8 +187,8 @@ public sealed class CardQueryTests
     [Test]
     public void QueryString_NeverContainsTheInventedQParameter()
     {
-        // Regression guard: `?q=` is not a TCGdex parameter, but the previous
-        // SDK emitted it and its tests never looked.
+        // Regression guard: `?q=` is not a TCGdex parameter. Filters are
+        // top-level query parameters.
         var queryString = Query()
             .Where(c => c.Name == "Furret")
             .Where(c => c.Hp > 100)

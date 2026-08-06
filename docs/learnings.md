@@ -274,16 +274,16 @@ alone would only prove the builder is self-consistent.
 ## Transport tests are mutation-checked, not just green
 
 A test that passes on first write proves nothing until you have seen it fail.
-The URL assertions were verified by reintroducing the exact defect the previous
-SDK shipped — wrapping the query string in an invented `?q=` parameter — and
+The URL assertions were verified by deliberately breaking the transport —
+wrapping the query string in a `?q=` parameter the API does not have — and
 confirming that `GetAsync_PreservesQueryStringVerbatim` failed, and that it was
 the only failure.
 
-That defect passed the old suite because its mock handler ignored the `request`
-argument entirely, so no test ever observed a URL.
-`Http/RecordingHandler.cs` exists to make that class of blind spot impossible:
-it records every request, exposes the URI for assertion, and fails loudly with
-the offending method and URL when the code makes an unexpected extra call.
+That class of bug is invisible to a mock handler that ignores its `request`
+argument, because no test ever observes a URL.
+`Http/RecordingHandler.cs` is built to make it impossible: it records every
+request, exposes the URI for assertion, and fails loudly with the offending
+method and URL when the code makes an unexpected extra call.
 
 Worth repeating for any new area: if a test has never been red, confirm it can
 be.

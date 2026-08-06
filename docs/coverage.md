@@ -107,9 +107,9 @@ Coverage that is measured but not enforced drifts. Once the gap is closed:
 
 ## What coverage does not tell you
 
-100% line coverage means every line ran, not that behaviour is correct. The
-previous version of this SDK had a passing suite that never once asserted a
-request URL, which is how it shipped a `?q=` parameter the API does not have.
+100% line coverage means every line ran, not that behaviour is correct. A suite
+that exercises every line of an HTTP client while never asserting a single
+request URL will sit at 100% and still let a wrong endpoint ship.
 
 The tests that caught real defects here were not the ones chasing lines — they
 were the ones asserting exact URLs, deserializing recorded payloads with

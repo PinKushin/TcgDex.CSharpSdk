@@ -59,7 +59,7 @@ public sealed class TransportTests
     public async Task GetAsync_PreservesQueryStringVerbatim()
     {
         // Filters are top-level query parameters. Anything that rewrites or
-        // wraps them (the previous SDK invented `?q=`) breaks the API contract.
+        // wraps them — in a `?q=` parameter, say — breaks the API contract.
         var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
 
         await CreateTransport(handler)

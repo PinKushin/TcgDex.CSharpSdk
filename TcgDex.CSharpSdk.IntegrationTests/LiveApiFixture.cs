@@ -7,8 +7,8 @@ namespace TcgDex.IntegrationTests;
 /// <para>
 /// Every test deriving from this is categorised <c>Integration</c>, so
 /// <c>dotnet test --filter TestCategory=Integration</c> selects exactly this
-/// set. The previous SDK documented that command in a comment while defining no
-/// categories at all, so it silently selected nothing.
+/// set. Documenting that command without applying the attribute would make it
+/// silently select nothing.
 /// </para>
 /// <para>
 /// These are deliberately excluded from the per-push CI run: they depend on a
