@@ -269,10 +269,11 @@ anything else picks it up by configuring that tool in your application. See
 
 In this repository:
 
-- [`docs/api-info.md`](docs/api-info.md) — the API reference this SDK is built
-  against, verified field by field against live responses.
-- [`docs/learnings.md`](docs/learnings.md) — non-obvious behaviour discovered
-  while building it.
+- [`docs/api-info.md`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/docs/api-info.md)
+  — the API reference this SDK is built against, verified field by field against
+  live responses.
+- [`docs/learnings.md`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/docs/learnings.md)
+  — non-obvious behaviour discovered while building it.
 
 ## Contributing
 
@@ -296,7 +297,7 @@ does not redden a pull request.
 
 ## License
 
-MIT — see [LICENSE.txt](LICENSE.txt).
+MIT — see [LICENSE.txt](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/LICENSE.txt).
 
 This is an unofficial, community-maintained SDK. It is not affiliated with
 TCGdex, Nintendo, Creatures Inc., GAME FREAK inc. or The Pokémon Company.
