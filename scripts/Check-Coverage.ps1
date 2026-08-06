@@ -1,7 +1,7 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-    Fails if line coverage of the hand-written SDK falls below a threshold.
+    Fails if line or branch coverage of the hand-written SDK falls below a threshold.
 
 .DESCRIPTION
     The XPlat code-coverage collector emits a report but cannot enforce a
@@ -14,7 +14,14 @@
     thousand lines of *.g.cs, which swamp the hand-written SDK and make the
     headline number meaningless.
 
-    Prints a per-file breakdown of anything below 100% so a failure says which
+    Both metrics are gated, because they answer different questions. Line
+    coverage asks whether a line ran; branch coverage asks whether both outcomes
+    of a condition were tested. A line holding `flipped ? a : b` is fully
+    line-covered the first time it executes, while half its behaviour has never
+    been exercised — so line coverage alone can sit near 100% with real logic
+    untested.
+
+    Prints a per-file breakdown of anything incomplete so a failure says which
     file regressed, not merely that the total moved.
 
 .PARAMETER ResultsDirectory
@@ -22,6 +29,9 @@
 
 .PARAMETER Threshold
     Minimum acceptable line-coverage percentage.
+
+.PARAMETER BranchThreshold
+    Minimum acceptable branch-coverage percentage.
 
 .EXAMPLE
     ./scripts/Check-Coverage.ps1 -ResultsDirectory ./TestResults -Threshold 99.5
@@ -33,7 +43,11 @@ param(
 
     [Parameter()]
     [ValidateRange(0, 100)]
-    [double] $Threshold = 99.5
+    [double] $Threshold = 99.5,
+
+    [Parameter()]
+    [ValidateRange(0, 100)]
+    [double] $BranchThreshold = 95
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,6 +63,13 @@ if (-not $reports) {
 # under one of them is exercised.
 $covered = [System.Collections.Generic.HashSet[string]]::new()
 $total = [System.Collections.Generic.HashSet[string]]::new()
+
+# Branch data hangs off the same line elements, as "condition-coverage" of the
+# form "50% (1/2)". Counted once per line across reports, like lines are.
+$branchSeen = [System.Collections.Generic.HashSet[string]]::new()
+$branchCovered = 0
+$branchTotal = 0
+$partialBranches = @{}
 
 foreach ($report in $reports) {
     $xml = [xml](Get-Content -Path $report.FullName -Raw)
@@ -66,6 +87,33 @@ foreach ($report in $reports) {
 
             if ([int] $line.hits -gt 0) {
                 [void] $covered.Add($key)
+            }
+
+            if ($line.branch -ne 'True' -or -not $line.'condition-coverage') {
+                continue
+            }
+
+            if (-not $branchSeen.Add($key)) {
+                continue
+            }
+
+            # "50% (1/2)" -> 1 and 2
+            $fraction = ($line.'condition-coverage' -split '\(')[1].TrimEnd(')')
+            $parts = $fraction -split '/'
+            $hit = [int] $parts[0]
+            $all = [int] $parts[1]
+
+            $branchCovered += $hit
+            $branchTotal += $all
+
+            if ($hit -lt $all) {
+                $name = Split-Path -Path $file -Leaf
+
+                if (-not $partialBranches.ContainsKey($name)) {
+                    $partialBranches[$name] = @()
+                }
+
+                $partialBranches[$name] += "L$($line.number)($hit/$all)"
             }
         }
     }
@@ -115,9 +163,31 @@ if ($incomplete) {
     }
 }
 
+$branchPercentage = if ($branchTotal -gt 0) { 100.0 * $branchCovered / $branchTotal } else { 100.0 }
+
+if ($partialBranches.Count -gt 0) {
+    Write-Host ''
+    Write-Host 'Partially covered branches (one side of a condition untested):'
+
+    foreach ($entry in $partialBranches.GetEnumerator() | Sort-Object { -$_.Value.Count }) {
+        Write-Host ('  {0,-34} {1}' -f $entry.Key, ($entry.Value -join ', '))
+    }
+}
+
 Write-Host ''
-Write-Host ('Line coverage: {0}/{1} = {2:N2}%  (threshold {3:N2}%)' -f
+Write-Host ('Line   coverage: {0}/{1} = {2:N2}%  (threshold {3:N2}%)' -f
     $covered.Count, $total.Count, $percentage, $Threshold)
+Write-Host ('Branch coverage: {0}/{1} = {2:N2}%  (threshold {3:N2}%)' -f
+    $branchCovered, $branchTotal, $branchPercentage, $BranchThreshold)
+
+if ($branchPercentage -lt $BranchThreshold) {
+    $message = "Branch coverage {0:N2}% is below the {1:N2}% threshold. " -f $branchPercentage, $BranchThreshold
+    $message += 'One side of a condition listed above is untested — that is behaviour '
+    $message += 'no test has ever exercised, even though the line reports as covered.'
+
+    Write-Host ''
+    Write-Error $message
+}
 
 if ($percentage -lt $Threshold) {
     $message = "Coverage {0:N2}% is below the {1:N2}% threshold. " -f $percentage, $Threshold
@@ -128,4 +198,4 @@ if ($percentage -lt $Threshold) {
     Write-Error $message
 }
 
-Write-Host 'Coverage threshold met.'
+Write-Host 'Coverage thresholds met.'
