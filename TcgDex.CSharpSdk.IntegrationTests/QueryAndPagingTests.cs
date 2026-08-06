@@ -57,6 +57,25 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     }
 
     [Test]
+    public async Task BareWildcard_IsAcceptedAndMatchesAnything()
+    {
+        // A lone "*" used to throw out of the query builder before it could
+        // reach the network. The unit tests prove the string is now `name=*`;
+        // only this proves the API agrees that it means "match anything"
+        // rather than rejecting it.
+        var search = "*";
+
+        var cards = await Client.Cards.ListAsync(
+            new CardQuery().Where(c => c.Name.Contains(search)).Page(1, 30),
+            Timeout);
+
+        // Deliberately no assertion on which cards come back — that is exactly
+        // the volatile live data this suite must not depend on. A full page
+        // proves the filter was accepted and did not narrow to nothing.
+        cards.Count.ShouldBe(30);
+    }
+
+    [Test]
     public async Task EndsWith_AnchorsToTheEnd()
     {
         var cards = await Client.Cards.ListAsync(

@@ -134,6 +134,29 @@ public sealed class CardQueryTests
         => Query().Where(c => c.Name.StartsWith("Big Air")).ToQueryString()
             .ShouldBe("name=Big%20Air*");
 
+    // A caller passing a literal "*" — a user typing the wildcard they already
+    // know the API understands. The live API answers `name=*` with 200 and
+    // every card, and the official JavaScript SDK passes values through
+    // untouched, so this is a legitimate match-anything query rather than an
+    // error. A single asterisk is *one* wildcard; counting it as both a leading
+    // and a trailing one is what used to make this throw.
+    [Test]
+    public void SingleAsterisk_IsOneWildcard_NotTwo()
+    {
+        // A local rather than a literal: this is how the value actually
+        // arrives, and it keeps CA1847 from pushing the call to the char
+        // overload, which would exercise a different translator path.
+        var search = "*";
+
+        Query().Where(c => c.Name.Contains(search)).ToQueryString()
+            .ShouldBe("name=*");
+    }
+
+    [Test]
+    public void AsteriskOnBothEnds_SurvivesAsBothWildcards()
+        => Query().Where(c => c.Name.Contains("**")).ToQueryString()
+            .ShouldBe("name=**");
+
     [Test]
     public void EmptyValue_IsEmittedWithoutBeingMistakenForAWildcard()
     {

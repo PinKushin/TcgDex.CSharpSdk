@@ -90,8 +90,13 @@ internal sealed record QueryFilter(string Field, QueryOperator Operator, IReadOn
         // and the range indexers below are all post-netstandard2.0, and a
         // direct character comparison is both portable and exactly what those
         // overloads do.
-        var trailingWildcard = value.Length > 0 && value[value.Length - 1] == '*';
         var leadingWildcard = value.Length > 0 && value[0] == '*';
+
+        // `> 1`, so a lone "*" counts as one wildcard rather than as both a
+        // leading and a trailing one. Counting it twice left nothing to strip
+        // and threw ArgumentOutOfRangeException out of the substring below —
+        // for a query the API answers with 200 and every card.
+        var trailingWildcard = value.Length > 1 && value[value.Length - 1] == '*';
 
         var core = value;
         if (leadingWildcard)

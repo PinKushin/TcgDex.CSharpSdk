@@ -156,6 +156,43 @@ should too.
 
 ---
 
+## Check the wrapped service before deciding an input is invalid
+
+A filter value of a single `*` threw `ArgumentOutOfRangeException` out of
+`QueryFilter.EscapeValue`: the wildcard detection counted the one character as
+both a leading *and* a trailing wildcard, stripped it twice, and computed a
+negative substring length.
+
+The fix was one character — `value.Length > 1` on the trailing test, so a lone
+asterisk counts once. The part worth keeping is how the *correct behaviour* was
+decided, because "reject it with a better exception" was equally plausible:
+
+- **The API was asked.** `GET /v2/en/cards?name=*` returns **200 with every
+  card**. It is a legitimate match-anything query, not a malformed one. So was
+  `name=` with no value; only `name=eq:` (equality against the empty string)
+  returns `[]`.
+- **The official SDK was read.** The JavaScript SDK's `Query.contains` pushes
+  the value through untouched — it does no wildcard parsing at all, so `*`
+  reaches the wire exactly as written. Throwing would have made this SDK reject
+  a query every other client can express.
+
+Neither answer was available from inside the repository. A wrapper does not get
+to invent validation the wrapped service does not have; that turns a working
+query into a crash and makes the SDK the least capable client of the API.
+
+Also worth noting what did *not* fail: `StartsWith("")` and `EndsWith("")` were
+my first guess at the trigger, and both are already rejected upstream by a
+deliberate `NotSupportedException` in `ExpressionTranslator`. The reachable path
+was a caller passing a literal `"*"` — a user typing the wildcard they know the
+API understands. Guessing the trigger and confirming it are different acts; the
+test only became meaningful once it failed with `length ('-1')`.
+
+The unit test proves the query string is `name=*`. A live integration test
+proves the API accepts it — the same split that caught the set-logo URL bug,
+where a string assertion happily confirmed a URL that 404s.
+
+---
+
 ## Supporting netstandard2.0 cost portability work, not API compromises
 
 Adding `netstandard2.0` reaches Unity and .NET Framework 4.6.1+. The public
