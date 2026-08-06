@@ -10,6 +10,7 @@ published site at
 | [`getting-started.md`](getting-started.md) | Install, configure, first calls, error handling. |
 | [`querying.md`](querying.md) | Every filter operator and the query string it produces. |
 | [`caching.md`](caching.md) | Response caching: the three request paths, defaults, and how to replace the store. |
+| [`observability.md`](observability.md) | Logging and tracing: levels, event ids, and why the SDK takes no telemetry dependency. |
 | [`api-info.md`](api-info.md) | **The specification.** The TCGdex v2 API, verified field by field against live responses. If the SDK and this disagree, one of them is a bug. |
 | [`architecture.md`](architecture.md) | How the SDK is put together and why. Start here to extend it. |
 | [`learnings.md`](learnings.md) | Non-obvious behaviour discovered while building it, each with its evidence. |

@@ -273,6 +273,17 @@ public sealed class PaginationAndImageTests
     }
 
     [Test]
+    public void GetLogoAndSymbolUrls_WorkOnAFullSetToo()
+    {
+        // Both Set and SetBrief carry logos, and a caller holding either should
+        // not have to know which overload they are on.
+        var set = Fixture.Load<Set>("set-full.json");
+
+        set.GetLogoUrl().ShouldEndWith("/logo.png");
+        set.GetSymbolUrl(ImageFormat.Webp).ShouldEndWith("/symbol.webp");
+    }
+
+    [Test]
     public void BuildAsset_OmitsTheQualitySegment()
     {
         // The distinction that matters: set assets are addressed differently

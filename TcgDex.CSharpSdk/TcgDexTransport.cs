@@ -1,6 +1,10 @@
 namespace TcgDex;
 
+using System.Diagnostics;
 using System.Net;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using TcgDex.Diagnostics;
 using TcgDex.Models;
 using TcgDex.Serialization;
 
@@ -26,14 +30,19 @@ internal sealed class TcgDexTransport
 {
     private readonly HttpClient _httpClient;
     private readonly Uri _languageBase;
+    private readonly ILogger _logger;
 
-    internal TcgDexTransport(HttpClient httpClient, TcgDexOptions options)
+    internal TcgDexTransport(HttpClient httpClient, TcgDexOptions options, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(options);
 
         options.Validate();
 
+        // NullLogger rather than a nullable field: the source-generated log
+        // methods short-circuit on IsEnabled, so this costs a branch and keeps
+        // every call site free of null checks.
+        _logger = logger ?? NullLogger.Instance;
         _httpClient = httpClient;
 
         // The trailing slash is what makes the resource path append to the
@@ -62,11 +71,22 @@ internal sealed class TcgDexTransport
 
         var uri = new Uri(_languageBase, relativePath);
 
-        using var response = await SendAsync(uri, cancellationToken).ConfigureAwait(false);
+        using var activity = TcgDexActivity.Start($"TCGdex {typeof(T).Name}");
+        activity?.AddTag("url.full", uri.ToString());
+        activity?.AddTag("http.request.method", "GET");
+
+        var timestamp = Stopwatch.GetTimestamp();
+        _logger.SendingRequest("GET", uri);
+
+        using var response = await SendAsync(uri, activity, cancellationToken).ConfigureAwait(false);
+
+        var elapsed = (long)Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds;
+        activity?.AddTag("http.response.status_code", (int)response.StatusCode);
+        _logger.RequestCompleted(uri, (int)response.StatusCode, elapsed);
 
         if (!response.IsSuccessStatusCode)
         {
-            return await HandleFailureAsync<T>(uri, response, cancellationToken).ConfigureAwait(false);
+            return await HandleFailureAsync<T>(uri, response, activity, cancellationToken).ConfigureAwait(false);
         }
 
         var body = await response.Content
@@ -98,7 +118,10 @@ internal sealed class TcgDexTransport
             "expected always to be available.");
     }
 
-    private async Task<HttpResponseMessage> SendAsync(Uri uri, CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> SendAsync(
+        Uri uri,
+        Activity? activity,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -110,12 +133,18 @@ internal sealed class TcgDexTransport
         }
         catch (HttpRequestException ex)
         {
+            _logger.RequestErrored(ex, uri);
+            TcgDexActivity.RecordFailure(activity, ex);
+
             throw new TcgDexApiException($"The request to '{uri}' could not be completed.", ex);
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             // Cancellation requested by the caller is theirs to observe; this
             // branch is specifically a client-side timeout, which is a fault.
+            _logger.RequestTimedOut(ex, uri);
+            TcgDexActivity.RecordFailure(activity, ex);
+
             throw new TcgDexApiException($"The request to '{uri}' timed out.", ex);
         }
     }
@@ -129,9 +158,10 @@ internal sealed class TcgDexTransport
     /// document's <c>type</c> is the discriminator. Treating a language typo as
     /// "not found" would hide a caller mistake behind an empty result.
     /// </remarks>
-    private static async Task<T?> HandleFailureAsync<T>(
+    private async Task<T?> HandleFailureAsync<T>(
         Uri uri,
         HttpResponseMessage response,
+        Activity? activity,
         CancellationToken cancellationToken)
         where T : class
     {
@@ -139,15 +169,23 @@ internal sealed class TcgDexTransport
 
         if (response.StatusCode == HttpStatusCode.NotFound && problem?.IsLanguageError != true)
         {
+            // Debug, not Warning: a missing resource is an ordinary result.
+            _logger.ResourceNotFound(uri);
             return null;
         }
 
         var description = problem?.Describe() ?? response.ReasonPhrase ?? "no detail supplied";
 
-        throw new TcgDexApiException(
+        _logger.RequestFailed(uri, (int)response.StatusCode, description);
+
+        var exception = new TcgDexApiException(
             $"The TCGdex API returned {(int)response.StatusCode} for '{uri}': {description}",
             response.StatusCode,
             problem);
+
+        TcgDexActivity.RecordFailure(activity, exception);
+
+        throw exception;
     }
 
     private static async Task<TcgDexProblem?> ReadProblemAsync(
@@ -172,7 +210,7 @@ internal sealed class TcgDexTransport
         }
     }
 
-    private static T? Deserialize<T>(string body, Uri uri)
+    private T? Deserialize<T>(string body, Uri uri)
         where T : class
     {
         try
@@ -182,6 +220,8 @@ internal sealed class TcgDexTransport
         }
         catch (JsonException ex)
         {
+            _logger.DeserializationFailed(ex, uri, typeof(T).Name);
+
             // Callers should need to catch only one exception type, so a
             // malformed body (an HTML error page from a proxy, say) is reported
             // as an API failure rather than leaking JsonException.

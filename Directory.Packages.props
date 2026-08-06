@@ -8,6 +8,7 @@
   <!-- Runtime dependencies of the SDK. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.10" />
     <PackageVersion Include="System.Text.Json" Version="10.0.10" />
   </ItemGroup>

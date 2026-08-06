@@ -55,7 +55,10 @@ public static class TcgDexServiceCollectionExtensions
         return services.AddHttpClient<ITcgDexClient, TcgDexClient>(
             (httpClient, provider) => new TcgDexClient(
                 httpClient,
-                provider.GetRequiredService<TcgDexOptions>()));
+                provider.GetRequiredService<TcgDexOptions>(),
+                // Resolved rather than required: logging is a convenience, and a
+                // container without it should still produce a working client.
+                provider.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()));
     }
 
     /// <summary>

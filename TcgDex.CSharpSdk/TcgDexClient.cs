@@ -1,6 +1,9 @@
 namespace TcgDex;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using TcgDex.Caching;
+using TcgDex.Diagnostics;
 using TcgDex.Resources;
 
 /// <summary>
@@ -65,17 +68,45 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
     /// lifetime and connection reuse.
     /// </remarks>
     public TcgDexClient(HttpClient httpClient, TcgDexOptions? options = null)
-        : this(httpClient, options, ownsHttpClient: false)
+        : this(httpClient, options, ownsHttpClient: false, loggerFactory: null)
     {
     }
 
-    private TcgDexClient(HttpClient httpClient, TcgDexOptions? options, bool ownsHttpClient)
+    /// <summary>
+    /// Creates a client that logs through the supplied factory.
+    /// </summary>
+    /// <param name="httpClient">The client used for requests.</param>
+    /// <param name="options">Language and endpoint configuration.</param>
+    /// <param name="loggerFactory">Where SDK log messages are written.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="httpClient"/> is null.</exception>
+    /// <exception cref="ArgumentException">The options are not valid.</exception>
+    /// <remarks>
+    /// Registering through <c>AddTcgDex</c> supplies this automatically from the
+    /// container, so this overload is for callers building the client by hand.
+    /// </remarks>
+    public TcgDexClient(HttpClient httpClient, TcgDexOptions? options, ILoggerFactory? loggerFactory)
+        : this(httpClient, options, ownsHttpClient: false, loggerFactory)
+    {
+    }
+
+    private TcgDexClient(
+        HttpClient httpClient,
+        TcgDexOptions? options,
+        bool ownsHttpClient,
+        ILoggerFactory? loggerFactory)
     {
         _ownedHttpClient = ownsHttpClient ? httpClient : null;
 
         var resolved = options ?? new TcgDexOptions();
-        var transport = new TcgDexTransport(httpClient, resolved);
-        var graphQl = new GraphQlTransport(httpClient, resolved);
+
+        // One category for the whole SDK, so a consumer can filter everything it
+        // emits with a single rule on "TcgDex".
+        var logger = loggerFactory?.CreateLogger("TcgDex") ?? NullLogger.Instance;
+
+        var transport = new TcgDexTransport(httpClient, resolved, logger);
+        var graphQl = new GraphQlTransport(httpClient, resolved, logger);
+
+        logger.ClientConfigured(resolved.Language, resolved.BaseAddress);
 
         Cards = new CardResource(transport, graphQl);
         Sets = new SetResource(transport);
@@ -113,6 +144,7 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
     /// When supplied, enables response caching and applies this policy. Pass an
     /// empty delegate to enable it with defaults.
     /// </param>
+    /// <param name="loggerFactory">Optional destination for SDK log messages.</param>
     /// <returns>A client that owns and disposes its own <see cref="HttpClient"/>.</returns>
     /// <exception cref="ArgumentException">The options are not valid.</exception>
     /// <remarks>
@@ -139,7 +171,8 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
     /// </example>
     public static TcgDexClient Create(
         TcgDexOptions? options = null,
-        Action<TcgDexCacheOptions>? configureCache = null)
+        Action<TcgDexCacheOptions>? configureCache = null,
+        ILoggerFactory? loggerFactory = null)
     {
         var resolved = options ?? new TcgDexOptions();
         resolved.Validate();
@@ -165,7 +198,7 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
             };
         }
 
-        return new TcgDexClient(new HttpClient(handler), resolved, ownsHttpClient: true);
+        return new TcgDexClient(new HttpClient(handler), resolved, ownsHttpClient: true, loggerFactory);
     }
 
     /// <summary>

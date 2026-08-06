@@ -3,6 +3,9 @@ namespace TcgDex;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using TcgDex.Diagnostics;
 using TcgDex.Models;
 using TcgDex.Querying;
 using TcgDex.Serialization;
@@ -36,7 +39,10 @@ using TcgDex.Serialization;
 /// one call per card — 13 round trips versus 1 for a search returning 12 cards.
 /// </para>
 /// </remarks>
-internal sealed class GraphQlTransport(HttpClient httpClient, TcgDexOptions options)
+internal sealed class GraphQlTransport(
+    HttpClient httpClient,
+    TcgDexOptions options,
+    ILogger? logger = null)
 {
     /// <summary>
     /// The card fields requested. Restricted to what the GraphQL schema
@@ -61,6 +67,8 @@ internal sealed class GraphQlTransport(HttpClient httpClient, TcgDexOptions opti
 
     private readonly TcgDexOptions _options = options
         ?? throw new ArgumentNullException(nameof(options));
+
+    private readonly ILogger _logger = logger ?? NullLogger.Instance;
 
     /// <summary>
     /// Searches for cards, returning full detail for each in a single request.
@@ -88,6 +96,8 @@ internal sealed class GraphQlTransport(HttpClient httpClient, TcgDexOptions opti
         {
             var messages = string.Join("; ", response.Errors.Select(e => e.Message));
 
+            _logger.GraphQlErrors(messages);
+
             throw new TcgDexApiException($"The TCGdex GraphQL endpoint reported errors: {messages}");
         }
 
@@ -100,8 +110,19 @@ internal sealed class GraphQlTransport(HttpClient httpClient, TcgDexOptions opti
 
         // A null entry means the server could not resolve a non-nullable field
         // for that card. Dropping it beats handing back a null the caller has to
-        // guard on every iteration.
-        return [.. cards.Where(card => card is not null).Select(card => card!)];
+        // guard on every iteration — but it is logged, so a missing card is
+        // explainable rather than mysterious.
+        var resolved = cards.Where(card => card is not null).Select(card => card!).ToArray();
+
+        var dropped = cards.Count - resolved.Length;
+        if (dropped > 0)
+        {
+            _logger.GraphQlDroppedEntries(dropped);
+        }
+
+        _logger.GraphQlSearchCompleted(resolved.Length);
+
+        return resolved;
     }
 
     private static string BuildQuery(CardFilter filter, int? page, int? itemsPerPage)
