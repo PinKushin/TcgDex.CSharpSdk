@@ -95,15 +95,50 @@ For reference, since these are the areas worth keeping covered as the SDK grows:
   (`energy-types`, `regulation-marks`, `dex-ids`) are trivially mistyped as
   camelCase and would only fail at runtime.
 
-## How to hold it
+## How it is held
 
-Coverage that is measured but not enforced drifts. Once the gap is closed:
+Coverage that is measured but not enforced drifts, so CI gates on it:
 
-- Add a threshold to the CI unit-test step so a drop fails the build:
-  `/p:ThresholdType=line /p:Threshold=100 /p:ThresholdStat=total`.
-- Keep the threshold on **hand-written code only**, via the runsettings above.
-- Treat a deliberate exclusion as a code review decision: `[ExcludeFromCodeCoverage]`
-  with a comment explaining why, not a silent drop in the number.
+```yaml
+- name: Coverage threshold
+  shell: pwsh
+  run: ./scripts/Check-Coverage.ps1 -ResultsDirectory ./TestResults -Threshold 98
+```
+
+Run the identical check locally:
+
+```bash
+dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj   --collect:"XPlat Code Coverage" --settings coverlet.runsettings   --results-directory ./TestResults
+
+pwsh ./scripts/Check-Coverage.ps1
+```
+
+### Why a script rather than a build property
+
+`coverlet.msbuild` can enforce a threshold with `/p:Threshold=…`, but this repo
+uses the **XPlat collector**, which produces the report and cannot gate on it.
+Switching packages to get the gate would mean giving up the collector's cleaner
+integration with `dotnet test`. A separate pass over the Cobertura output keeps
+both, and prints a per-file breakdown so a failure names the file that regressed
+rather than only reporting that the total moved.
+
+The script excludes generated files exactly as the runsettings does, so the gate
+measures the same thing the report does.
+
+### Why 98 and not 100
+
+The ceiling is **99.0%** — the 8 unreachable lines below are 0.98% of the total,
+and no test can reach them. A gate at 100 could never pass; a gate at 99.0 would
+sit exactly on the current value and break the moment a single defensive branch
+is added anywhere.
+
+98 leaves room for that while still failing on any real regression: dropping a
+genuinely tested file to zero would cost far more than two points. Raise it if
+the unreachable set ever shrinks.
+
+**Do not lower the gate to make a build pass.** If a line is genuinely
+unreachable, record why here — as the ones below are — rather than moving the
+number.
 
 ## What coverage does not tell you
 
