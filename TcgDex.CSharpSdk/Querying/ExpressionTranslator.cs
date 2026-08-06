@@ -294,7 +294,25 @@ internal static class ExpressionTranslator
                 $"Cannot read a value from '{member.Name}' while building a filter."),
         };
 
-    private static string Format(object value)
+    /// <summary>
+    /// Renders a filter value as the API expects to receive it.
+    /// </summary>
+    /// <param name="value">The value pulled out of the expression.</param>
+    /// <returns>The text to place after the operator.</returns>
+    /// <remarks>
+    /// <para>
+    /// Invariant culture is not optional: a machine with a comma decimal
+    /// separator would otherwise emit a filter the API cannot parse.
+    /// </para>
+    /// <para>
+    /// Internal rather than private so it can be tested directly. No model
+    /// property is currently a <see cref="bool"/>, so the boolean branch is
+    /// unreachable through a predicate — but leaving it out would make the
+    /// first such property silently emit <c>"True"</c> instead of
+    /// <c>"true"</c>.
+    /// </para>
+    /// </remarks>
+    internal static string Format(object value)
         => value switch
         {
             string text => text,

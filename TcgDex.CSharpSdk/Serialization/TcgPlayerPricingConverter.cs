@@ -22,11 +22,8 @@ public sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing>
     /// <inheritdoc />
     public override TcgPlayerPricing? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        if (reader.TokenType == JsonTokenType.Null)
-        {
-            return null;
-        }
-
+        // No null check: HandleNull defaults to false, so System.Text.Json
+        // handles a null value itself and never invokes this converter for one.
         if (reader.TokenType != JsonTokenType.StartObject)
         {
             throw new JsonException($"Expected an object for TCGplayer pricing but found {reader.TokenType}.");
@@ -38,11 +35,9 @@ public sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing>
 
         while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
         {
-            if (reader.TokenType != JsonTokenType.PropertyName)
-            {
-                throw new JsonException($"Expected a property name but found {reader.TokenType}.");
-            }
-
+            // Utf8JsonReader guarantees a PropertyName here: the loop exits on
+            // EndObject, and malformed JSON fails inside the reader before
+            // reaching this point.
             var name = reader.GetString()!;
             reader.Read();
 

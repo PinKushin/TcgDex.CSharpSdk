@@ -129,6 +129,43 @@ comes from the shared framework.
 
 ---
 
+## Four of the 18 advertised languages have no card data
+
+The API enumerates 18 language codes in its own error payload, and all 18 route
+successfully. But `pt-pt`, `nl`, `pl` and `ru` return **HTTP 200 with empty
+arrays** — no cards, empty catalogs. `nl`, `pl` and `ru` do carry a few sets
+(3, 2 and 9) with no cards in them; `pt-pt` is empty entirely.
+
+Accepted is not the same as populated. A client must treat an empty result as
+valid rather than as a failure, which is what the SDK does.
+
+## Card ids are not universal across languages
+
+Each language is backed by its own card pool. `swsh3-136` is a Western card and
+returns **404** in `ja`, `ko`, `th`, `id`, `zh-cn` and `pt-br` — those databases
+contain different sets entirely.
+
+Consequence for tests and for callers: to work in an arbitrary language, take
+ids from that language's own list endpoint rather than assuming a shared id
+resolves. The integration suite proves each language is live by asking it for
+its *own* first card, not for a fixed id.
+
+Where the pool is shared, names are genuinely localised: `swsh3-136` is *Furret*
+in `en`, *Fouinar* in `fr`, *Wiesenior* in `de`.
+
+## `JsonConverter.HandleNull` is false, so null branches are dead code
+
+Both custom converters had a `JsonTokenType.Null` case and a null check in
+`Write`. Tests covering null passed — while those exact lines stayed uncovered.
+
+The reason: `JsonConverter<T>.HandleNull` defaults to `false`, so
+System.Text.Json handles a null value itself and never invokes the converter.
+The branches could not run. They were deleted rather than tested.
+
+Worth remembering as a general point: a line that stays dark while a test
+covering that scenario passes is evidence the line cannot run, not evidence the
+test is missing.
+
 ## GraphQL's win is the flat card search, not nested fetch
 
 The obvious assumption — that GraphQL avoids N+1 by fetching a set together with
