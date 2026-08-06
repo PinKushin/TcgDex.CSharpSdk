@@ -121,14 +121,39 @@ body and exposes `ex.IsLanguageError`.
 
 ## Images
 
-`Image`, `Logo` and `Symbol` are base URLs **without a file extension**. Append a
-quality and format:
+`Image`, `Logo` and `Symbol` are base URLs **without a file extension**, and the
+helpers build the right form for each:
 
 ```csharp
-var url = $"{card.Image}/high.png";   // or low.webp, high.jpg, ...
+string? art  = card.GetImageUrl(ImageQuality.High, ImageFormat.Png);
+string? logo = card.Set.GetLogoUrl();
+string? sym  = card.Set.GetSymbolUrl(ImageFormat.Webp);
 ```
 
-Some cards genuinely have no artwork, so `Image` can be null.
+Worth knowing why these are not one method: **card artwork takes a quality
+segment and set assets do not.**
+
+```
+https://assets.tcgdex.net/en/swsh/swsh3/136/high.png   card    200
+https://assets.tcgdex.net/en/swsh/swsh3/logo.png       logo    200
+https://assets.tcgdex.net/en/swsh/swsh3/logo/high.png  logo    404
+```
+
+Every one of these returns `null` rather than a broken URL when the asset is
+absent — some cards genuinely have no artwork.
+
+## Streaming large result sets
+
+```csharp
+await foreach (var card in tcgdex.Cards.StreamAsync(
+    new CardQuery().Where(c => c.Category == "Pokemon"), pageSize: 100, ct))
+{
+    // Pages are fetched as you consume them; breaking out stops the requests.
+}
+```
+
+The API reports no total count, so the end of the results can only be detected
+by receiving a short page. `StreamAsync` handles that once so you do not have to.
 
 ## Reading the models
 

@@ -302,8 +302,10 @@ should be treated as optional.
 
 ## 6. Assets
 
-The card's `image` and the set's `logo`/`symbol` are **base URLs without a file extension**.
-Append quality and format:
+The card's `image` and the set's `logo`/`symbol` are **base URLs without a file extension** —
+but the two are addressed **differently**, which is easy to miss because the fields look alike.
+
+**Card artwork** takes a quality segment:
 
 ```
 {image}/{quality}.{format}      quality = high | low       format = png | webp | jpg
@@ -312,7 +314,17 @@ https://assets.tcgdex.net/en/swsh/swsh3/136/low.webp     -> 200 image/webp
 https://assets.tcgdex.net/en/swsh/swsh3/136.png          -> 404
 ```
 
-Set logos are language-scoped (`/en/...`) while symbols are served from `/univ/...`.
+**Set logos and symbols take no quality at all** — only an extension:
+
+```
+{logo}.{format}
+https://assets.tcgdex.net/en/swsh/swsh3/logo.png          -> 200 image/png
+https://assets.tcgdex.net/en/swsh/swsh3/logo/high.png     -> 404
+https://assets.tcgdex.net/univ/swsh/swsh3/symbol.png      -> 200 image/png
+```
+
+Applying the card pattern to a logo returns 404. Set logos are language-scoped (`/en/...`) while
+symbols are served language-neutral from `/univ/...`.
 
 ---
 

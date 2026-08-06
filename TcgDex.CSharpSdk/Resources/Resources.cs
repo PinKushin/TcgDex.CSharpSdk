@@ -55,6 +55,38 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport g
             query.ToRelativePath(),
             cancellationToken);
     }
+
+    public async IAsyncEnumerable<CardBrief> StreamAsync(
+        Querying.CardQuery query,
+        int pageSize = 100,
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
+
+        for (var page = 1; ; page++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var batch = await ListAsync(query.Page(page, pageSize), cancellationToken)
+                .ConfigureAwait(false);
+
+            foreach (var card in batch)
+            {
+                yield return card;
+            }
+
+            // A short page is the only end-of-results signal the API gives: it
+            // reports no total and sends no pagination headers. An exactly-full
+            // final page therefore costs one extra empty request, which is the
+            // price of not being told how many there are.
+            if (batch.Count < pageSize)
+            {
+                yield break;
+            }
+        }
+    }
 }
 
 /// <inheritdoc cref="ISetResource" />
