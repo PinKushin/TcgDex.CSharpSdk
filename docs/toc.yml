@@ -10,6 +10,9 @@
 - name: Caching
   href: caching.md
 
+- name: Logging and tracing
+  href: observability.md
+
 - name: API reference
   href: api/
   homepage: api/index.md

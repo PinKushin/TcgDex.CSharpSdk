@@ -228,6 +228,22 @@ var url = $"{card.Image}/high.png";   // or low.webp, high.jpg, ...
 
 Some cards genuinely have no artwork, so `Image` can be null.
 
+### Logging and tracing
+
+Structured logs via `ILogger` and OpenTelemetry spans via `ActivitySource`, both
+free when nothing is listening. With DI it is automatic; everything is under the
+`TcgDex` category.
+
+```csharp
+builder.Services.AddOpenTelemetry()
+    .WithTracing(t => t.AddSource(TcgDexActivity.SourceName));
+```
+
+The SDK takes **no dependency on any telemetry vendor** — it writes to .NET's
+standard abstractions, so Serilog, Application Insights, Datadog, Sentry or
+anything else picks it up by configuring that tool in your application. See
+[Logging and tracing](https://pinkushin.github.io/TcgDex.CSharpSdk/observability.html).
+
 ## Documentation
 
 **[Full documentation and API reference](https://pinkushin.github.io/TcgDex.CSharpSdk/)**
