@@ -18,7 +18,7 @@ public sealed class MemoryCacheTests
             Body = System.Text.Encoding.UTF8.GetBytes(body),
             ETag = etag,
             ContentType = "application/json",
-            StoredAt = DateTimeOffset.UnixEpoch,
+            StoredAt = UnixEpoch,
         };
 
     [Test]
@@ -172,7 +172,7 @@ public sealed class MemoryCacheTests
     [Test]
     public void IsFresh_ComparesAgainstTheStoreTime()
     {
-        var stored = DateTimeOffset.UnixEpoch;
+        var stored = UnixEpoch;
         var response = Response() with { StoredAt = stored };
 
         response.IsFresh(stored.AddSeconds(30), TimeSpan.FromMinutes(1)).ShouldBeTrue();
@@ -236,16 +236,16 @@ public sealed class MemoryCacheTests
     private sealed class CountingCache : ITcgDexResponseCache
     {
         public ValueTask<CachedResponse?> GetAsync(string key, CancellationToken cancellationToken = default)
-            => ValueTask.FromResult<CachedResponse?>(null);
+            => new ValueTask<CachedResponse?>((CachedResponse?)null);
 
         public ValueTask SetAsync(
             string key,
             CachedResponse response,
             TimeSpan timeToLive,
             CancellationToken cancellationToken = default)
-            => ValueTask.CompletedTask;
+            => default;
 
         public ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default)
-            => ValueTask.CompletedTask;
+            => default;
     }
 }

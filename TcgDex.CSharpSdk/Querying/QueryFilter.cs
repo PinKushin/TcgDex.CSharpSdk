@@ -86,18 +86,22 @@ internal sealed record QueryFilter(string Field, QueryOperator Operator, IReadOn
 
     private static string EscapeValue(string value)
     {
-        var trailingWildcard = value.EndsWith('*');
-        var leadingWildcard = value.StartsWith('*');
+        // Indexed rather than StartsWith('*')/EndsWith('*'): the char overloads
+        // and the range indexers below are all post-netstandard2.0, and a
+        // direct character comparison is both portable and exactly what those
+        // overloads do.
+        var trailingWildcard = value.Length > 0 && value[value.Length - 1] == '*';
+        var leadingWildcard = value.Length > 0 && value[0] == '*';
 
         var core = value;
         if (leadingWildcard)
         {
-            core = core[1..];
+            core = core.Substring(1);
         }
 
         if (trailingWildcard)
         {
-            core = core[..^1];
+            core = core.Substring(0, core.Length - 1);
         }
 
         var escaped = Uri.EscapeDataString(core);

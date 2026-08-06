@@ -6,7 +6,11 @@
          on net8.0 from a package at a different major version. Testing only
          net10.0 would leave the shipped net8.0 assembly build-verified but
          never executed. -->
-    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <!-- net472 is how the netstandard2.0 assembly gets executed rather than
+         merely compiled: .NET Framework resolves that asset, so these runs
+         exercise exactly the DLL a Unity or WinForms consumer receives —
+         including the init/required shims, which every model relies on. -->
+    <TargetFrameworks>net472;net8.0;net10.0</TargetFrameworks>
     <RootNamespace>TcgDex.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>

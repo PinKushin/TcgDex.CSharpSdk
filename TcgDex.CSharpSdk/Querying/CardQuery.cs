@@ -110,8 +110,8 @@ public sealed class CardQuery
     /// </remarks>
     public CardQuery Page(int page, int itemsPerPage)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
-        ArgumentOutOfRangeException.ThrowIfLessThan(itemsPerPage, 1);
+        Guard.NotLessThan(page, 1);
+        Guard.NotLessThan(itemsPerPage, 1);
 
         return new CardQuery(_filters, _sortField, _sortOrder, page, itemsPerPage);
     }
@@ -159,7 +159,7 @@ public sealed class CardQuery
 
     private CardQuery WithSort<TKey>(Expression<Func<Card, TKey>> selector, string order)
     {
-        ArgumentNullException.ThrowIfNull(selector);
+        Guard.NotNull(selector);
 
         var field = ExpressionTranslator.SortFieldName(selector);
 

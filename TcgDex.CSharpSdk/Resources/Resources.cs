@@ -23,7 +23,7 @@ internal abstract class ResourceBase(TcgDexTransport transport)
     /// <returns>The escaped identifier.</returns>
     protected static string EscapeId(string id)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        Guard.NotNullOrWhiteSpace(id);
         return Uri.EscapeDataString(id);
     }
 }
@@ -49,7 +49,7 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport g
         Querying.CardQuery query,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(query);
+        Guard.NotNull(query);
 
         return Transport.GetRequiredAsync<IReadOnlyList<CardBrief>>(
             query.ToRelativePath(),
@@ -62,8 +62,8 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport g
         [System.Runtime.CompilerServices.EnumeratorCancellation]
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(query);
-        ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
+        Guard.NotNull(query);
+        Guard.NotLessThan(pageSize, 1);
 
         for (var page = 1; ; page++)
         {

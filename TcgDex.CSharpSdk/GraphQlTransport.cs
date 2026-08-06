@@ -85,7 +85,7 @@ internal sealed class GraphQlTransport(
         int? itemsPerPage,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(filter);
+        Guard.NotNull(filter);
 
         var query = BuildQuery(filter, page, itemsPerPage);
         var response = await PostAsync(query, cancellationToken).ConfigureAwait(false);

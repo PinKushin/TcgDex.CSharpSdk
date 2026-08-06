@@ -45,8 +45,8 @@ default to no-ops, so neither costs anything when unconfigured.
 
 | Project | Purpose |
 |---|---|
-| `TcgDex.CSharpSdk` | The SDK. Multi-targets `net8.0` and `net10.0`. |
-| `TcgDex.CSharpSdk.Tests` | Unit tests. Offline, against recorded fixtures. |
+| `TcgDex.CSharpSdk` | The SDK. Multi-targets `netstandard2.0`, `net8.0` and `net10.0`. |
+| `TcgDex.CSharpSdk.Tests` | Unit tests. Offline, against recorded fixtures. Runs on `net472`, `net8.0` and `net10.0` — the `net472` pass executes the `netstandard2.0` assembly rather than merely compiling it. |
 | `TcgDex.CSharpSdk.IntegrationTests` | Live API. `[Category("Integration")]`, weekly in CI. |
 | `TcgDex.CSharpSdk.AotSmokeTest` | Publishes with Native AOT and runs, proving compatibility. |
 

@@ -21,6 +21,22 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
 
+    <!-- Every security rule, not just the recommended subset. `recommended`
+         leaves most of the CA3xxx injection and CA5xxx cryptography rules off,
+         which is the wrong default for a library that parses responses from a
+         remote service. Combined with TreatWarningsAsErrors, a security finding
+         fails the build rather than joining a warning list nobody reads. -->
+    <AnalysisModeSecurity>All</AnalysisModeSecurity>
+
+    <!-- Fail restore on a dependency with a known advisory. `all` covers
+         transitive packages too, which is where this realistically bites: the
+         netstandard2.0 target pulls a 8.0.x dependency graph that the modern
+         targets get in-box and therefore service automatically. `low` reports
+         everything rather than only the alarming ones. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+
     <Deterministic>true</Deterministic>
     <InvariantGlobalization>true</InvariantGlobalization>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>

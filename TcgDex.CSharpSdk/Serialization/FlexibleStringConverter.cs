@@ -42,7 +42,7 @@ public sealed class FlexibleStringConverter : JsonConverter<string?>
     /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options)
     {
-        ArgumentNullException.ThrowIfNull(writer);
+        Guard.NotNull(writer);
 
         // Likewise never called with null, so this writes the value directly.
         writer.WriteStringValue(value);

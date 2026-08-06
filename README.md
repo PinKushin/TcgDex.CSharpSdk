@@ -6,8 +6,17 @@ support for dependency injection, trimming and Native AOT.
 
 [![CI](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/ci.yml/badge.svg)](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/ci.yml)
 
-Targets **.NET 8** and **.NET 10**. No API key required — TCGdex is a free,
-public, read-only API.
+Targets **.NET 8**, **.NET 10** and **netstandard2.0** — so it runs on modern
+.NET, on **Unity**, and on **.NET Framework 4.6.1+**. No API key required —
+TCGdex is a free, public, read-only API.
+
+The API surface is identical on every target, async included. One difference is
+worth knowing before you rely on it: connection recycling, which keeps a
+long-lived client from pinning stale DNS, uses `SocketsHttpHandler` on modern
+.NET and `ServicePoint.ConnectionLeaseTimeout` on .NET Framework. Same
+guarantee, different mechanism. Response cancellation mid-body is best-effort on
+netstandard2.0, because the cancellable `HttpContent` read overloads do not
+exist there.
 
 ---
 

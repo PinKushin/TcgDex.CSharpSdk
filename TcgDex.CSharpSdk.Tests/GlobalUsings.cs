@@ -8,3 +8,7 @@ global using System.Linq;
 global using System.Text.Json;
 global using NUnit.Framework;
 global using Shouldly;
+
+// `using static` so tests read `UnixEpoch`, matching the BCL member they stand
+// in for on the targets that have it.
+global using static TcgDex.Tests.TestTime;

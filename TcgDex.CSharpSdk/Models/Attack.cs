@@ -48,20 +48,44 @@ public sealed record Attack
     {
         get
         {
-            if (string.IsNullOrEmpty(Damage))
+            // Read once into a local: the property is nullable, and the
+            // netstandard2.0 reference assembly does not annotate
+            // string.IsNullOrEmpty with [NotNullWhen(false)], so an explicit
+            // null test is what keeps the loop below provably safe on every
+            // target.
+            var damage = Damage;
+            if (damage is null || damage.Length == 0)
             {
                 return null;
             }
 
+            // Deliberately an ASCII range test rather than char.IsDigit: the
+            // latter accepts every Unicode decimal digit, which int.Parse would
+            // then reject. char.IsAsciiDigit itself is .NET 7+, and this also
+            // builds for netstandard2.0.
             var length = 0;
-            while (length < Damage.Length && char.IsAsciiDigit(Damage[length]))
+            while (length < damage.Length && damage[length] is >= '0' and <= '9')
             {
                 length++;
             }
 
-            return length == 0
-                ? null
-                : int.Parse(Damage.AsSpan(0, length), provider: System.Globalization.CultureInfo.InvariantCulture);
+            if (length == 0)
+            {
+                return null;
+            }
+
+#if NETSTANDARD2_0
+            // No span-based int.Parse overload here, so this allocates a
+            // substring. CA1846 would prefer AsSpan and is right on the targets
+            // where it applies — hence the split rather than a suppression.
+            return int.Parse(
+                damage.Substring(0, length),
+                System.Globalization.CultureInfo.InvariantCulture);
+#else
+            return int.Parse(
+                damage.AsSpan(0, length),
+                provider: System.Globalization.CultureInfo.InvariantCulture);
+#endif
         }
     }
 }

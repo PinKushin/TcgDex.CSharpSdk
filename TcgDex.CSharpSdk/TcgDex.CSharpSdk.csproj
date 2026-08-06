@@ -1,14 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net8.0;net10.0</TargetFrameworks>
     <RootNamespace>TcgDex</RootNamespace>
     <AssemblyName>TcgDex.CSharpSdk</AssemblyName>
   </PropertyGroup>
 
   <!-- Trim- and AOT-safety. The JSON layer is source-generated, so no
-       reflection-based serialization is rooted at runtime. -->
-  <PropertyGroup>
+       reflection-based serialization is rooted at runtime.
+
+       net6.0+ only: trimming and AOT do not exist on netstandard2.0, and
+       IsAotCompatible there raises NETSDK1210. The analyzers still run on the
+       modern targets, which compile the same source, so netstandard2.0 gets the
+       benefit of the discipline without being able to declare it. -->
+  <PropertyGroup Condition="'$(TargetFramework)' != 'netstandard2.0'">
     <IsAotCompatible>true</IsAotCompatible>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <IsTrimmable>true</IsTrimmable>
@@ -41,6 +46,15 @@
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+  <!-- Supplied by the shared framework on net8.0+; packages here. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="System.Text.Json" />
+    <PackageReference Include="System.Net.Http.Json" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" />
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" />
+    <PackageReference Include="Microsoft.Bcl.TimeProvider" />
   </ItemGroup>
 
   <!-- System.Text.Json is deliberately NOT referenced as a package. Both

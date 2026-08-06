@@ -54,7 +54,10 @@ public sealed class TransportFailureTests
     [TestCase(HttpStatusCode.InternalServerError)]
     [TestCase(HttpStatusCode.BadGateway)]
     [TestCase(HttpStatusCode.ServiceUnavailable)]
-    [TestCase(HttpStatusCode.TooManyRequests)]
+    // Cast rather than the named member: HttpStatusCode.TooManyRequests does
+    // not exist in .NET Framework's enum, and these tests also run on net472 to
+    // exercise the netstandard2.0 assembly. The wire value is what matters.
+    [TestCase((HttpStatusCode)429)]
     public void Rest_WhenServerFails_ThrowsWithTheStatus(HttpStatusCode status)
     {
         var handler = new RecordingHandler().RespondWith(status, "{}");

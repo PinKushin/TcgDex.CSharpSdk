@@ -31,7 +31,7 @@ public static class TcgDexServiceCollectionExtensions
         this IServiceCollection services,
         Action<TcgDexOptions>? configure = null)
     {
-        ArgumentNullException.ThrowIfNull(services);
+        Guard.NotNull(services);
 
         var options = new TcgDexOptions();
         configure?.Invoke(options);
@@ -95,7 +95,7 @@ public static class TcgDexServiceCollectionExtensions
         Action<TcgDexOptions>? configure = null,
         Action<TcgDexCacheOptions>? configureCache = null)
     {
-        ArgumentNullException.ThrowIfNull(services);
+        Guard.NotNull(services);
 
         var cacheOptions = new TcgDexCacheOptions();
         configureCache?.Invoke(cacheOptions);

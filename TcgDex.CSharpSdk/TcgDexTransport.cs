@@ -34,8 +34,8 @@ internal sealed class TcgDexTransport
 
     internal TcgDexTransport(HttpClient httpClient, TcgDexOptions options, ILogger? logger = null)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentNullException.ThrowIfNull(options);
+        Guard.NotNull(httpClient);
+        Guard.NotNull(options);
 
         options.Validate();
 
@@ -67,7 +67,7 @@ internal sealed class TcgDexTransport
     internal async Task<T?> GetAsync<T>(string relativePath, CancellationToken cancellationToken)
         where T : class
     {
-        ArgumentNullException.ThrowIfNull(relativePath);
+        Guard.NotNull(relativePath);
 
         var uri = new Uri(_languageBase, relativePath);
 
@@ -80,7 +80,7 @@ internal sealed class TcgDexTransport
 
         using var response = await SendAsync(uri, activity, cancellationToken).ConfigureAwait(false);
 
-        var elapsed = (long)Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds;
+        var elapsed = (long)ElapsedSince(timestamp).TotalMilliseconds;
         activity?.AddTag("http.response.status_code", (int)response.StatusCode);
         _logger.RequestCompleted(uri, (int)response.StatusCode, elapsed);
 
@@ -187,6 +187,19 @@ internal sealed class TcgDexTransport
 
         throw exception;
     }
+
+    /// <summary>
+    /// Time since a <see cref="Stopwatch.GetTimestamp"/> reading.
+    /// </summary>
+    /// <remarks>
+    /// <c>Stopwatch.GetElapsedTime(long)</c> is .NET 7+. This is what it
+    /// does: raw ticks scaled by the platform's timer frequency. Measuring from
+    /// a timestamp rather than allocating a <see cref="Stopwatch"/> keeps the
+    /// request path allocation-free.
+    /// </remarks>
+    private static TimeSpan ElapsedSince(long timestamp)
+        => TimeSpan.FromTicks(
+            (long)((Stopwatch.GetTimestamp() - timestamp) * (TimeSpan.TicksPerSecond / (double)Stopwatch.Frequency)));
 
     private static async Task<TcgDexProblem?> ReadProblemAsync(
         HttpResponseMessage response,

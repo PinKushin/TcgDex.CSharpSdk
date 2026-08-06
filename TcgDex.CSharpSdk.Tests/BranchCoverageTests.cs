@@ -330,13 +330,13 @@ public sealed class BranchCoverageTests
         await cache.SetAsync("a", new CachedResponse
         {
             Body = [1],
-            StoredAt = DateTimeOffset.UnixEpoch,
+            StoredAt = UnixEpoch,
         }, TimeSpan.FromHours(1));
 
         await cache.SetAsync("b", new CachedResponse
         {
             Body = [2],
-            StoredAt = DateTimeOffset.UnixEpoch,
+            StoredAt = UnixEpoch,
         }, TimeSpan.FromHours(1));
 
         cache.Count.ShouldBe(1, "the bound should hold after eviction");

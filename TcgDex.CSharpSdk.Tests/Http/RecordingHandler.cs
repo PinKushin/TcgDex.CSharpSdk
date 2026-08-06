@@ -83,7 +83,7 @@ internal sealed class RecordingHandler : HttpMessageHandler
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        Guard.NotNull(request);
 
         Requests.Add(request);
 

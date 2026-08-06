@@ -31,7 +31,7 @@ public sealed class MemoryTcgDexResponseCache : ITcgDexResponseCache
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxEntries"/> is less than one.</exception>
     public MemoryTcgDexResponseCache(int maxEntries = 512, TimeProvider? timeProvider = null)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(maxEntries, 1);
+        Guard.NotLessThan(maxEntries, 1);
 
         _maxEntries = maxEntries;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -43,12 +43,12 @@ public sealed class MemoryTcgDexResponseCache : ITcgDexResponseCache
     /// <inheritdoc />
     public ValueTask<CachedResponse?> GetAsync(string key, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        Guard.NotNullOrWhiteSpace(key);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (!_entries.TryGetValue(key, out var entry))
         {
-            return ValueTask.FromResult<CachedResponse?>(null);
+            return new ValueTask<CachedResponse?>((CachedResponse?)null);
         }
 
         var now = _timeProvider.GetUtcNow();
@@ -58,12 +58,12 @@ public sealed class MemoryTcgDexResponseCache : ITcgDexResponseCache
         if (now >= entry.ExpiresAt)
         {
             _entries.TryRemove(key, out _);
-            return ValueTask.FromResult<CachedResponse?>(null);
+            return new ValueTask<CachedResponse?>((CachedResponse?)null);
         }
 
         entry.Touch(now);
 
-        return ValueTask.FromResult<CachedResponse?>(entry.Response);
+        return new ValueTask<CachedResponse?>(entry.Response);
     }
 
     /// <inheritdoc />
@@ -73,16 +73,19 @@ public sealed class MemoryTcgDexResponseCache : ITcgDexResponseCache
         TimeSpan timeToLive,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        ArgumentNullException.ThrowIfNull(response);
+        Guard.NotNullOrWhiteSpace(key);
+        Guard.NotNull(response);
         cancellationToken.ThrowIfCancellationRequested();
 
         var now = _timeProvider.GetUtcNow();
 
         // Retained well past its freshness window so the ETag stays available:
         // a stale-but-present entry turns a re-download into a 304.
+        // FromTicks rather than `timeToLive * multiplier`: the TimeSpan
+        // multiplication operator is .NET Core 3.0+ and this also builds for
+        // netstandard2.0. Same arithmetic.
         var absoluteLifetime = timeToLive > TimeSpan.Zero
-            ? timeToLive * RevalidationLifetimeMultiplier
+            ? TimeSpan.FromTicks(timeToLive.Ticks * RevalidationLifetimeMultiplier)
             : TimeSpan.FromMinutes(1);
 
         _entries[key] = new Entry(response, now + absoluteLifetime, now);
@@ -92,18 +95,18 @@ public sealed class MemoryTcgDexResponseCache : ITcgDexResponseCache
             EvictLeastRecentlyUsed();
         }
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     /// <inheritdoc />
     public ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        Guard.NotNullOrWhiteSpace(key);
         cancellationToken.ThrowIfCancellationRequested();
 
         _entries.TryRemove(key, out _);
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     /// <summary>Empties the cache.</summary>
