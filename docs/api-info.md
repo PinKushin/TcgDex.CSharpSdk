@@ -117,6 +117,12 @@ GET /v2/en/cards?name=eq:Furret&hp=gt:100&sort:field=name&sort:order=DESC&pagina
 | `notnull:` | `effect=notnull:` | Field present |
 
 - **Wildcards** apply to laxist filters: `name=*chu` (ends with), `name=fu*` (starts with).
+  - A bare `name=*` is valid — **200 with every card**, i.e. match anything.
+    Verified 2026-08-06. `name=` (no value at all) behaves the same way, while
+    `name=eq:` is an equality test against the empty string and returns `[]`.
+  - The server URL-decodes before interpreting, so `name=%2A` is treated
+    identically to `name=*`. The SDK still sends the wildcard literally and
+    escapes only the surrounding value, which keeps the query readable.
 - **OR** within one field uses `|`: `name=eq:Furret|Pikachu`.
 - **AND** across fields: repeat parameters — `?category=Pokemon&rarity=eq:Rare`.
 
