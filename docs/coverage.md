@@ -8,7 +8,7 @@ CI. The 2 uncovered lines are provably unreachable — see [Why not 100%](#why-n
 | | Line | Branch | Unit tests | Integration tests |
 |---|---|---|---|---|
 | Baseline (`f45e496`) | 83.2% | — | 113 | 22 |
-| Now | **99.76%** | **96.06%** | **339** | **129** |
+| Now | **99.76%** | **96.06%** | **339** | **148** |
 
 ---
 
