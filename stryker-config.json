@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/src/Stryker.Core/Stryker.Core/Schemas/stryker-config-schema.json",
+  "stryker-config": {
+    "solution": "TcgDex.CSharpSdk.sln",
+    "project": "TcgDex.CSharpSdk.csproj",
+    "test-projects": ["TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj"],
+    "target-framework": "net10.0",
+    "reporters": ["html", "progress", "cleartext"],
+    "thresholds": {
+      "high": 85,
+      "low": 70,
+      "break": 60
+    },
+    "mutate": [
+      "**/*.cs",
+      "!**/Compatibility/CompilerFeatureShims.cs"
+    ]
+  }
+}

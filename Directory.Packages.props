@@ -41,6 +41,13 @@
     <PackageVersion Include="Microsoft.Bcl.TimeProvider" Version="8.0.1" />
   </ItemGroup>
 
+  <!-- Benchmark-only. Never shipped: the benchmarks live in their own
+       non-packable project, so this never reaches a consumer's dependency
+       graph. MIT licensed. -->
+  <ItemGroup>
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+  </ItemGroup>
+
   <!-- Test-only dependencies. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
