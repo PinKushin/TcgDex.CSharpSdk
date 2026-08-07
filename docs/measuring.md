@@ -415,7 +415,25 @@ being a one-off nobody can re-run. Verified in the failing direction before
 being trusted: rewriting the transport's wrapping throw to leak an
 `InvalidOperationException` fails it on 300+ named cases.
 
-### Weekly: coverage-guided fuzzing
+### Weekly: coverage-guided fuzzing across seven modes
+
+The harness multiplexes on the first byte of the input, so one process covers
+every path that consumes input the SDK did not produce. libFuzzer prefers a
+narrow target and seven executables would be the textbook answer — it would also
+mean seven projects, seven corpora, and a fixed budget divided seven ways. The
+selector is just another input byte, and coverage feedback teaches the fuzzer to
+exercise each branch.
+
+| Mode | Reaches |
+|---|---|
+| Card | The richest model, and the only path through both hand-written converters |
+| Card list | Collection handling and the coalescing backing fields |
+| Set | A different model graph: card counts, abbreviations, boosters |
+| Enumeration | Bare JSON arrays of strings and integers |
+| Problem details | The error path, which runs when something has already gone wrong |
+| GraphQL | A separate transport with its own envelope |
+| Query building | Not a response at all — caller-supplied text on its way into a URL |
+
 
 ```bash
 gh workflow run fuzz.yml -f seconds=300
@@ -426,14 +444,22 @@ seeded with the recorded responses. Seeding is what makes it work — given rand
 bytes, a fuzzer spends its entire budget rediscovering that JSON starts with a
 brace.
 
-First run, 2026-08-07, 300 seconds:
+Widening the harness and fixing the seeding are worth 2.3x the coverage,
+measured over 120 seconds locally:
 
-| | |
-|---|---|
-| Executions | **4,452,889** at ~14,800/s |
-| Corpus | 17 seeds → **496 entries** |
-| Features | 641 at init → **1,757** |
-| Crashes | **none** |
+| Harness | Features at init | Features at end |
+|---|---:|---:|
+| One mode (card fetch only) | 641 | 1,757 |
+| Seven modes, fixtures seeded raw | 1,196 | 2,705 |
+| **Seven modes, seeded per mode** | **3,085** | **3,990** |
+
+**The seeding bug is the interesting one.** Every recorded response starts with
+`{` or `[`, and `123 % 7 = 4` while `91 % 7 = 0` — so the raw fixtures only ever
+seeded two of the seven modes, and the fuzzer had to discover the rest by
+mutating the selector byte. Prefixing each fixture with each mode byte starts
+the run *above where the mis-seeded one finished*.
+
+No crashes in any run.
 
 **Read `cov: 8` in the libFuzzer output as normal, not broken.** That counts
 edges in the tiny native `libfuzzer-dotnet` shim. The .NET signal arrives as

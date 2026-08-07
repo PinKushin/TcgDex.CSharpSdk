@@ -87,15 +87,29 @@ jobs:
           restore-keys: |
             fuzz-corpus-
 
-      # The recorded API responses seed it. Copied every run rather than only on
-      # a cache miss, so a corpus minimised by libFuzzer cannot lose the known
-      # good inputs — cp will not overwrite what is already there with identical
-      # content, and adding a seed twice costs nothing.
+      # The recorded API responses seed it, once per fuzz-target mode.
+      #
+      # The mode byte is why. The harness multiplexes on the first byte, and
+      # every recorded response starts with '{' (0x7B) or '[' (0x5B) — so
+      # 123 % 7 = 4 and 91 % 7 = 0, and the raw fixtures only ever seed two of
+      # the seven modes. Measured: seeding them raw started at 1,196 features
+      # and reached 2,705; prefixing each fixture with each mode byte started at
+      # 3,085 and reached 3,990. Proper seeding begins above where the other run
+      # ended.
+      #
+      # Seeds are written every run rather than only on a cache miss, so a
+      # corpus minimised by libFuzzer cannot lose the known good inputs. Adding
+      # one that is already present costs nothing.
       - name: Seed the corpus
         run: |
           mkdir -p corpus findings
           restored=$(ls corpus | wc -l)
-          cp -n fuzz-out/corpus/*.json corpus/ 2>/dev/null || true
+          for fixture in fuzz-out/corpus/*.json; do
+            name=$(basename "$fixture" .json)
+            for mode in 0 1 2 3 4 5 6; do
+              printf "$(printf '\\%03o' "$mode")" | cat - "$fixture" > "corpus/${name}-m${mode}.bin"
+            done
+          done
           echo "restored $restored from cache, now $(ls corpus | wc -l) inputs"
 
       - name: Fuzz
