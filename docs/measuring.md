@@ -177,16 +177,33 @@ Full run, ~10 minutes:
 
 | Outcome | Baseline | After the sweep | Now |
 |---|---:|---:|---:|
-| Killed + timeout | 508 | 587 | **604** |
-| **Survived** | **140** | **63** | **80** |
+| Killed + timeout | 508 | 587 | **642** |
+| **Survived** | **140** | **63** | **84** |
 | No coverage | 4 | 0 | 2 |
-| Total mutants | 652 | 650 | 686 |
-| **Mutation score** | **77.91%** | **90.03%** | **~88%** |
+| Total mutants | 652 | 650 | 728 |
+| **Mutation score** | **77.91%** | **90.03%** | **88.19%** |
+
+### The score went down twice, for two different reasons
+
+90.03% was the high-water mark when the mutation campaign ended. It is **88.19%**
+now, across 728 mutants rather than 650, and both drops are worth separating:
+
+- **New code arrives faster than tests for it.** The caching, pricing and
+  benchmark work added 78 mutants. Optimising or extending code without
+  revisiting its tests lowers the verification, and nothing announces it — which
+  is why this gets re-run after any such pass, not on a schedule.
+- **Part of the earlier number was never real.** See below.
+
+The run that prompted this write-up found three survivors in new code that were
+*not* equivalent: both halves of a validation message, and the default
+`MaxResponseBytes`, which is a security control that nothing pinned. Those are
+fixed. `TcgDexOptions` went 83.3% to 91.7%, and the total from 87.09% to 88.19%.
 
 ### The score is not deterministic, so do not quote decimals
 
-Two consecutive full runs on identical code and identical tests returned
-**89.21%** and **88.05%**. Nothing changed between them.
+Three consecutive full runs on identical code and identical tests returned
+**89.21%**, **88.05%** and, after the fixes above, numbers that move by a point
+run to run.
 
 The cause is that **a timeout counts as killed**. Six mutants — the ones that
 make `BoundedContent` size a buffer absurdly, plus a removed guard — flipped
@@ -208,7 +225,7 @@ Per file:
 | File | Baseline | Now |
 |---|---:|---:|
 | `Querying/CardFilter.cs` | 67% | **100%** |
-| `Caching/MemoryTcgDexResponseCache.cs` | 71% | **100%** |
+| `Caching/MemoryTcgDexResponseCache.cs` | 71% | **91%** |
 | `Caching/TcgDexCacheOptions.cs` | 83% | **97%** |
 | `TcgDexClient.cs` | 53% | **93%** |
 | `Models/CardImage.cs` | 93% | **93%** |
@@ -216,9 +233,13 @@ Per file:
 | `Querying/ExpressionTranslator.cs` | 84% | **88%** |
 | `Resources/Resources.cs` | 82% | **85%** |
 | `Serialization/TcgPlayerPricingConverter.cs` | 77% | **81%** |
-| `TcgDexTransport.cs` | 64% | **79%** |
+| `TcgDexOptions.cs` | — | **92%** |
+| `Caching/BoundedLru.cs` | — | **96%** |
+| `Caching/DeserializedResponseCache.cs` | — | **91%** |
+| `Serialization/TcgDexJsonContracts.cs` | — | **73%** |
+| `TcgDexTransport.cs` | 64% | **77%** |
 | `TcgDexServiceCollectionExtensions.cs` | 60% | **80%** |
-| `Http/BoundedContent.cs` | 63% | **77%** |
+| `Http/BoundedContent.cs` | 63% | **74%** |
 | `Caching/TcgDexCachingHandler.cs` | 65% | **70%** |
 
 ### The score went down, and that is the point of having it
@@ -265,7 +286,7 @@ let the actionable half be deleted silently. One test was even named
 
 If you write one kind of test after reading this, assert the message.
 
-### What the remaining 72 are
+### What the remaining 84 are
 
 Mostly not gaps. In rough order of frequency:
 

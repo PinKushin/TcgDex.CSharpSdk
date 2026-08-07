@@ -1,12 +1,12 @@
 # Roadmap
 
-State at `483b27a`: the SDK covers the full TCGdex REST surface, builds clean on
+State at `a7b8d3a`: the SDK covers the full TCGdex REST surface, builds clean on
 `netstandard2.0`, `net8.0` and `net10.0`, and is verified under Native AOT.
 
 | | |
 |---|---|
-| Tests | **467 unit × 3 frameworks + 149 integration** |
-| Mutation score | **~88%**, break threshold 85 |
+| Tests | **468 unit × 3 frameworks + 149 integration** |
+| Mutation score | **88.19%**, break threshold 85 |
 | Line coverage | **99.80%**, gated at 99.5 |
 | Branch coverage | **96.53%**, gated at 95 |
 | Warnings | zero — compiler, analyzers, DocFX, CI annotations |
