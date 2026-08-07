@@ -35,6 +35,12 @@ internal sealed class TcgDexTransport
     /// <summary>Ceiling on a buffered response body. See <see cref="TcgDexOptions.MaxResponseBytes"/>.</summary>
     private readonly long _maxResponseBytes;
 
+    /// <summary>
+    /// The deserialization contract, resolved once. See
+    /// <see cref="TcgDexOptions.DeserializePricing"/>.
+    /// </summary>
+    private readonly JsonSerializerOptions _jsonOptions;
+
     internal TcgDexTransport(HttpClient httpClient, TcgDexOptions options, ILogger? logger = null)
     {
         Guard.NotNull(httpClient);
@@ -52,6 +58,7 @@ internal sealed class TcgDexTransport
         // language segment rather than replace it.
         _languageBase = new Uri(options.BaseAddress, options.Language + "/");
         _maxResponseBytes = options.MaxResponseBytes;
+        _jsonOptions = TcgDexJsonContracts.For(options);
 
         // Both endpoints are checked here rather than in Validate(): this is
         // advice, not a rule, and Validate has no logger to give it through.
@@ -284,7 +291,7 @@ internal sealed class TcgDexTransport
     {
         try
         {
-            var typeInfo = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
+            var typeInfo = (JsonTypeInfo<T>)_jsonOptions.GetTypeInfo(typeof(T));
 
             return JsonSerializer.Deserialize(
                 new ReadOnlySpan<byte>(body.Array, body.Offset, body.Count),

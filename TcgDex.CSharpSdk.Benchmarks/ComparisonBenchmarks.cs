@@ -21,11 +21,29 @@ using TcgDex.Querying;
 /// </para>
 /// <para>
 /// <b>Rules this comparison holds itself to.</b> Both sides get the same stub
-/// transport serving the same recorded payload, so neither is doing less work.
-/// Caching is off on both — both libraries have it, and pitting a warm cache
-/// against a cold fetch would measure a configuration difference and call it
-/// speed. Losses are reported alongside wins; the point is a number a reader can
-/// reproduce, not a favourable one.
+/// transport serving the same recorded payload. Caching is off on both — both
+/// libraries have it, and pitting a warm cache against a cold fetch would
+/// measure a configuration difference and call it speed. Losses are reported
+/// alongside wins; the point is a number a reader can reproduce, not a
+/// favourable one.
+/// </para>
+/// <para>
+/// <b>That second rule was stated here for weeks and was not true.</b> The other
+/// SDK caches <em>by default</em> — a freshly constructed client already has a
+/// <c>MemoryTCGDexCache</c> and <c>CacheTTL = 3600</c> — and this benchmark asks
+/// for the same card id on every iteration. So every measured call after the
+/// first was a cache hit, and the comparison was charging this SDK for a
+/// transport round trip the other side was skipping. Verified by counting
+/// requests at the handler: three calls, one request. <c>CacheTTL = 0</c> is
+/// what actually disables it; assigning <c>Cache = null</c> throws.
+/// </para>
+/// <para>
+/// The distortion turned out to be small, because their cache stores the
+/// response <em>string</em> rather than the deserialized model — a hit re-parses,
+/// returning a different instance each time — so it was saving the stub
+/// transport and not the deserialization that dominates both sides. Small is not
+/// the point. A stated fairness rule that nobody checked is worth less than no
+/// rule at all, because it reads as evidence.
 /// </para>
 /// <para>
 /// What this does <b>not</b> measure: network time, which dominates real usage
@@ -40,8 +58,10 @@ public class ComparisonBenchmarks : IDisposable
 
     private string _body = string.Empty;
     private HttpClient _mineHttp = null!;
+    private HttpClient _mineNoPricingHttp = null!;
     private HttpClient _theirsHttp = null!;
     private TcgDexClient _mine = null!;
+    private TcgDexClient _mineNoPricing = null!;
     private TCGDex.TCGDexClient _theirs = null!;
 
     /// <summary>Answers every request from memory with the recorded card.</summary>
@@ -65,13 +85,26 @@ public class ComparisonBenchmarks : IDisposable
         _theirsHttp = new HttpClient(new StubHandler(_body));
 
         _mine = new TcgDexClient(_mineHttp, new TcgDexOptions());
-        _theirs = new TCGDex.TCGDexClient(TCGDex.SupportedLanguages.En, _theirsHttp);
+
+        _mineNoPricingHttp = new HttpClient(new StubHandler(_body));
+        _mineNoPricing = new TcgDexClient(
+            _mineNoPricingHttp,
+            new TcgDexOptions { DeserializePricing = false });
+
+        // CacheTTL = 0 is the only way to switch their caching off: it is on by
+        // default, and assigning Cache = null throws ArgumentNullException.
+        _theirs = new TCGDex.TCGDexClient(TCGDex.SupportedLanguages.En, _theirsHttp)
+        {
+            CacheTTL = 0,
+        };
     }
 
     public void Dispose()
     {
         _mine?.Dispose();
         _mineHttp?.Dispose();
+        _mineNoPricing?.Dispose();
+        _mineNoPricingHttp?.Dispose();
         _theirsHttp?.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -89,6 +122,31 @@ public class ComparisonBenchmarks : IDisposable
     public async Task<string?> FetchCard_Theirs()
     {
         var card = await _theirs.FetchCardAsync(CardId, cancellationToken: CancellationToken.None)
+            .ConfigureAwait(false);
+
+        return card?.Name;
+    }
+
+    /// <summary>This SDK with <c>DeserializePricing = false</c>.</summary>
+    /// <remarks>
+    /// <para>
+    /// The nearest thing to like-for-like on this row, and the reason it is
+    /// here. Their <c>CardModel</c> has no pricing property at all — nor any
+    /// pricing type anywhere in their assembly — so the block arrives on the
+    /// wire and is discarded. The baseline row above is therefore charging this
+    /// SDK for work the other side never does.
+    /// </para>
+    /// <para>
+    /// This does not make the comparison fair, it makes the gap legible.
+    /// Parsing pricing is a feature, and a consumer who wants prices has to
+    /// write that code themselves against the other SDK. But a reader comparing
+    /// deserialization speed deserves to see both numbers.
+    /// </para>
+    /// </remarks>
+    [Benchmark]
+    public async Task<string?> FetchCard_MineWithoutPricing()
+    {
+        var card = await _mineNoPricing.Cards.GetAsync(CardId, CancellationToken.None)
             .ConfigureAwait(false);
 
         return card?.Name;

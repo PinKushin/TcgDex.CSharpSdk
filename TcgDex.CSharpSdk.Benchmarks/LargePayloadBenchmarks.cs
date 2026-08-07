@@ -59,8 +59,10 @@ public class LargePayloadBenchmarks : IDisposable
 
     private HttpClient _declaredLengthHttp = null!;
     private HttpClient _chunkedHttp = null!;
+    private HttpClient _theirsHttp = null!;
     private TcgDexClient _declaredLength = null!;
     private TcgDexClient _chunked = null!;
+    private TCGDex.TCGDexClient _theirs = null!;
 
     [GlobalSetup]
     public void Setup()
@@ -84,6 +86,19 @@ public class LargePayloadBenchmarks : IDisposable
 
         _declaredLength = new TcgDexClient(_declaredLengthHttp, new TcgDexOptions());
         _chunked = new TcgDexClient(_chunkedHttp, new TcgDexOptions());
+
+        // The other SDK on the identical body. Its list model, CardResumeModel,
+        // carries exactly the same four fields as CardBrief, so this is the
+        // closest to like-for-like anywhere in these benchmarks — unlike the
+        // single-card comparison, where their model has no pricing at all.
+        // CacheTTL = 0 disables their caching, which is ON by default with a
+        // one-hour TTL. Without this the row measures a warm cache hit against
+        // this SDK's full fetch — every iteration asks for the same URL.
+        _theirsHttp = new HttpClient(new StubHandler(_listUtf8, declareLength: true));
+        _theirs = new TCGDex.TCGDexClient(TCGDex.SupportedLanguages.En, _theirsHttp)
+        {
+            CacheTTL = 0,
+        };
     }
 
     /// <summary>Disposes the clients built in setup — CA1001 requires it.</summary>
@@ -93,6 +108,7 @@ public class LargePayloadBenchmarks : IDisposable
         _chunked?.Dispose();
         _declaredLengthHttp?.Dispose();
         _chunkedHttp?.Dispose();
+        _theirsHttp?.Dispose();
         GC.SuppressFinalize(this);
     }
 
@@ -130,6 +146,20 @@ public class LargePayloadBenchmarks : IDisposable
     [Benchmark]
     public async Task<int> FetchList_ChunkedNoLength()
         => (await _chunked.Cards.ListAsync(CancellationToken.None).ConfigureAwait(false)).Count;
+
+    /// <summary>The other SDK fetching and deserializing the same list.</summary>
+    /// <remarks>
+    /// Their per-property reflection — <c>ModelBase.Fill</c> resolves each field
+    /// with <c>GetType().GetProperty(...)</c> — is a fixed cost per property per
+    /// object, and this response has roughly 21,000 objects. On one card it was
+    /// cheap enough not to matter. Whether it stays cheap at this scale is the
+    /// question, and it is the opposite of the one the single-card comparison
+    /// answers.
+    /// </remarks>
+    [Benchmark]
+    public async Task<int> FetchList_Theirs()
+        => (await _theirs.Cards.ListAsync(TCGDex.Query.Create(), CancellationToken.None)
+            .ConfigureAwait(false)).Count;
 
     // ----- fixture synthesis -----
 

@@ -42,6 +42,11 @@ public class EvictionBenchmarks
     private CachedResponse _response = null!;
     private int _next;
 
+    private MemoryTcgDexResponseCache _mineFixed = null!;
+    private TCGDex.MemoryTCGDexCache _theirsFixed = null!;
+    private string[] _pool = [];
+    private int _cursor;
+
     // A fourth row stood here: stores into a cache with a bound it could never
     // reach, meant to isolate insertion from eviction by subtraction. It was
     // unsound and had to go. A cache that never evicts grows for as long as the
@@ -73,11 +78,63 @@ public class EvictionBenchmarks
         }
 
         _next = MaxEntries;
+
+        // ----- the like-for-like pair -----
+        //
+        // The other SDK's cache has no bound: MemoryTCGDexCache is a Dictionary
+        // behind a lock, with no MaxEntries and no eviction. There is therefore
+        // no "full" state on their side to compare against the row above, and
+        // driving it with unique keys would grow it until the process died —
+        // which is exactly how the removed fourth row failed.
+        //
+        // So the comparable question is narrower and both sides can answer it:
+        // what does a store cost when nothing has to be evicted? A fixed pool of
+        // keys, cycled, makes every store after the first a replacement. Neither
+        // cache grows, memory is bounded at MaxEntries on both, and the row
+        // measures insertion rather than policy.
+        _pool = new string[MaxEntries];
+
+        for (var i = 0; i < MaxEntries; i++)
+        {
+            _pool[i] = Key(i);
+        }
+
+        _mineFixed = new MemoryTcgDexResponseCache(MaxEntries);
+        _theirsFixed = new TCGDex.MemoryTCGDexCache();
+
+        foreach (var key in _pool)
+        {
+            Store(_mineFixed, key);
+            _theirsFixed.Set(key, _response, 300);
+        }
     }
 
     /// <summary>One store into a full cache: insert, overflow, evict.</summary>
     [Benchmark(Baseline = true)]
     public void StoreWhenFull() => Store(_cache, Key(_next++));
+
+    /// <summary>Replacing an existing entry — no eviction, no growth.</summary>
+    [Benchmark]
+    public void StoreExisting_Mine() => Store(_mineFixed, NextPooledKey());
+
+    /// <summary>The same on the other SDK's cache, which has no bound at all.</summary>
+    /// <remarks>
+    /// Read this as measuring what a bound costs, not who wrote a faster
+    /// dictionary. Theirs takes a lock and inserts; ours additionally maintains
+    /// the count that decides when to evict. The difference is the price of
+    /// never exceeding <c>MaxEntries</c> — which their cache does not offer, so
+    /// a long-lived process holds every response it ever fetched.
+    /// </remarks>
+    [Benchmark]
+    public void StoreExisting_Theirs() => _theirsFixed.Set(NextPooledKey(), _response, 300);
+
+    private string NextPooledKey()
+    {
+        var key = _pool[_cursor];
+        _cursor = _cursor + 1 == _pool.Length ? 0 : _cursor + 1;
+
+        return key;
+    }
 
     /// <summary>
     /// The bound check alone — <c>_entries.Count</c>, which every store performs.
