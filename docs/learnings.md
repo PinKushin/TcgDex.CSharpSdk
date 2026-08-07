@@ -491,6 +491,122 @@ time bomb.
 
 ---
 
+## 99.77% line coverage, 77.91% mutation score
+
+The two numbers measure different things, and only one of them is about whether
+the tests work.
+
+| | Question |
+|---|---|
+| Line coverage | Did this line run? |
+| Branch coverage | Were both outcomes of this condition exercised? |
+| **Mutation score** | **If this code were wrong, would any test fail?** |
+
+Running Stryker over a suite sitting at 99.77% line coverage returned **77.91%**
+— 144 mutants the suite would not have caught. After a sweep through the worst
+files it is **86.81%**, and *line coverage did not move at all*. Every one of the
+57 newly-killed mutants was in code the suite already executed. Coverage said the
+lines ran; mutation testing said whether running them proved anything.
+
+The distribution was more useful than the total. Models and the query builder
+scored 93–95%; the transport, the GraphQL filter and the caching handler — the
+most complex and most consequential code — sat at 64–67%. **Verification was
+strongest where the code was simplest**, which is the inverse of where it should
+be, and completely invisible in a coverage report where all of them read as
+fully covered.
+
+---
+
+## The worst-scoring file had tests. They asserted nothing.
+
+`TcgDexClient` came in at 53%, and not one of its problems was a missing test:
+
+- `Create_DisposesItsOwnHttpClient` called `Should.ThrowAsync(...)` and
+  **discarded the returned `Task`**. The assertion never ran. That test passed
+  no matter what the client did with its `HttpClient`.
+- `Create_WithCaching_Works` asserted `client.Cards.ShouldNotBeNull()`, which
+  holds whether or not the caller's `configureCache` delegate is ever invoked —
+  so deleting that call entirely went unnoticed.
+- `Create_AppliesTheConfiguredLanguage` asserted `client.ShouldNotBeNull()`
+  while claiming in its name to prove something it structurally cannot observe,
+  since `Create` builds its own `HttpClient`.
+- The caller-supplied-`HttpClient` disposal test covered one of two constructor
+  overloads.
+
+All four ran the code. None verified it. **This is the class of test that
+coverage rewards and mutation testing exposes**, and it is why the score moved
+53% → 93% almost entirely by fixing existing tests rather than adding new ones.
+
+The generalisation worth keeping: an assertion on a property that is non-null
+regardless of the behaviour under test is not an assertion. Neither is an
+un-awaited async one.
+
+---
+
+## Most surviving mutants are equivalent — triage before writing tests
+
+Chasing 100% produces tests written for the metric. The recurring unkillable
+shapes here, in rough order of frequency:
+
+- **`.ConfigureAwait(false)` flipped to `true`.** No observable difference
+  without a synchronization context. The single largest group — ten of the
+  caching handler's sixteen remaining survivors.
+- **Guards the public API validates first.** `TcgDexClient` checks its arguments
+  before the transport or handler sees them, so the inner `Guard.NotNull` calls
+  cannot be reached with null through any public path. Note the contrast with
+  `MemoryTcgDexResponseCache`, where the same guards *are* reachable because the
+  type is public and its interface is an extension point — there they were real
+  gaps.
+- **Ternary and catch collapses** where the mutated branch throws into a `catch`
+  that produces the same result anyway. Forcing `Deserialize("   ")` raises
+  `JsonException`, which the very next `catch` turns back into `null`.
+- **Non-deterministic tie-breaks**, such as an LRU eviction comparison that
+  depends on dictionary ordering.
+
+Two files finished at 70–76% for these reasons and are at their realistic
+ceilings. Recording *why* a survivor is equivalent is more useful than the
+number, because the next person will otherwise try to kill it again.
+
+---
+
+## Boundary mutants find the off-by-one nobody writes a test for
+
+Two of the most valuable kills were single-character mutations at a boundary:
+
+- `buffered.Length + read > maxBytes` flipped to `>=`, which would reject a
+  response of **exactly** `MaxResponseBytes`. A limit is a maximum, not a
+  threshold to stay under, and this only ever misfires on the one payload size
+  nobody produces by accident.
+- `Errors is { Count: > 0 }` flipped to `>= 0`, which treats a present-but-empty
+  GraphQL `errors` array as a failure. Only a present-but-empty collection
+  distinguishes them — `null` and non-empty behave identically either way.
+
+Both had full line and branch coverage. Neither had a test that landed on the
+boundary.
+
+---
+
+## Traps encountered while measuring
+
+- **A file scores differently alone than in a full run.** `TcgDexTransport`
+  measured 85% by itself and 76% in the full sweep. Scoring one file runs only
+  the mutants in it; a full run includes mutants elsewhere that the same tests
+  cover, which shifts the denominator. Compare like with like.
+- **Restoring a mutated file with `Copy-Item` keeps the backup's older
+  timestamp**, so MSBuild sees the build as up to date and keeps the *mutated*
+  DLL. A test then fails only on whichever target framework rebuilt for some
+  other reason, which reads exactly like flakiness. Touch the file after
+  restoring.
+- **`StreamContent` over a `MemoryStream` computes a `Content-Length`**, because
+  the stream is seekable. Testing the "unknown length" path needs an
+  `HttpContent` whose `TryComputeLength` returns `false` — otherwise the early
+  rejection fires and the streaming path is never exercised.
+- **`ReasonPhrase = null` does not stick** on a known status code; .NET
+  substitutes the standard phrase. Reaching a `?? "no detail supplied"` fallback
+  needs a non-standard status — which is not contrived, since HTTP/2 removed
+  reason phrases from the protocol entirely.
+
+---
 ## Line, block and branch coverage answer different questions
 
 | Metric | Question |
