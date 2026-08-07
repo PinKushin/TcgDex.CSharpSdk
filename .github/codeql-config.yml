@@ -1,0 +1,21 @@
+name: TcgDex.CSharpSdk CodeQL config
+
+# The first scan produced 212 alerts and every one of them was in a *.g.cs file
+# emitted by System.Text.Json's source generator — 211 `cs/useless-cast-to-self`
+# plus one LINQ note, none with a security severity. Zero findings in
+# hand-written code.
+#
+# That is worth excluding rather than tolerating. Alerts nobody can act on train
+# everyone to ignore the Security tab, which is where a real finding would
+# appear. The casts belong to Microsoft's generator and cannot be changed from
+# here; the same reasoning already excludes *.g.cs from the coverage gate, for
+# the same reason — a number dominated by generated code stops measuring this
+# project.
+paths-ignore:
+  - "**/*.g.cs"
+
+queries:
+  # A superset of the default suite. Worth the extra noise for a library this
+  # size, and it is the setting that reports taint-flow issues rather than only
+  # the obvious ones.
+  - uses: security-and-quality

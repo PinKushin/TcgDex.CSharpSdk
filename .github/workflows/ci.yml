@@ -74,6 +74,44 @@ jobs:
       - name: Verify the package builds
         run: dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj --configuration Release --no-build --output ./artifacts
 
+  # The netstandard2.0 assembly is a contract that never executes on its own, so
+  # without this job it ships build-verified and never run. .NET Framework
+  # resolves that asset, which makes a net472 run the only way to execute
+  # exactly the DLL a Unity or WinForms consumer receives.
+  #
+  # A separate Windows job rather than a matrix on the job above: net472 needs
+  # mono off Windows, GitHub's ubuntu runners do not have it, and vstest aborts
+  # the whole run rather than skipping that one framework. Coverage is collected
+  # on ubuntu only — coverlet does not instrument the .NET Framework run — so
+  # this job asserts behaviour and the other one holds the gate.
+  framework-test:
+    name: Unit test on .NET Framework
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore -warnaserror
+
+      # net472 explicitly. The net8.0 and net10.0 runs are the ubuntu job's
+      # responsibility, and repeating them here would double CI time to
+      # re-prove what is already proven.
+      - name: Unit tests
+        run: >
+          dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj
+          --configuration Release --no-build --framework net472
+          --logger "trx;LogFileName=framework-tests.trx"
+          --results-directory ./TestResults
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7

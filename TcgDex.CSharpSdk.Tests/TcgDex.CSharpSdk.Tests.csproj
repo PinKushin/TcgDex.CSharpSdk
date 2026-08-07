@@ -9,8 +9,15 @@
     <!-- net472 is how the netstandard2.0 assembly gets executed rather than
          merely compiled: .NET Framework resolves that asset, so these runs
          exercise exactly the DLL a Unity or WinForms consumer receives —
-         including the init/required shims, which every model relies on. -->
-    <TargetFrameworks>net472;net8.0;net10.0</TargetFrameworks>
+         including the init/required shims, which every model relies on.
+
+         Windows only. Running a net472 test assembly elsewhere needs mono, and
+         GitHub's ubuntu runners do not have it — vstest aborts the *entire*
+         run with "Could not find 'mono' host", taking the net8.0 and net10.0
+         results down with it rather than skipping the one framework. The
+         Windows CI job is what keeps this framework covered; see ci.yml. -->
+    <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">net472;net8.0;net10.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(OS)' != 'Windows_NT'">net8.0;net10.0</TargetFrameworks>
     <RootNamespace>TcgDex.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>

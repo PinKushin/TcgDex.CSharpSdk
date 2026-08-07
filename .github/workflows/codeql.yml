@@ -52,10 +52,10 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: csharp
-          # security-and-quality is a superset of the default suite. The extra
-          # noise is acceptable for a library this size, and it is the setting
-          # that catches the taint-flow issues rather than only the obvious ones.
-          queries: security-and-quality
+          # Query suite and the generated-file exclusion both live in the config
+          # file, so they are documented next to the reasoning rather than
+          # spread across workflow inputs.
+          config-file: ./.github/codeql-config.yml
 
       # An explicit build rather than autobuild: this repository multi-targets
       # netstandard2.0, net8.0 and net10.0, and analysing a single framework is
