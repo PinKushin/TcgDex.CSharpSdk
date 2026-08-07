@@ -526,6 +526,98 @@ out to be **86% of the request path**, which nothing before the benchmark had
 established.
 
 ---
+## A benchmark only tells you about the size you ran it at
+
+Everything above was measured on one card of 2,938 bytes. Two of its conclusions
+did not survive being re-run on the 2.3 MB unpaginated card list and a cache at
+its bound — and the failures point in opposite directions, which is the useful
+part.
+
+**A cost dismissed as fixed turned out to scale.** Pre-sizing the response
+buffer from `Content-Length` measured as nothing at 2.9 KB and went into the
+"ruled out" list. At 2.3 MB it saves **2.24 MB per request**, because that is
+where the doubling growth of a `MemoryStream` starts to matter. The code had
+been left in place anyway; the conclusion about it was simply wrong.
+
+**A cost dismissed as small turned out to be the whole thing.** Source
+generation losing to reflection by ~5 µs on a card looked like a fixed per-call
+overhead that a real payload would drown. It is proportional: 0.81× time at
+2.9 KB, 0.85× at 2.3 MB. The AOT guarantee costs 15–20% of deserialization at
+every size, not a flat 5 µs.
+
+The cache had the sharper version of the same problem. `CachingBenchmarks`
+reported the caching layer's overhead as ~0.8 µs — measured, honestly, on a
+cache that had never reached its bound. Eviction only runs when a cache is full,
+and once it is full it runs on *every* store. Measured in that state, a store
+cost 14 µs at the default bound and 49 µs at 4096. The published 0.8 µs was true
+of a state that a long-running application leaves within minutes and never
+returns to.
+
+**Pick the size the code will actually see, and the state it will actually be
+in.** A benchmark that only exercises the easy case is not neutral; it publishes
+a number that is wrong in the direction you would have chosen.
+
+---
+## `ConcurrentDictionary.Count` is not a field read
+
+It acquires every lock in the dictionary and sums the per-lock counters, and the
+lock array grows with the table. Isolated:
+
+| Entries | `Count` |
+|---:|---:|
+| 64 | 299 ns |
+| 512 | 4,701 ns |
+| 4096 | 18,925 ns |
+
+`MemoryTcgDexResponseCache.SetAsync` called it on every store to check its
+bound. At 4096 entries that check cost **17× the entire store operation
+containing it** — the cheapest-looking line in the class was its most expensive.
+
+The reason this went unnoticed is worth more than the fix. The suspect was the
+eviction scan, which genuinely was O(n) and genuinely did run on every store
+once the cache filled. Batching it to `MaxEntries/8` — an amortisation that
+should have bought about 6× — bought 1.3×, and *that* was the signal: when a
+fix aimed at the presumed bottleneck barely moves the number, the bottleneck is
+somewhere else. Decomposing the operation into its parts found it in one run.
+
+The replacement is a counter maintained incrementally, which needs `TryAdd`
+rather than the indexer so that replacing an entry is not counted as growth, and
+which is re-derived inside eviction so drift from concurrent add/remove races
+cannot accumulate. The public `Count` still asks the dictionary, because callers
+are entitled to an exact answer; only the internal bound check uses the cheap
+one.
+
+---
+## Mutation testing rejects designs, not just tests
+
+The first eviction implementation scanned the live dictionary into `ArrayPool`
+buffers. It was faster and allocated less. Stryker found three mutants in it
+that no test could kill:
+
+- the empty-cache early return,
+- the guard against the dictionary growing mid-scan,
+- the buffers' return path, whose deletion changes nothing observable.
+
+All three exist *because* the scan reads a structure that other threads are
+modifying. They are not missing tests — the first two need a race to reach, and
+the third is a pure leak with no visible effect.
+
+`ConcurrentDictionary.ToArray()` takes the locks once and returns a consistent
+snapshot, so none of the three are needed. It allocates more (385 B per store
+against 256 B) and it is only affordable because eviction now runs once per
+batch rather than once per store. The file went from 86.54% to **100%**.
+
+The general shape: **an uncoverable branch is usually a design telling you it
+chose the harder correctness problem.** The right response is sometimes a
+cleverer test, and sometimes deleting the branch by not needing it.
+
+One of the surviving mutants was not equivalent at all. Deleting the count reset
+in `Clear()` left every existing test passing, and it is a real bug: the cache
+would still believe it was full, so the next store would trip the bound and
+evict the entry just written. A clear-then-store sequence — the obvious thing a
+consumer does — would silently lose data.
+
+---
 ## Benchmarking against a competitor, and losing
 
 The other public C# TCGdex SDK accepts an injected `HttpClient`, which is the
@@ -564,18 +656,29 @@ rather than failing at runtime — and it is charged once per request against a
 directions: real difference, irrelevant consequence.
 
 The fetch row is **a real cost that does matter**, and the honest response is to
-fix it rather than explain it. 43 KB to deserialize a ~10 KB payload is more
-copying than the job needs, and the leading suspect is code added in this same
-session: `BoundedContent` enforces the response-size limit by buffering into a
+fix it rather than explain it. The suspect was code added in the same session:
+`BoundedContent` enforced the response-size limit by buffering into a
 `MemoryStream`, calling `ToArray()`, converting to a `string`, and only then
-deserializing — at least two full copies before parsing starts. A safety feature
-paid for in allocations, which nobody noticed until something measured it.
+deserializing — at least two full copies before parsing started. A safety
+feature paid for in allocations, which nobody noticed until something measured
+it.
+
+That was fixed, and the row now reads **25.3 µs / 18.6 KB against 15.3 µs /
+12.2 KB** — 0.60× time and 0.66× allocations. Still a loss, and a smaller one.
+
+**A second correction belongs here, because it was published before it was
+checked.** The paragraph above originally described this as "43 KB to
+deserialize a ~10 KB payload". The card fixture is **2,938 bytes**. The
+allocation was 14.7× the payload, not 4×, and the wrong figure made the
+situation look considerably better than it was. That is the second time in this
+document a flattering number went out unverified; the first was the model
+property count two paragraphs up.
 
 The general point: a benchmark that only ever flatters the thing that
 commissioned it is marketing. This one was written expecting a mixed result,
 produced a clean loss on both axes, and is published with the harness so anyone
 can rerun it. That is what makes the numbers elsewhere in these docs worth
-anything.
+anything — and the two corrections above are the cost of keeping it that way.
 
 ---
 ## 99.77% line coverage, 77.91% mutation score
@@ -591,9 +694,14 @@ the tests work.
 
 Running Stryker over a suite sitting at 99.77% line coverage returned **77.91%**
 — 144 mutants the suite would not have caught. After a sweep through the worst
-files it is **86.81%**, and *line coverage did not move at all*. Every one of the
-57 newly-killed mutants was in code the suite already executed. Coverage said the
-lines ran; mutation testing said whether running them proved anything.
+files it reached **90.03%**, and *line coverage did not move at all*. Every one
+of the newly-killed mutants was in code the suite already executed. Coverage
+said the lines ran; mutation testing said whether running them proved anything.
+
+It is **89.21%** now, and the drop is the more useful half of the story: that is
+the first full run since a round of performance work, which changed code without
+changing its tests. A mutation score is not a certificate earned once — it
+decays exactly when code moves and tests do not.
 
 The distribution was more useful than the total. Models and the query builder
 scored 93–95%; the transport, the GraphQL filter and the caching handler — the

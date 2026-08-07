@@ -1,12 +1,12 @@
 # Roadmap
 
-State at `e66fef9`: the SDK covers the full TCGdex REST surface, builds clean on
+State at `43ff3be`: the SDK covers the full TCGdex REST surface, builds clean on
 `netstandard2.0`, `net8.0` and `net10.0`, and is verified under Native AOT.
 
 | | |
 |---|---|
-| Tests | **447 unit × 3 frameworks + 149 integration** |
-| Mutation score | **90.03%**, break threshold 85 |
+| Tests | **451 unit × 3 frameworks + 149 integration** |
+| Mutation score | **89.21%**, break threshold 85 |
 | Line coverage | **99.76%**, gated at 99.5 |
 | Branch coverage | **96.06%**, gated at 95 |
 | Warnings | zero — compiler, analyzers, DocFX, CI annotations |
@@ -71,6 +71,12 @@ roadmap that only lists future work hides what the project already decided.
 - **Fixture drift detection** — the recorded responses every offline test relies
   on are re-fetched weekly and compared by shape, so an API change fails with a
   precise message instead of silently invalidating the offline suite.
+- **Benchmarked at the sizes and states that actually occur** — the 2.3 MB
+  unpaginated card list, and a response cache sitting at its bound. Both found
+  something the small-payload benchmarks could not: a capacity hint previously
+  written off as useless saves 2.24 MB per request there, and
+  `ConcurrentDictionary.Count` was costing a cache store up to 17× the
+  operation it was guarding. See [`measuring.md`](measuring.md).
 
 ---
 

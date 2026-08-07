@@ -12,6 +12,8 @@ own non-packable project, Stryker is a `dotnet tool`.
 ```bash
 dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*Query*"
 dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*Serialization*"
+dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*LargePayload*"
+dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*Eviction*"
 ```
 
 Release only — BenchmarkDotNet refuses a Debug build, and it is right to: a Debug
@@ -74,6 +76,70 @@ through `Options.GetTypeInfo(typeof(T))` on **every** request, which looked like
 an obvious optimisation. At 0.99 it is free, so that optimisation was not made —
 a negative result that prevented a pointless change.
 
+### The same measurement at 800× the size
+
+Every figure above comes from one card of **2,938 bytes**. `GET /v2/en/cards`
+returns **2,356,046 bytes** — measured against the live API on 2026-08-07, with
+an accurate `Content-Length` and no compression — and applications hit it on
+startup to build an index. `LargePayloadBenchmarks` runs the same comparison
+there, against a body synthesized to that size from the recorded brief-list
+shape.
+
+| | Time | Allocated |
+|---|---:|---:|
+| Source-generated (as shipped) | 26.3 ms | 8.63 MB |
+| Reflection, same model | 22.4 ms | 7.48 MB |
+| Fetch + deserialize, `Content-Length` declared | 25.6 ms | 10.88 MB |
+| Fetch + deserialize, length unknown | 26.2 ms | 13.12 MB |
+
+Two things follow, one of which contradicts an earlier conclusion.
+
+**The source-generation penalty is proportional, not fixed.** At 2.9 KB it was
+0.81× time and 0.66× allocations against reflection; here it is 0.85× and 0.87×.
+Had the cost been a fixed per-call overhead it would have vanished into a
+payload 800× larger. It does not, so the AOT guarantee costs roughly 15–20% of
+deserialization time at any size — about 4 ms on this endpoint, against a live
+fetch of it that took 703 ms.
+
+**The `Content-Length` capacity hint measured as doing nothing, and that was a
+size artefact.** `BoundedContent` pre-sizes its buffer from the declared length,
+which changed neither time nor allocations on a 2.9 KB card. At 2.3 MB it saves
+**2.24 MB per request** — the doubling `MemoryStream` growth it avoids — while
+still not measurably changing the time. The allocation figures are identical
+across repeat runs; the times are not, so read the ratio and not the millisecond.
+
+The uncomfortable number is the last column of the first row: **8.63 MB
+allocated to parse 2.25 MB of JSON**, and 10.88 MB for the whole request. That
+is 3.8× and 4.8× the payload.
+
+### Where a cache store spends its time
+
+`EvictionBenchmarks` stores into a cache already at its bound, sweeping
+`MaxEntries`, because that is the only state in which eviction runs — and once
+a cache is full, it runs on *every* write.
+
+| `MaxEntries` | Store, before | Store, after | `ConcurrentDictionary.Count` alone |
+|---:|---:|---:|---:|
+| 64 | 1,827 ns | 924 ns | 299 ns |
+| 512 (default) | 13,995 ns | 1,072 ns | 4,701 ns |
+| 4096 | 49,279 ns | 1,077 ns | 18,925 ns |
+
+The last column is the finding, and it was not the one being looked for. The
+suspected cost was the eviction scan, which really did look at every entry on
+every store. Batching that scan to `MaxEntries/8` bought 1.3× — which meant the
+scan was not the cost.
+
+`ConcurrentDictionary.Count` reads like a field access and is not: it acquires
+every lock in the dictionary, and the lock array grows with the table. `SetAsync`
+called it once per store to check the bound, and at 4096 entries that single
+check cost **17× the entire operation containing it**. It is now maintained
+incrementally and re-derived only inside eviction.
+
+The store is flat across the sweep afterwards, where before it grew with a bound
+the caller chooses. This also corrects a claim made from `CachingBenchmarks`:
+the caching layer's overhead of ~0.8 µs was measured on a cache that had never
+filled, and a store into a full one was never anywhere near that.
+
 ---
 
 ## Mutation testing
@@ -107,38 +173,68 @@ done by hand on a dozen specific claims. Stryker does it everywhere.
 
 ### Where it stands
 
-Full run, ~11 minutes:
+Full run, ~10 minutes:
 
-| Outcome | Baseline | Now |
-|---|---:|---:|
-| Killed | 497 | **575** |
-| **Survived** | **140** | **63** |
-| Timeout | 11 | 12 |
-| No coverage | 4 | 0 |
-| **Mutation score** | **77.91%** | **90.03%** |
+| Outcome | Baseline | After the sweep | Now |
+|---|---:|---:|---:|
+| Killed + timeout | 508 | 587 | **612** |
+| **Survived** | **140** | **63** | **72** |
+| No coverage | 4 | 0 | 2 |
+| Total mutants | 652 | 650 | 686 |
+| **Mutation score** | **77.91%** | **90.03%** | **89.21%** |
 
 Line coverage did not move across any of that work — 99.77% before and after.
-Every one of those 78 newly-killed mutants was in code the suite already
-executed. Coverage said the lines ran; mutation testing said whether running
-them proved anything.
+Every one of those newly-killed mutants was in code the suite already executed.
+Coverage said the lines ran; mutation testing said whether running them proved
+anything.
 
 Per file:
 
 | File | Baseline | Now |
 |---|---:|---:|
 | `Querying/CardFilter.cs` | 67% | **100%** |
-| `Caching/MemoryTcgDexResponseCache.cs` | 71% | **97%** |
+| `Caching/MemoryTcgDexResponseCache.cs` | 71% | **100%** |
 | `Caching/TcgDexCacheOptions.cs` | 83% | **97%** |
 | `TcgDexClient.cs` | 53% | **93%** |
 | `Models/CardImage.cs` | 93% | **93%** |
 | `GraphQlTransport.cs` | 79% | **92%** |
 | `Querying/ExpressionTranslator.cs` | 84% | **88%** |
 | `Resources/Resources.cs` | 82% | **85%** |
-| `Serialization/TcgPlayerPricingConverter.cs` | 77% | **85%** |
-| `Http/BoundedContent.cs` | 63% | **83%** |
-| `TcgDexTransport.cs` | 64% | **81%** |
+| `Serialization/TcgPlayerPricingConverter.cs` | 77% | **81%** |
+| `TcgDexTransport.cs` | 64% | **79%** |
 | `TcgDexServiceCollectionExtensions.cs` | 60% | **80%** |
+| `Http/BoundedContent.cs` | 63% | **77%** |
 | `Caching/TcgDexCachingHandler.cs` | 65% | **70%** |
+
+### The score went down, and that is the point of having it
+
+90.03% was recorded when the mutation campaign ended. The run above is the first
+full one since the performance work, and it is **89.21%** — 36 more mutants, 9
+more survivors. Optimising code without touching its tests lowered the
+verification, and nothing announced it.
+
+Most of the new survivors are near-equivalent: `ConfigureAwait(false)` flips in
+the added `await`s, and the `Content-Length` capacity hint in `BoundedContent`,
+whose whole purpose is to change an allocation count rather than a result — a
+mutation there is invisible by construction.
+
+**One was not equivalent, and it was in the security guard.** `BoundedContent`
+enforces `MaxResponseBytes` while reading by checking `buffered.Length + read >
+maxBytes` before each write. Stryker turned that addition into a subtraction and
+every one of the 450 tests passed.
+
+Checking it by hand rather than filing it as equivalent is what made it useful.
+The existing test sends 68 KB against a 32 KB limit, and under the mutation the
+*final partial chunk* is small enough that `length - read` clears the ceiling
+anyway — so it still throws, and still says "exceeded", for the wrong reason.
+The mutant only survives for a body modestly over the limit: **40,000 bytes
+sails past a 32,768-byte ceiling untouched**. Which is the size that matters,
+because a decompression bomb does not have to be enormous to be over budget.
+`Rest_AnUndeclaredLengthOneByteOver_IsRejected` now covers it.
+
+The lesson is about when to run this. A mutation score is not a certificate
+earned once. It decays exactly when code changes and tests do not — which is
+precisely what an optimisation pass is.
 
 ### The single most common real gap
 
@@ -154,7 +250,7 @@ let the actionable half be deleted silently. One test was even named
 
 If you write one kind of test after reading this, assert the message.
 
-### What the remaining 63 are
+### What the remaining 72 are
 
 Mostly not gaps. In rough order of frequency:
 
@@ -167,8 +263,16 @@ Mostly not gaps. In rough order of frequency:
   because those types are public and their interface is an extension point.
 - **Ternary and catch collapses** where the mutated branch throws into a `catch`
   that produces the same result anyway.
-- **Non-deterministic tie-breaks**, such as the LRU eviction comparison, which
-  depends on dictionary ordering.
+- **Optimisations whose only effect is an allocation count.** The
+  `Content-Length` capacity hint decides how large a buffer starts, not what
+  ends up in it, so no assertion about a *result* can ever see the difference.
+  Four of `BoundedContent`'s eight survivors are this.
+
+The LRU eviction tie-break used to be listed here as a non-deterministic
+survivor that depended on dictionary ordering. It is gone: the eviction was
+rewritten to take a consistent snapshot, and that file is now at 100%. Worth
+noting because it is the good outcome — an "equivalent" mutant that stopped
+being one after the design around it changed.
 
 `TcgDexCachingHandler` at 70% is the floor and is dominated by the first
 category; its realistic ceiling is around 75%. Pushing past that means writing

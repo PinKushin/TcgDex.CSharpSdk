@@ -249,6 +249,42 @@ public sealed class ResponseLimitTests
         exception.Message.ShouldContain("exceeded");
     }
 
+    [Test]
+    public void Rest_AnUndeclaredLengthOneByteOver_IsRejected()
+    {
+        // The streaming twin of Rest_ResponseOneByteOverTheLimit_IsRejected,
+        // and it exists because mutation testing changed the running total in
+        // `buffered.Length + read > maxBytes` to a subtraction and every test
+        // still passed.
+        //
+        // Why the test above missed it. That one sends 68 KB against a 32 KB
+        // limit, and with the subtraction the *final partial chunk* is small
+        // enough that `length - read` clears the ceiling anyway — so it still
+        // throws, just later and for the wrong reason. The mutant only survives
+        // for a body modestly over the limit, where 40,000 bytes would sail
+        // past a 32,768-byte ceiling. That is the interesting size: a
+        // decompression bomb does not have to be enormous to be over budget,
+        // and this is the check standing between the SDK and one.
+        //
+        // Sizing it one byte over rather than picking a number keeps the test
+        // independent of the 16 KB chunk size — with the subtraction, the
+        // running total can never reach a limit that close to the body length.
+        var card = OversizedCard(40 * 1024);
+        var oneByteShort = System.Text.Encoding.UTF8.GetByteCount(card) - 1;
+
+        var handler = new RecordingHandler().RespondWith(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new UnknownLengthContent(card),
+            });
+
+        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+            await CreateClient(handler, oneByteShort).Cards
+                .GetAsync("swsh3-136", CancellationToken.None)).Result;
+
+        exception.Message.ShouldContain("exceeded", Case.Insensitive);
+    }
+
     /// <summary>
     /// Content that refuses to report its length, as a chunked response does.
     /// </summary>
