@@ -170,4 +170,41 @@ public sealed class SerializationTests
         restored.Id.ShouldBe(original.Id);
         restored.Sets.Count.ShouldBe(original.Sets.Count);
     }
-}
+
+    [Test]
+    public void FlexibleString_GivenAnUnsupportedToken_SaysWhatItFound()
+    {
+        // damage is polymorphic across string, number and null, so the failure
+        // message has to name the token actually received — otherwise a caller
+        // hitting an unexpected shape learns only that parsing failed.
+        var exception = Should.Throw<JsonException>(() =>
+            Deserialize<Attack>("""{"name":"Tackle","damage":["not","a","scalar"]}"""));
+
+        exception.Message.ShouldContain("StartArray");
+        exception.Message.ShouldContain("string, number or null");
+    }
+    [Test]
+    public void TcgPlayerPricing_GivenSomethingOtherThanAnObject_SaysWhatItFound()
+    {
+        // Naming the token found is what separates "the server sent an array
+        // where pricing should be" from an unexplained parse failure.
+        var exception = Should.Throw<JsonException>(() =>
+            Deserialize<TcgPlayerPricing>("""["not","an","object"]"""));
+
+        exception.Message.ShouldContain("StartArray");
+        exception.Message.ShouldContain("object for TCGplayer pricing");
+    }
+
+    [Test]
+    public void TcgPlayerPricing_RoundTrips_WithUpdatedPresent()
+    {
+        // `updated` is written only when present, and that branch had no test:
+        // a round trip that omits it passes whether the branch exists or not.
+        var updated = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var json = Serialize(new TcgPlayerPricing { Unit = "USD", Updated = updated });
+
+        json.ShouldContain("updated");
+
+        Deserialize<TcgPlayerPricing>(json).Updated.ShouldBe(updated);
+    }}

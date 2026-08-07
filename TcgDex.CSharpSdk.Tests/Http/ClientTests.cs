@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using TcgDex;
 using TcgDex.Querying;
 
@@ -187,6 +188,50 @@ public sealed class ClientTests
         client.ShouldNotBeNull();
         client.Cards.ShouldNotBeNull();
         client.Catalog.ShouldNotBeNull();
+    }
+
+    [Test]
+    public void AddTcgDex_RegistersOptionsForIOptionsConsumers()
+    {
+        // The existing test resolves the TcgDexOptions singleton. Nothing
+        // resolved IOptions<TcgDexOptions>, so the Configure delegate that
+        // populates it had never executed in any test — Stryker reported the
+        // whole block as NoCoverage rather than merely unverified.
+        //
+        // It matters because IOptions<T> is the idiomatic way a consumer reads
+        // configuration, and someone injecting it would have got a default
+        // instance while the singleton held their settings.
+        var services = new ServiceCollection();
+
+        services.AddTcgDex(options =>
+        {
+            options.Language = TcgDexLanguages.German;
+            options.BaseAddress = new Uri("https://mirror.example/v2/");
+            options.GraphQlEndpoint = new Uri("https://mirror.example/v2/graphql");
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<TcgDexOptions>>().Value;
+
+        options.Language.ShouldBe("de");
+        options.BaseAddress.ShouldBe(new Uri("https://mirror.example/v2/"));
+        options.GraphQlEndpoint.ShouldBe(new Uri("https://mirror.example/v2/graphql"));
+    }
+
+    [Test]
+    public void AddTcgDex_WithNullServices_Throws()
+    {
+        // A public extension method on IServiceCollection, so this guard is
+        // contract rather than internal defensiveness — and it was untested on
+        // both overloads.
+        Should.Throw<ArgumentNullException>(() => TcgDexServiceCollectionExtensions.AddTcgDex(null!));
+    }
+
+    [Test]
+    public void AddTcgDexWithCaching_WithNullServices_Throws()
+    {
+        Should.Throw<ArgumentNullException>(
+            () => TcgDexServiceCollectionExtensions.AddTcgDexWithCaching(null!));
     }
 
     [Test]

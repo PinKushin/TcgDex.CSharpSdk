@@ -94,4 +94,5 @@ public sealed class PricingContractTests
         variants.FirstEdition.ShouldBeFalse();
         variants.WPromo.ShouldBeFalse();
     }
+
 }
