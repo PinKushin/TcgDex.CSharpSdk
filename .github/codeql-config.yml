@@ -11,8 +11,24 @@ name: TcgDex.CSharpSdk CodeQL config
 # here; the same reasoning already excludes *.g.cs from the coverage gate, for
 # the same reason — a number dominated by generated code stops measuring this
 # project.
+# Kept, but it is not what does the work: for compiled languages CodeQL cannot
+# exclude files the compiler pulls into the build, and the generator emits into
+# obj/ during `dotnet build`. Verified — the config loads ("Using configuration
+# file input from workflow") and all 211 alerts survived it.
 paths-ignore:
   - "**/*.g.cs"
+  - "**/obj/**"
+
+query-filters:
+  # So this is the mechanism that actually works. The rule fires 211 times and
+  # every instance is in a System.Text.Json-generated file; there are none in
+  # hand-written code.
+  #
+  # Nothing is lost by excluding it: redundant casts in code we own are already
+  # caught by IDE0004 with TreatWarningsAsErrors, so the check exists, it just
+  # runs in the compiler where the results are actionable.
+  - exclude:
+      id: cs/useless-cast-to-self
 
 queries:
   # A superset of the default suite. Worth the extra noise for a library this

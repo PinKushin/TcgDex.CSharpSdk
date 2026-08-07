@@ -92,6 +92,15 @@ public class TcgDexCacheOptions
         return IsSingleCardPath(path) ? PricingTimeToLive : DefaultTimeToLive;
     }
 
+    /// <remarks>
+    /// A <c>foreach</c> rather than <c>CatalogEndpoints.Any(e =&gt; …)</c>, which
+    /// CodeQL's <c>cs/linq/missed-where</c> suggests. The LINQ form reads better
+    /// and allocates a delegate plus a closure capturing <paramref name="path"/>
+    /// on every call — this runs per request on the caching path, where the SDK
+    /// keeps allocations off the hot path deliberately. Kept as a loop on
+    /// purpose; the alert is dismissed rather than silenced repo-wide, so a
+    /// genuine instance of that rule elsewhere still surfaces.
+    /// </remarks>
     private static bool IsCatalogPath(string path)
     {
         foreach (var endpoint in CatalogEndpoints)
