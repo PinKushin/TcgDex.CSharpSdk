@@ -58,6 +58,13 @@
     <PackageVersion Include="TCGdex" Version="0.1.0" />
   </ItemGroup>
 
+  <!-- Fuzzing, run on a schedule rather than per push. Instruments the SDK
+       assembly and drives it with libFuzzer. MIT licensed, its own
+       non-packable project, never shipped. -->
+  <ItemGroup>
+    <PackageVersion Include="SharpFuzz" Version="2.3.0" />
+  </ItemGroup>
+
   <!-- Test-only dependencies. -->
   <ItemGroup>
     <!-- Renders the compiled public surface as C# so a test can compare it to a

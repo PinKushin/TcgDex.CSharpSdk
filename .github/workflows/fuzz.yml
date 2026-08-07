@@ -1,0 +1,99 @@
+name: Fuzz
+
+# Not a per-push gate. Fuzzing answers a question that has no fixed running
+# time: it explores until it finds something or the budget runs out, so putting
+# it in front of every push would either be too short to find anything or too
+# slow to tolerate. The deterministic version of this check —
+# MalformedResponseTests — runs in the normal suite on every push.
+#
+# Ubuntu only. libFuzzer and the SharpFuzz instrumentation toolchain are
+# Linux-first, and the code under test is platform-independent.
+on:
+  schedule:
+    # Weekly, Tuesday 04:23 UTC. A day off the CI schedule so a failure here is
+    # not competing for attention with a failure there, and off the hour to
+    # avoid the queue that on-the-hour runs join.
+    - cron: "23 4 * * 2"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "Fuzzing budget in seconds"
+        required: false
+        default: "300"
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  fuzz:
+    name: Fuzz the response path
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      # libfuzzer-dotnet is the bridge between libFuzzer and a .NET process. It
+      # is distributed as source, so it is built here rather than downloaded —
+      # a prebuilt binary from a third party is exactly the supply-chain risk
+      # this repository's own dependency policy declines elsewhere.
+      - name: Install clang and build libfuzzer-dotnet
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang
+          curl -sSL -o libfuzzer-dotnet.cc \
+            https://raw.githubusercontent.com/Metalnem/libfuzzer-dotnet/master/libfuzzer-dotnet.cc
+          clang -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet
+
+      - name: Install SharpFuzz
+        run: dotnet tool install --global SharpFuzz.CommandLine
+
+      - name: Publish the fuzz target
+        run: dotnet publish TcgDex.CSharpSdk.Fuzz -c Release -o fuzz-out
+
+      # The SDK assembly is instrumented, not the harness: coverage feedback
+      # has to come from the code under test for the fuzzer to make progress.
+      - name: Instrument the SDK
+        run: sharpfuzz fuzz-out/TcgDex.CSharpSdk.dll
+
+      # The recorded API responses are the seed corpus. Copied out of the
+      # publish output so the fuzzer can write new inputs beside them without
+      # touching the repository.
+      - name: Prepare the corpus
+        run: |
+          mkdir -p corpus findings
+          cp fuzz-out/corpus/*.json corpus/
+          echo "seeded with $(ls corpus | wc -l) recorded responses"
+
+      - name: Fuzz
+        env:
+          BUDGET: ${{ github.event.inputs.seconds || '300' }}
+        run: |
+          ./libfuzzer-dotnet \
+            --target_path=fuzz-out/TcgDex.CSharpSdk.Fuzz \
+            -max_total_time="$BUDGET" \
+            -artifact_prefix=findings/ \
+            -print_final_stats=1 \
+            corpus
+
+      # A crash is written as the exact bytes that caused it, which is a
+      # regression fixture rather than a bug report. Uploaded on failure as
+      # well as success, since failure is when there is something to collect.
+      - name: Upload findings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-findings
+          path: |
+            findings/
+            corpus/
+          if-no-files-found: ignore
