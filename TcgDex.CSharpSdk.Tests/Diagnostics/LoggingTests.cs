@@ -28,6 +28,43 @@ public sealed class LoggingTests
     }
 
     [Test]
+    public void AnHttpBaseAddress_WarnsThatTrafficIsPlaintext()
+    {
+        // BaseAddress is deliberately overridable so callers can target a
+        // mirror or a local stub, and http://localhost is a legitimate use of
+        // that. But plaintext against a real host exposes every request and
+        // response, and this SDK trusts the body enough to deserialize it — so
+        // the case is worth saying out loud rather than validating away.
+        var log = new RecordingLogger(LogLevel.Trace);
+
+        _ = new TcgDexClient(
+            new HttpClient(new RecordingHandler()),
+            new TcgDexOptions { BaseAddress = new Uri("http://api.tcgdex.net/v2/") },
+            log.Factory);
+
+        // Filtered to warnings: the client also logs ClientConfigured at
+        // Information on construction, so asserting on every entry would be
+        // asserting on unrelated output.
+        var warning = log.Entries.Where(e => e.Level == LogLevel.Warning).ShouldHaveSingleItem();
+
+        warning.Message.ShouldContain("plaintext");
+        warning.Message.ShouldContain("http://api.tcgdex.net/v2/");
+    }
+
+    [Test]
+    public void AnHttpsBaseAddress_WarnsAboutNothing()
+    {
+        // The ordinary case must stay silent, or the warning becomes noise that
+        // everyone filters out — and a test that only proves the warning fires
+        // would not notice it firing always.
+        var log = new RecordingLogger(LogLevel.Trace);
+
+        _ = new TcgDexClient(new HttpClient(new RecordingHandler()), new TcgDexOptions(), log.Factory);
+
+        log.Entries.ShouldNotContain(e => e.Level >= LogLevel.Warning);
+    }
+
+    [Test]
     public async Task ASuccessfulRequest_LogsAtDebug()
     {
         var handler = new RecordingHandler()
@@ -175,7 +212,7 @@ public sealed class LoggingTests
         var (client, log) = Build(handler, LogLevel.None);
         await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
-        log.Entries.ShouldBeEmpty();
+        log.Entries.ShouldNotContain(e => e.Level >= LogLevel.Warning);
         log.FormatterInvocations.ShouldBe(0, "a disabled level must not format anything");
     }
 

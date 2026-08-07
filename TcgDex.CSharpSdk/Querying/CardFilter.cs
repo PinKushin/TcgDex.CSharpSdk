@@ -128,8 +128,18 @@ public sealed record CardFilter
     /// Quotes a value as a GraphQL string literal.
     /// </summary>
     /// <remarks>
-    /// Escaping matters: a card name containing a quote would otherwise break
-    /// out of the literal and change the query being sent.
+    /// <para>
+    /// Two separate jobs. The quote and backslash cases are the security ones:
+    /// a card name containing either would otherwise break out of the literal
+    /// and change the query being sent, and nothing else in a string can.
+    /// </para>
+    /// <para>
+    /// The control characters are a correctness one. The GraphQL grammar
+    /// forbids them raw inside a string, so passing one through unescaped turns
+    /// a caller's odd input into a server-side syntax error rather than a clean
+    /// result. Backspace and form feed have dedicated escapes; everything else
+    /// below U+0020 goes out as \uXXXX.
+    /// </para>
     /// </remarks>
     private static string Quote(string value)
     {
@@ -145,7 +155,22 @@ public sealed record CardFilter
                 case '\n': builder.Append("\\n"); break;
                 case '\r': builder.Append("\\r"); break;
                 case '\t': builder.Append("\\t"); break;
-                default: builder.Append(character); break;
+                case '\b': builder.Append("\\b"); break;
+                case '\f': builder.Append("\\f"); break;
+
+                default:
+                    // Uppercase hex, four digits: the grammar accepts either
+                    // case, and fixing one keeps the wire output assertable.
+                    if (character < ' ')
+                    {
+                        builder.Append("\\u").Append(((int)character).ToString("X4", System.Globalization.CultureInfo.InvariantCulture));
+                    }
+                    else
+                    {
+                        builder.Append(character);
+                    }
+
+                    break;
             }
         }
 
