@@ -32,6 +32,9 @@ internal sealed class TcgDexTransport
     private readonly Uri _languageBase;
     private readonly ILogger _logger;
 
+    /// <summary>Ceiling on a buffered response body. See <see cref="TcgDexOptions.MaxResponseBytes"/>.</summary>
+    private readonly long _maxResponseBytes;
+
     internal TcgDexTransport(HttpClient httpClient, TcgDexOptions options, ILogger? logger = null)
     {
         Guard.NotNull(httpClient);
@@ -48,6 +51,7 @@ internal sealed class TcgDexTransport
         // The trailing slash is what makes the resource path append to the
         // language segment rather than replace it.
         _languageBase = new Uri(options.BaseAddress, options.Language + "/");
+        _maxResponseBytes = options.MaxResponseBytes;
     }
 
     /// <summary>
@@ -89,8 +93,8 @@ internal sealed class TcgDexTransport
             return await HandleFailureAsync<T>(uri, response, activity, cancellationToken).ConfigureAwait(false);
         }
 
-        var body = await response.Content
-            .ReadAsStringAsync(cancellationToken)
+        var body = await BoundedContent
+            .ReadAsStringAsync(response.Content, _maxResponseBytes, uri, cancellationToken)
             .ConfigureAwait(false);
 
         return Deserialize<T>(body, uri);
@@ -165,7 +169,8 @@ internal sealed class TcgDexTransport
         CancellationToken cancellationToken)
         where T : class
     {
-        var problem = await ReadProblemAsync(response, cancellationToken).ConfigureAwait(false);
+        var problem = await ReadProblemAsync(response, _maxResponseBytes, uri, cancellationToken)
+            .ConfigureAwait(false);
 
         if (response.StatusCode == HttpStatusCode.NotFound && problem?.IsLanguageError != true)
         {
@@ -203,12 +208,14 @@ internal sealed class TcgDexTransport
 
     private static async Task<TcgDexProblem?> ReadProblemAsync(
         HttpResponseMessage response,
+        long maxResponseBytes,
+        Uri uri,
         CancellationToken cancellationToken)
     {
         try
         {
-            var body = await response.Content
-                .ReadAsStringAsync(cancellationToken)
+            var body = await BoundedContent
+                .ReadAsStringAsync(response.Content, maxResponseBytes, uri, cancellationToken)
                 .ConfigureAwait(false);
 
             return string.IsNullOrWhiteSpace(body)
@@ -219,6 +226,14 @@ internal sealed class TcgDexTransport
         {
             // An unparseable error body must not mask the underlying failure —
             // the caller still gets a TcgDexApiException, just without detail.
+            return null;
+        }
+        catch (TcgDexApiException)
+        {
+            // An oversized error body is bounded like any other, but here the
+            // status code is the real news. Swallowing this keeps the caller's
+            // exception describing the 500 they got rather than the size of the
+            // page the server sent to explain it.
             return null;
         }
     }

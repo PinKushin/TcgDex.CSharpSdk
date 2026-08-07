@@ -1,0 +1,70 @@
+name: CodeQL
+
+# CodeQL does interprocedural taint analysis — it follows a value from where it
+# enters the program to where it is used. That is the class of problem the
+# CA3xxx/CA5xxx analyzers in the build cannot see: those match known-dangerous
+# API shapes at a single call site, which is why a deliberate `new Random()`
+# probe went unflagged while `SHA1.Create()` was caught. The two are
+# complementary rather than redundant.
+#
+# Free for public repositories.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, Tuesday 04:23 UTC. Deliberately a different day and an off-hour
+    # minute from CI, so a scheduled security scan never queues behind the
+    # scheduled integration run.
+    - cron: "23 4 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  analyze:
+    name: Analyze C#
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Required to upload results to the Security tab.
+      security-events: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Initialise CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+          # security-and-quality is a superset of the default suite. The extra
+          # noise is acceptable for a library this size, and it is the setting
+          # that catches the taint-flow issues rather than only the obvious ones.
+          queries: security-and-quality
+
+      # An explicit build rather than autobuild: this repository multi-targets
+      # netstandard2.0, net8.0 and net10.0, and analysing a single framework is
+      # enough — the source is identical across them, and building all three
+      # would triple the scan for no extra coverage.
+      - name: Build
+        run: dotnet build TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj -c Release -f net10.0
+
+      - name: Analyse
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:csharp"

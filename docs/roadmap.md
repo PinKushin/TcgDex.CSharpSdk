@@ -5,7 +5,7 @@ State at `e66fef9`: the SDK covers the full TCGdex REST surface, builds clean on
 
 | | |
 |---|---|
-| Tests | **340 unit × 3 frameworks + 148 integration** |
+| Tests | **359 unit × 3 frameworks + 149 integration** |
 | Line coverage | **99.76%**, gated at 99.5 |
 | Branch coverage | **96.06%**, gated at 95 |
 | Warnings | zero — compiler, analyzers, DocFX, CI annotations |

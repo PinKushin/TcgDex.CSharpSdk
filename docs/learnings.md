@@ -156,6 +156,46 @@ should too.
 
 ---
 
+## An SDK has two untrusted inputs, and hardening one is not hardening both
+
+Worth separating, because the defences are unrelated:
+
+**The server's responses.** A body is buffered before deserialization, so
+without a ceiling the peak memory of a request is whatever the server sends —
+and automatic decompression sharpens that, since a few kilobytes of hostile gzip
+expand to gigabytes. `TcgDexOptions.MaxResponseBytes` (32 MiB default, against a
+2.4 MB largest real response) bounds it. Three details decide whether such a
+limit works:
+
+- **It lives in the transport, not on `HttpClient.MaxResponseContentBufferSize`.**
+  Callers may supply their own `HttpClient`, and that is precisely the case an
+  SDK cannot configure.
+- **`Content-Length` is a claim, not proof.** It is worth acting on when it
+  already admits the body is too large, but the bytes are counted while reading
+  because a hostile sender simply lies or omits it.
+- **The check happens before each write to the buffer**, so an oversized body is
+  abandoned at the limit rather than fully buffered and then rejected — which
+  would concede exactly the memory the limit exists to protect.
+
+**The caller's arguments.** Consumers are programmers, who probe harder than end
+users. Card ids go into the URL path, so an id is untrusted input: they are
+escaped with `Uri.EscapeDataString`, which turns `/` into `%2F` that `Uri` never
+decodes, so no id can move a request off the configured path.
+
+Two things deliberately *not* done, because both would be inventing protection:
+
+- **No cap on id length.** .NET Core removed the `Uri` length limit, so a
+  1 MB id builds a 1 MB URL and unicode expands ~6× through escaping. It is
+  wasteful, but the server answers 414 and that is the right authority. A cap
+  here could reject a legitimate id the API later introduces.
+- **No test for deeply nested JSON.** `Utf8JsonReader` tracks depth with a bit
+  stack rather than recursion and these models are shallow, so there is no stack
+  to exhaust; `MaxDepth` 64 is a backstop, not the thing preventing a crash. A
+  test would also have passed regardless, since `[[[[…]]]]` fails to deserialize
+  into a `Card` at any depth.
+
+---
+
 ## Check the wrapped service before deciding an input is invalid
 
 A filter value of a single `*` threw `ArgumentOutOfRangeException` out of

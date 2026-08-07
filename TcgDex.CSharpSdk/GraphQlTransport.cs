@@ -179,8 +179,12 @@ internal sealed class GraphQlTransport(
                 .PostAsync(_options.GraphQlEndpoint, content, cancellationToken)
                 .ConfigureAwait(false);
 
-            var body = await httpResponse.Content
-                .ReadAsStringAsync(cancellationToken)
+            var body = await BoundedContent
+                .ReadAsStringAsync(
+                    httpResponse.Content,
+                    _options.MaxResponseBytes,
+                    _options.GraphQlEndpoint,
+                    cancellationToken)
                 .ConfigureAwait(false);
 
             if (!httpResponse.IsSuccessStatusCode)

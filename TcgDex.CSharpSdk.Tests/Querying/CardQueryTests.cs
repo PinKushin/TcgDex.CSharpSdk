@@ -141,6 +141,23 @@ public sealed class CardQueryTests
     // error. A single asterisk is *one* wildcard; counting it as both a leading
     // and a trailing one is what used to make this throw.
     [Test]
+    public void Where_ReturnsANewQuery_LeavingTheOriginalUntouched()
+    {
+        // The contract behind every other guarantee here. A fluent builder that
+        // mutates in place looks identical at one call site and breaks the
+        // moment a caller keeps a base query and branches off it — which is the
+        // obvious way to use this, and would fail as a data race rather than as
+        // an error anyone could debug.
+        var baseQuery = Query().Where(c => c.Name == "Furret");
+
+        var narrowed = baseQuery.Where(c => c.Hp > 100);
+
+        baseQuery.ToQueryString().ShouldBe("name=eq:Furret");
+        narrowed.ToQueryString().ShouldBe("name=eq:Furret&hp=gt:100");
+        narrowed.ShouldNotBeSameAs(baseQuery);
+    }
+
+    [Test]
     public void SingleAsterisk_IsOneWildcard_NotTwo()
     {
         // A local rather than a literal: this is how the value actually

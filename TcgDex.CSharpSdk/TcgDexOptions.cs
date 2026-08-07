@@ -33,6 +33,28 @@ public sealed class TcgDexOptions
     public Uri GraphQlEndpoint { get; set; } = new("https://api.tcgdex.net/v2/graphql");
 
     /// <summary>
+    /// The largest response body the client will buffer, in bytes. Defaults to
+    /// 32 MiB. Set to zero to remove the limit.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A response is read into memory before it is deserialized, so without a
+    /// ceiling the peak memory of a request is whatever the server chooses to
+    /// send. Compression makes that worse rather than better: a few kilobytes
+    /// of hostile gzip can expand to gigabytes, and the expansion happens in
+    /// the handler below this one, so the limit is applied to the *decompressed*
+    /// bytes where it actually protects anything.
+    /// </para>
+    /// <para>
+    /// The default is generous on purpose. The largest response the API
+    /// produces is the unpaginated card list at roughly 2.4 MB, so 32 MiB
+    /// leaves an order of magnitude of headroom while still bounding memory.
+    /// Raise it if you target a mirror that serves something larger.
+    /// </para>
+    /// </remarks>
+    public long MaxResponseBytes { get; set; } = 32L * 1024 * 1024;
+
+    /// <summary>
     /// Throws when the options cannot produce valid requests.
     /// </summary>
     /// <exception cref="ArgumentException">
@@ -51,6 +73,14 @@ public sealed class TcgDexOptions
             throw new ArgumentException(
                 $"BaseAddress must be an absolute URI, but was '{BaseAddress}'.",
                 nameof(BaseAddress));
+        }
+
+        if (MaxResponseBytes < 0)
+        {
+            throw new ArgumentException(
+                $"MaxResponseBytes cannot be negative, but was {MaxResponseBytes}. " +
+                "Use zero to remove the limit.",
+                nameof(MaxResponseBytes));
         }
 
         if (!TcgDexLanguages.IsSupported(Language))

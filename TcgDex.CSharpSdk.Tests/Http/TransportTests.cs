@@ -194,6 +194,28 @@ public sealed class TransportTests
     }
 
     [Test]
+    public void Options_WithNegativeMaxResponseBytes_AreRejected()
+    {
+        // Negative is neither a limit nor the documented "no limit", so it is a
+        // caller mistake worth naming at construction rather than silently
+        // behaving like one of the two.
+        var options = new TcgDexOptions { MaxResponseBytes = -1 };
+
+        var exception = Should.Throw<ArgumentException>(options.Validate);
+
+        exception.Message.ShouldContain("-1");
+        exception.Message.ShouldContain("zero");
+    }
+
+    [Test]
+    public void Options_WithZeroMaxResponseBytes_AreAccepted()
+    {
+        // Zero is the documented escape hatch, so validation must not treat it
+        // as "not set" and reject it alongside the negative case.
+        Should.NotThrow(new TcgDexOptions { MaxResponseBytes = 0 }.Validate);
+    }
+
+    [Test]
     public void Options_WithSupportedLanguage_AreAccepted()
     {
         foreach (var language in TcgDexLanguages.All)
