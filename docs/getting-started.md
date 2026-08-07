@@ -41,6 +41,32 @@ builder.Services
     .AddStandardResilienceHandler();
 ```
 
+## Timeouts
+
+One request may take 30 seconds, headers and body together. Change it or remove
+it entirely:
+
+```csharp
+builder.Services.AddTcgDex(options =>
+{
+    options.Timeout = TimeSpan.FromSeconds(10);      // stricter
+    options.Timeout = Timeout.InfiniteTimeSpan;      // no limit
+});
+```
+
+The default replaces `HttpClient`'s own 100 seconds, which nobody chose and
+which leaves a caller blocked for over a minute and a half on an endpoint that
+has stopped answering. The live API returns its largest response, the 2.3 MB
+card list, in well under a second.
+
+An expiry throws `TcgDexApiException`, like every other failure. Cancellation
+**you** requested stays an `OperationCanceledException`, because that is yours to
+observe rather than a fault to report.
+
+The limit is applied with a linked `CancellationTokenSource` rather than by
+setting `HttpClient.Timeout`, so an `HttpClient` you supply and share with the
+rest of your application is left alone.
+
 ## Skipping pricing
 
 Every card carries a `pricing` block, and it is the most expensive part of one
