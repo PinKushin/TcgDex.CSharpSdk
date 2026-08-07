@@ -40,6 +40,45 @@ Time-to-live therefore controls *how long you serve data without asking*, not ho
 long before you pay for it again. That makes short windows cheap — the default
 for a single card is one minute, because cards embed pricing.
 
+## The parse is cached too
+
+The table above is about bytes. There is a second layer above it that is about
+**work**, and it exists because the first one could not be.
+
+This cache stores bytes rather than objects, deliberately: it sits on the
+`HttpMessageHandler` pipeline, which is what lets `ETag` revalidation work at all
+and lets one implementation serve every endpoint. The cost was that a fresh hit
+still deserialized the same bytes into the same object on every call — and
+deserialization is roughly **86%** of the in-process cost of a request. A hit
+avoided the network and paid nearly the full local price anyway.
+
+`TcgDexOptions.MaxDeserializedCacheEntries` (default **64**, zero to disable)
+retains the parsed model as well:
+
+| Fetching a card whose bytes are already cached | Time | Allocated |
+|---|---:|---:|
+| Byte cache only | 25.71 µs | 16.25 KB |
+| **With the parse cached** | **1.40 µs** | **2.12 KB** |
+
+**Entries are validated by `ETag`, not by a lifetime of their own.** A stored
+model is handed back only when the response carries the exact tag it was built
+from — whether the server sent that header or the byte cache replayed it. So a
+typed entry can never be staler than the bytes underneath it, and there is no
+second expiry policy to keep in step with the first. A response with no `ETag`
+is never served from this layer.
+
+Two consequences worth knowing before you rely on it:
+
+- **Callers share one instance.** Two fetches of an unchanged resource now return
+  the same object rather than two equal ones. The models are records with
+  `init`-only properties, so this is safe for anything the type system permits; a
+  caller who casts an `IReadOnlyList<T>` property back to `List<T>` and mutates
+  it would corrupt the entry for everyone. Set the bound to zero if that is a
+  risk your codebase cannot rule out.
+- **The bound counts entries, and parsed objects are large.** The unpaginated
+  card list is 2.3 MB on the wire and roughly 8 MB once parsed, which is why the
+  default is 64 rather than the byte cache's 512.
+
 ## Defaults
 
 | Resource | Window | Reason |
@@ -146,3 +185,9 @@ does for repeated identical queries. A query whose parameters differ is a new UR
 and therefore a new request. If you need genuinely local search over a fixed
 working set, fetch the set once and query it in memory with LINQ — that is a
 different tool from this one, and the SDK does not pretend otherwise.
+
+One more thing it cannot do: **the deserialization cache does not remove
+requests.** Without the caching handler in front of it, every fetch still goes to
+the network to learn the `ETag`; what it saves is the parse afterwards. The two
+layers are worth roughly 20–50 ms and 24 µs respectively, which is the right
+order to reach for them in.

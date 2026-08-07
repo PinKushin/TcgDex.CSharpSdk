@@ -1,11 +1,11 @@
 # Roadmap
 
-State at `43ff3be`: the SDK covers the full TCGdex REST surface, builds clean on
+State at `741a4f3`: the SDK covers the full TCGdex REST surface, builds clean on
 `netstandard2.0`, `net8.0` and `net10.0`, and is verified under Native AOT.
 
 | | |
 |---|---|
-| Tests | **451 unit × 3 frameworks + 149 integration** |
+| Tests | **466 unit × 3 frameworks + 149 integration** |
 | Mutation score | **~88%**, break threshold 85 |
 | Line coverage | **99.76%**, gated at 99.5 |
 | Branch coverage | **96.06%**, gated at 95 |
@@ -55,7 +55,9 @@ roadmap that only lists future work hides what the project already decided.
 - **Opt-in GraphQL search** for full card detail in one request instead of one
   call per card.
 - **Response caching** with ETag revalidation, so a stale entry costs a `304`
-  and zero bytes rather than a re-download. See [`caching.md`](caching.md).
+  and zero bytes rather than a re-download — plus a second layer that retains the
+  deserialized model against its ETag, taking a warm hit from 25.71 µs to
+  1.40 µs. See [`caching.md`](caching.md).
 - **Auto-pagination** via `StreamAsync`, which handles the short-page end signal
   the missing total count forces on every consumer.
 - **Typed image URLs**, including the asymmetry that card artwork takes a quality

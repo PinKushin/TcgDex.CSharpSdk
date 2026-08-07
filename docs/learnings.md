@@ -618,6 +618,50 @@ evict the entry just written. A clear-then-store sequence — the obvious thing 
 consumer does — would silently lose data.
 
 ---
+## A wall clock is the wrong ordering for an LRU
+
+Recency was stamped with `TimeProvider.GetUtcNow()`, which reads as the obvious
+choice and is a defect. The system clock is coarse — roughly **15 ms** on Windows
+by default — so a burst of cache accesses all receive the same timestamp, the
+eviction sort sees a wall of ties, and it picks among them arbitrarily. Including
+**the entry inserted a moment ago**, which turns a cache into wasted work.
+
+Found by the `net472` target, whose clock is coarser still. It is not a `net472`
+quirk: nothing stops the same thing happening on .NET 10 under a burst, it is
+just rarer and would have surfaced as an unreproducible hit-rate problem.
+
+An LRU needs *ordering*, not *time*. A monotonic counter — `Interlocked.Increment`
+on each access — has no resolution to run out of and cannot tie. It also removed
+the store's dependency on `TimeProvider` entirely; only the response cache's
+absolute expiry, which is genuinely about wall-clock time, still needs one.
+
+**The general shape: if a value is only ever compared, do not source it from a
+clock.** Clocks have resolution, jump, and go backwards.
+
+---
+## Extracting shared code has a cost, and it shows up in the allocation column
+
+Two caches needed the same bounding and eviction, so the policy moved into a
+shared `BoundedLru<TKey, TValue>`. Correct by the DRY rule and it cost **24 B and
+8 ns per write**, because each cache wrapped its own entry type inside the
+store's entry — one allocation became two.
+
+Making the stored value a struct — `(CachedResponse, DateTimeOffset)` rather than
+a class — put it back exactly: 409 B to 385 B, 105 ns to 97 ns. The struct lives
+inside the store's own entry instead of in a second heap object.
+
+Worth stating because the extraction was still right, and a benchmark is what
+kept it from being a quiet 6% regression on a hot path. The refactor and the
+measurement are the same task, not sequential ones.
+
+A second-order effect, found by mutation testing rather than reasoning: with a
+struct value, a cache miss returns `null` by *two* paths, because a default
+`DateTimeOffset` is always in the past and the miss falls through into the expiry
+branch. Removing the miss check is therefore an equivalent mutant where, with a
+class, it would have been a `NullReferenceException`. Changing a value's kind
+changes which of your branches are load-bearing.
+
+---
 ## Benchmarking against a competitor, and losing
 
 The other public C# TCGdex SDK accepts an injected `HttpClient`, which is the

@@ -86,6 +86,46 @@ public sealed class TcgDexOptions
     public bool DeserializePricing { get; set; } = true;
 
     /// <summary>
+    /// How many deserialized responses to retain so a repeat fetch can skip the
+    /// parse. Defaults to 64. Set to zero to disable.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Deserialization is roughly 86% of the in-process cost of a request, and
+    /// the response cache does not avoid it — that cache stores bytes, because
+    /// it sits on the <see cref="System.Net.Http.HttpMessageHandler"/> pipeline
+    /// where <c>ETag</c> revalidation is possible and one implementation covers
+    /// every endpoint. A cache hit therefore re-parsed the same bytes into the
+    /// same object every time. This layer stops that.
+    /// </para>
+    /// <para>
+    /// <b>Entries are validated by <c>ETag</c>, not by a lifetime of their
+    /// own.</b> A stored model is reused only when the response carries the
+    /// exact <c>ETag</c> it was built from — whether that header came from the
+    /// server or from the byte cache replaying it. So a typed entry cannot be
+    /// staler than the bytes underneath it, and there is no second expiry policy
+    /// to keep in step with the first. A response without an <c>ETag</c> is
+    /// never served from here.
+    /// </para>
+    /// <para>
+    /// <b>Callers share one instance.</b> Two fetches of an unchanged resource
+    /// now return the same object rather than two equal ones. The models are
+    /// records with <c>init</c>-only properties, so this is safe for anything
+    /// the type system allows; a caller who casts an
+    /// <see cref="IReadOnlyList{T}"/> property back to <see cref="List{T}"/> and
+    /// mutates it would corrupt the entry for everyone. Set this to zero if that
+    /// is a risk your codebase cannot rule out.
+    /// </para>
+    /// <para>
+    /// The bound is a count, and deserialized objects are several times the size
+    /// of the bytes they came from — the unpaginated card list is 2.3 MB on the
+    /// wire and roughly 8 MB once parsed. 64 is deliberately far below the
+    /// response cache's 512 for that reason.
+    /// </para>
+    /// </remarks>
+    public int MaxDeserializedCacheEntries { get; set; } = 64;
+
+    /// <summary>
     /// Throws when the options cannot produce valid requests.
     /// </summary>
     /// <exception cref="ArgumentException">
@@ -112,6 +152,14 @@ public sealed class TcgDexOptions
                 $"MaxResponseBytes cannot be negative, but was {MaxResponseBytes}. " +
                 "Use zero to remove the limit.",
                 nameof(MaxResponseBytes));
+        }
+
+        if (MaxDeserializedCacheEntries < 0)
+        {
+            throw new ArgumentException(
+                $"MaxDeserializedCacheEntries cannot be negative, but was " +
+                $"{MaxDeserializedCacheEntries}. Use zero to disable the cache.",
+                nameof(MaxDeserializedCacheEntries));
         }
 
         if (!TcgDexLanguages.IsSupported(Language))
