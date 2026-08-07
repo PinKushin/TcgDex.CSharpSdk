@@ -109,7 +109,7 @@ internal sealed class TcgDexTransport
         }
 
         var body = await BoundedContent
-            .ReadAsStringAsync(response.Content, _maxResponseBytes, uri, cancellationToken)
+            .ReadAsBytesAsync(response.Content, _maxResponseBytes, uri, cancellationToken)
             .ConfigureAwait(false);
 
         return Deserialize<T>(body, uri);
@@ -230,12 +230,17 @@ internal sealed class TcgDexTransport
         try
         {
             var body = await BoundedContent
-                .ReadAsStringAsync(response.Content, maxResponseBytes, uri, cancellationToken)
+                .ReadAsBytesAsync(response.Content, maxResponseBytes, uri, cancellationToken)
                 .ConfigureAwait(false);
 
-            return string.IsNullOrWhiteSpace(body)
+            // An empty or all-whitespace body carries no problem document. The
+            // span is trimmed rather than decoded to a string first — the whole
+            // point of reading bytes is to not pay for that conversion.
+            var span = new ReadOnlySpan<byte>(body.Array, body.Offset, body.Count);
+
+            return IsBlank(span)
                 ? null
-                : JsonSerializer.Deserialize(body, TcgDexJsonContext.Default.TcgDexProblem);
+                : JsonSerializer.Deserialize(span, TcgDexJsonContext.Default.TcgDexProblem);
         }
         catch (JsonException)
         {
@@ -253,13 +258,37 @@ internal sealed class TcgDexTransport
         }
     }
 
-    private T? Deserialize<T>(string body, Uri uri)
+    /// <summary>Whether a body is empty or entirely ASCII whitespace.</summary>
+    private static bool IsBlank(ReadOnlySpan<byte> body)
+    {
+        foreach (var b in body)
+        {
+            if (b is not ((byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n'))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Deserializes a UTF-8 body without decoding it to a string first.
+    /// </summary>
+    /// <remarks>
+    /// System.Text.Json reads UTF-8 natively, so passing the buffer straight
+    /// through avoids a full copy of every response body.
+    /// </remarks>
+    private T? Deserialize<T>(ArraySegment<byte> body, Uri uri)
         where T : class
     {
         try
         {
             var typeInfo = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
-            return JsonSerializer.Deserialize(body, typeInfo);
+
+            return JsonSerializer.Deserialize(
+                new ReadOnlySpan<byte>(body.Array, body.Offset, body.Count),
+                typeInfo);
         }
         catch (JsonException ex)
         {
