@@ -1,9 +1,10 @@
-# Benchmarks and mutation testing
+# Benchmarks, mutation testing and fuzzing
 
-Two things the rest of the test suite cannot tell you: **how fast the code is**,
-and **whether the tests would notice if it were wrong**. Both tools are free and
-MIT/Apache-2.0, and neither ships in the package — BenchmarkDotNet lives in its
-own non-packable project, Stryker is a `dotnet tool`.
+Three things the rest of the test suite cannot tell you: **how fast the code
+is**, **whether the tests would notice if it were wrong**, and **what happens on
+input nobody thought of**. All three tools are free and MIT/Apache-2.0, and none
+ships in the package — BenchmarkDotNet and SharpFuzz live in their own
+non-packable projects, Stryker is a `dotnet tool`.
 
 ---
 
@@ -386,3 +387,78 @@ The suite runs once per mutant, so a full pass takes minutes to tens of minutes
 — against roughly 2 seconds for the unit tests. It is a periodic and
 pre-release check, run deliberately, not something to put in front of every
 commit.
+
+---
+
+## Fuzzing
+
+The SDK consumes untrusted input in exactly one place: a response body from a
+server it does not control, over a `BaseAddress` the caller is explicitly
+allowed to repoint at a mirror. Two layers cover it, because they answer the
+same question at different depths and only one can afford to run per push.
+
+### Every push: `MalformedResponseTests`
+
+Corrupts the recorded fixtures mechanically — truncation at every tenth,
+single-bit flips, injected structural bytes, 2000-deep nesting, invalid UTF-8
+inside a string — and asserts one property:
+
+> The SDK returns a value or throws `TcgDexApiException`. Never anything else.
+
+That is the contract a consumer wraps in a single `catch`. An
+`IndexOutOfRangeException` arriving from the network is something they cannot
+defend against, because it comes from someone else's server rather than their
+own code.
+
+Seeded rather than random, so a failure names a reproducible case instead of
+being a one-off nobody can re-run. Verified in the failing direction before
+being trusted: rewriting the transport's wrapping throw to leak an
+`InvalidOperationException` fails it on 300+ named cases.
+
+### Weekly: coverage-guided fuzzing
+
+```bash
+gh workflow run fuzz.yml -f seconds=300
+```
+
+SharpFuzz instruments the SDK assembly and libFuzzer explores from a corpus
+seeded with the recorded responses. Seeding is what makes it work — given random
+bytes, a fuzzer spends its entire budget rediscovering that JSON starts with a
+brace.
+
+First run, 2026-08-07, 300 seconds:
+
+| | |
+|---|---|
+| Executions | **4,452,889** at ~14,800/s |
+| Corpus | 17 seeds → **496 entries** |
+| Features | 641 at init → **1,757** |
+| Crashes | **none** |
+
+**Read `cov: 8` in the libFuzzer output as normal, not broken.** That counts
+edges in the tiny native `libfuzzer-dotnet` shim. The .NET signal arrives as
+`ft:` — features from the shared-memory bitmap SharpFuzz fills — and the proof
+the instrumentation is live is that the corpus grew 55×. Without coverage
+feedback a corpus does not grow at all.
+
+A crash is written to `findings/` as the exact bytes that caused it, which makes
+it a regression fixture rather than a bug report.
+
+### Running it locally
+
+The toolchain is Linux-first, so on Windows this needs WSL:
+
+```bash
+sudo apt-get install --yes clang
+curl -sSL -o libfuzzer-dotnet.cc \
+  https://raw.githubusercontent.com/Metalnem/libfuzzer-dotnet/master/libfuzzer-dotnet.cc
+clang -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet
+dotnet tool install --global SharpFuzz.CommandLine
+dotnet publish TcgDex.CSharpSdk.Fuzz -c Release -o fuzz-out
+sharpfuzz fuzz-out/TcgDex.CSharpSdk.dll
+./libfuzzer-dotnet --target_path=fuzz-out/TcgDex.CSharpSdk.Fuzz \
+  -max_total_time=300 -artifact_prefix=findings/ corpus
+```
+
+`libfuzzer-dotnet` is built from source rather than downloaded prebuilt, which
+is the same supply-chain position this repository takes for its dependencies.

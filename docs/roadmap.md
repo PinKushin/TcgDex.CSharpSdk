@@ -1,11 +1,11 @@
 # Roadmap
 
-State at `a7b8d3a`: the SDK covers the full TCGdex REST surface, builds clean on
+State at `bb1ebb5`: the SDK covers the full TCGdex REST surface, builds clean on
 `netstandard2.0`, `net8.0` and `net10.0`, and is verified under Native AOT.
 
 | | |
 |---|---|
-| Tests | **468 unit × 3 frameworks + 149 integration** |
+| Tests | **470 unit × 3 frameworks + 149 integration** |
 | Mutation score | **88.19%**, break threshold 85 |
 | Line coverage | **99.80%**, gated at 99.5 |
 | Branch coverage | **96.53%**, gated at 95 |
@@ -70,6 +70,11 @@ roadmap that only lists future work hides what the project already decided.
   pass.
 - **Documentation site** generated from XML docs, so the reference cannot drift
   from the code.
+- **Fuzzed and API-gated** — the response path is driven with corrupted
+  fixtures on every push and coverage-guided fuzzing weekly (4.4M executions,
+  no crashes); the public surface is pinned by an approval test so a breaking
+  change cannot merge without someone accepting the diff. Tested on Linux,
+  Windows and macOS.
 - **Fixture drift detection** — the recorded responses every offline test relies
   on are re-fetched weekly and compared by shape, so an API change fails with a
   precise message instead of silently invalidating the offline suite.
