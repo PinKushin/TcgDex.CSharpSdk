@@ -16,7 +16,7 @@ namespace TcgDex.Serialization;
 /// modifiers — and matches how the GraphQL schema declares the same field.
 /// </para>
 /// </remarks>
-public sealed class FlexibleStringConverter : JsonConverter<string?>
+internal sealed class FlexibleStringConverter : JsonConverter<string?>
 {
     // No JsonTokenType.Null case: HandleNull defaults to false, so
     // System.Text.Json deals with null itself and never invokes this converter

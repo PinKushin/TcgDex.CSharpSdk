@@ -467,12 +467,6 @@ namespace TcgDex.Resources
 }
 namespace TcgDex.Serialization
 {
-    public sealed class FlexibleStringConverter : System.Text.Json.Serialization.JsonConverter<string?>
-    {
-        public FlexibleStringConverter() { }
-        public override string? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { }
-        public override void Write(System.Text.Json.Utf8JsonWriter writer, string? value, System.Text.Json.JsonSerializerOptions options) { }
-    }
     [System.Text.Json.Serialization.JsonSerializable(typeof(System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardBrief>))]
     [System.Text.Json.Serialization.JsonSerializable(typeof(System.Collections.Generic.IReadOnlyList<TcgDex.Models.SerieBrief>))]
     [System.Text.Json.Serialization.JsonSerializable(typeof(System.Collections.Generic.IReadOnlyList<TcgDex.Models.SetBrief>))]
@@ -544,11 +538,5 @@ namespace TcgDex.Serialization
         public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.WeaknessOrResistance> WeaknessOrResistance { get; }
         public static TcgDex.Serialization.TcgDexJsonContext Default { get; }
         public override System.Text.Json.Serialization.Metadata.JsonTypeInfo? GetTypeInfo(System.Type type) { }
-    }
-    public sealed class TcgPlayerPricingConverter : System.Text.Json.Serialization.JsonConverter<TcgDex.Models.TcgPlayerPricing>
-    {
-        public TcgPlayerPricingConverter() { }
-        public override TcgDex.Models.TcgPlayerPricing? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { }
-        public override void Write(System.Text.Json.Utf8JsonWriter writer, TcgDex.Models.TcgPlayerPricing value, System.Text.Json.JsonSerializerOptions options) { }
     }
 }
