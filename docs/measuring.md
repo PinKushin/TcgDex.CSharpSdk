@@ -98,7 +98,50 @@ done by hand on a dozen specific claims. Stryker does it everywhere.
 
 ### Baseline
 
-`Querying/QueryFilter.cs`: **35 mutants, 35 killed, 0 survived — 100%.**
+Full run, 11 minutes:
+
+| Outcome | Count |
+|---|---|
+| Killed | 497 |
+| **Survived** | **140** |
+| Timeout | 11 |
+| No coverage | 4 |
+| Ignored / compile error | 243 |
+
+**Mutation score 77.91%**, against 99.77% line coverage. **144 mutants the suite
+would not catch.** That gap is the honest measure of the test suite, and it is
+the number to quote rather than the coverage percentage.
+
+Where the survivors are matters more than the total:
+
+| Survivors | Score | File |
+|---:|---:|---|
+| 24 | 64% | `TcgDexTransport.cs` |
+| 22 | 67% | `Querying/CardFilter.cs` |
+| 19 | 65% | `Caching/TcgDexCachingHandler.cs` |
+| 13 | 79% | `GraphQlTransport.cs` |
+| 8 | 74% | `Caching/MemoryTcgDexResponseCache.cs` |
+| 8 | 67% | `Http/BoundedContent.cs` |
+| 8 | 84% | `Querying/ExpressionTranslator.cs` |
+| 7 | 53% | `TcgDexClient.cs` |
+| … | | |
+| 1 | 95% | `Models/Attack.cs` |
+| 1 | 94% | `Models/Card.cs` |
+| 1 | 95% | `Querying/CardQuery.cs` |
+
+**The tests are strongest where the code is simplest.** Models and the query
+builder score 93–95%; the transport, the filter serializer and the caching
+handler — the most complex and most consequential code in the SDK — sit at
+64–67%. That is the inverse of where verification effort should be concentrated,
+and it is invisible in a coverage report, where all of these read as fully
+covered.
+
+`Querying/QueryFilter.cs` is the counter-example and shows the ceiling is
+reachable: **35 mutants, 35 killed, 0 survived — 100%.**
+
+Some survivors will be equivalent mutants that no test could kill. Others are
+real gaps. Telling them apart is manual work, one file at a time, and the table
+above is the order to do it in.
 
 ### Thresholds, and why they are below the coverage gate
 
