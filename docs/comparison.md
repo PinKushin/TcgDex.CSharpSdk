@@ -40,8 +40,8 @@ Fetching and deserializing one card, from an in-memory stub:
 
 | | This SDK | `TCGdex` | Ratio |
 |---|---:|---:|---:|
-| Time | 29.1 µs | **16.8 µs** | **0.58×** |
-| Allocated | 43.3 KB | **12.2 KB** | **0.28×** |
+| Time | 25.3 µs | **15.3 µs** | **0.60×** |
+| Allocated | 18.6 KB | **12.2 KB** | **0.66×** |
 
 Building a filtered, sorted, paginated query:
 
@@ -50,8 +50,35 @@ Building a filtered, sorted, paginated query:
 | Time | 3,100 ns | **135 ns** | **0.04×** |
 | Allocated | 4,744 B | **416 B** | **0.09×** |
 
-Theirs is roughly **1.7× faster and 3.5× lighter** on a card fetch, and **23×
-faster** at building a query.
+This SDK is still slower on both. It is **1.7× the time** on a fetch and **23×**
+on query building.
+
+### What the first measurement changed
+
+The fetch row started worse — 29.1 µs and **43.3 KB** — and the benchmark is
+what found out why. Three fixes to `BoundedContent`, none of which gave anything
+up:
+
+| Change | Allocated |
+|---|---:|
+| Original | 43.3 KB |
+| Deserialize from UTF-8 bytes rather than a decoded `string` | 34.6 KB |
+| Pre-size the buffer from `Content-Length` | 34.6 KB |
+| Rent the 16 KB read chunk from `ArrayPool` instead of allocating it | **18.6 KB** |
+
+**57% of the allocations removed**, and the size limit, the AOT safety and every
+test are unchanged — 447 unit tests across three frameworks and 149 live
+integration tests still pass.
+
+Two things worth keeping from that:
+
+- **The largest cost was scratch space, not the payload.** A fresh 16 KB chunk
+  buffer per request was bigger than the ~10 KB body it was reading. Renting it
+  was a four-line change and did more than the other two together.
+- **Pre-sizing the buffer changed nothing at all**, despite being the obvious
+  fix and the one attempted second. Kept because it is correct and free, but it
+  is a reminder that the intuitive optimisation and the effective one are often
+  different, and only measurement tells them apart.
 
 ### The obvious excuse does not apply
 
@@ -59,8 +86,10 @@ A leaner model would explain the fetch result — less to populate, less to
 allocate. It is not the explanation: their `CardModel` exposes **37** properties
 to this SDK's **22**. If anything they deserialize more.
 
----
-
+Nor is it AOT. Their `ModelBase.Fill` resolves each property with
+`GetType().GetProperty(...)` — reflection, per property, per object, which is not
+trim- or AOT-safe and is normally *slower* than source generation. They are ahead
+despite that, not because of it.
 ## Reading the query result
 
 Deliberately not equivalent work. This SDK translates a **LINQ expression tree**,
@@ -88,24 +117,21 @@ number should not be hidden.
 
 ## Reading the fetch result
 
-This one is not so easily explained away, and is **worth fixing rather than
-justifying**. 43 KB to deserialize a ~10 KB payload is more copying than the job
-needs. The likely contributors, in order of suspicion:
+The copying identified by the first run has been fixed — see above. What remains
+of the gap is mostly deliberate:
 
-1. **`BoundedContent` reads the body twice.** Enforcing `MaxResponseBytes`
-   copies the stream into a `MemoryStream`, calls `ToArray()`, then
-   `Encoding.UTF8.GetString`, and hands a `string` to the deserializer — at
-   least two full copies of the body before parsing starts. Deserializing from
-   the buffered bytes directly, or from a size-limited stream, would remove
-   both.
-2. **Custom converters.** `FlexibleStringConverter` and
-   `TcgPlayerPricingConverter` do work the other SDK does not.
-3. **Source generation is not the faster path here.** Measured separately in
+1. **Source generation is not the faster path here.** Measured separately in
    [`measuring.md`](measuring.md): the source-generated path is 1.23× the time
-   and 1.5× the allocations of reflection for these models. It is kept because
-   it is what makes the SDK trim- and AOT-safe, not because it is quick.
+   and 1.5× the allocations of reflection for these models. It stays, because it
+   is what makes the SDK trim- and AOT-safe. That is a trade this SDK makes on
+   purpose and the other one does not.
+2. **Custom converters.** `FlexibleStringConverter` handles the polymorphic
+   `damage` field and `TcgPlayerPricingConverter` the dynamic printing keys —
+   work the other SDK does not do, in exchange for typed access to fields whose
+   shape varies.
 
-None of that is a defence of the number. It is a list of where to look.
+Neither is a reason to stop looking. 18.6 KB for a ~10 KB payload is defensible;
+it is not obviously optimal.
 
 ---
 
@@ -120,5 +146,5 @@ None of that is a defence of the number. It is a list of where to look.
 - **Correctness**, which the test suite covers — 447 unit tests across three
   frameworks and a 90.03% mutation score.
 
-Being slower at deserialization is a fair criticism of this SDK today, and the
-first item on the performance list.
+Being slower at deserialization is still a fair criticism of this SDK. It is
+less fair than it was a day ago, and it stopped being fair to call it careless.

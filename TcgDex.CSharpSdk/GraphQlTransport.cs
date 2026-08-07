@@ -180,7 +180,7 @@ internal sealed class GraphQlTransport(
                 .ConfigureAwait(false);
 
             var body = await BoundedContent
-                .ReadAsStringAsync(
+                .ReadAsBytesAsync(
                     httpResponse.Content,
                     _options.MaxResponseBytes,
                     _options.GraphQlEndpoint,
@@ -194,7 +194,9 @@ internal sealed class GraphQlTransport(
                     httpResponse.StatusCode);
             }
 
-            return JsonSerializer.Deserialize(body, GraphQlJsonContext.Default.GraphQlCardsResponse)
+            return JsonSerializer.Deserialize(
+                    new ReadOnlySpan<byte>(body.Array, body.Offset, body.Count),
+                    GraphQlJsonContext.Default.GraphQlCardsResponse)
                 ?? throw new TcgDexApiException("The GraphQL endpoint returned an empty response.");
         }
         catch (HttpRequestException ex)
