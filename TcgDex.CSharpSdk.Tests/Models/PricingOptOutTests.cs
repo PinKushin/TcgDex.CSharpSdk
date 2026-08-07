@@ -5,6 +5,8 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using TcgDex;
+using TcgDex.Models;
+using TcgDex.Serialization;
 using TcgDex.Tests.Http;
 
 /// <summary>
@@ -70,6 +72,23 @@ public sealed class PricingOptOutTests
         card.Set.ShouldNotBeNull().Id.ShouldBe("swsh3");
         card.Attacks.ShouldNotBeNull().ShouldNotBeEmpty();
         card.Variants.ShouldNotBeNull();
+    }
+
+    [Test]
+    public void WhenTurnedOff_ACardStillSerializes()
+    {
+        // The SDK reads an API it never writes to, so nothing internal takes
+        // this path — but a converter that threw on Write would turn any
+        // caller's attempt to serialize a Card into a crash, and round-tripping
+        // a model through System.Text.Json is an ordinary thing to do. Writing
+        // null is honest: with pricing off there is none to emit.
+        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        var contract = TcgDexJsonContracts.For(new TcgDexOptions { DeserializePricing = false });
+
+        var json = Should.NotThrow(() => JsonSerializer.Serialize(card, contract));
+
+        json.ShouldContain("\"pricing\":null");
+        json.ShouldContain("Furret", Case.Sensitive, "the rest of the card must still be written");
     }
 
     [Test]

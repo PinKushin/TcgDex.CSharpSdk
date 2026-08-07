@@ -101,27 +101,13 @@ internal sealed class DeserializedResponseCache
     }
 
     /// <summary>A URL and the type it was deserialized as.</summary>
-    private readonly struct Key(Uri uri, Type type) : IEquatable<Key>
-    {
-        private readonly Uri _uri = uri;
-        private readonly Type _type = type;
-
-        // Both halves are compared, and mutation testing reports swapping the
-        // && for a || as surviving. It does, but only because GetHashCode mixes
-        // both halves too, so two keys differing in either one land in different
-        // buckets and Equals is never consulted. That is a masked mutant rather
-        // than a harmless one: it would become live the moment two keys collided
-        // in the hash, which is exactly when this method is load-bearing.
-        public bool Equals(Key other)
-            => _type == other._type && _uri == other._uri;
-
-        public override bool Equals(object? obj) => obj is Key other && Equals(other);
-
-        // Uri.GetHashCode is ordinal-ignore-case over the whole URL, which is
-        // right here: the transport builds these itself, so two that differ only
-        // by case are the same request.
-        public override int GetHashCode()
-            => unchecked((_uri.GetHashCode() * 397) ^ _type.GetHashCode());
-    }
-
+    /// <remarks>
+    /// A <see langword="record struct"/> rather than hand-written equality. The
+    /// first version spelled out <c>Equals</c>, the <see cref="object"/>
+    /// overload and <c>GetHashCode</c>, which cost four uncovered lines and two
+    /// uncovered branches — the <see cref="object"/> overload is never called,
+    /// because a generic dictionary uses the typed comparer. The compiler
+    /// generates all three, correctly and without the untestable surface.
+    /// </remarks>
+    private readonly record struct Key(Uri Uri, Type Type);
 }
