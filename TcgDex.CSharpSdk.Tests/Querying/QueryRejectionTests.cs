@@ -53,6 +53,13 @@ public sealed class QueryRejectionTests
 
         exception.Message.ShouldContain("name");
         exception.Message.ShouldContain("rarity");
+
+        // And the way out, not just the complaint. Naming the two fields tells
+        // the caller what went wrong; "issue one query per field and combine
+        // the results" tells them what to do instead, and that half of the
+        // message could be deleted with the assertions above still passing.
+        exception.Message.ShouldContain("single field");
+        exception.Message.ShouldContain("one query per field");
     }
 
     [Test]
@@ -63,6 +70,28 @@ public sealed class QueryRejectionTests
             () => Query().Where(c => c.Name == "Furret" || c.Name.Contains("Pika")));
 
         exception.Message.ShouldContain("name");
+
+        // The test is named "NamesBothOperators" but asserted neither. Both are
+        // what makes the message actionable — knowing the field is not enough
+        // when the problem is that eq and like cannot be mixed.
+        exception.Message.ShouldContain("same operator");
+        exception.Message.ShouldContain(nameof(QueryOperator.Equal));
+        exception.Message.ShouldContain(nameof(QueryOperator.Like));
+    }
+
+    [Test]
+    public void AnUnsupportedExpression_ListsTheFormsThatAreSupported()
+    {
+        // The catch-all rejection. Its value is entirely in the list it
+        // carries: without it a caller learns only that their predicate is
+        // unsupported, with no way to discover what would work short of
+        // reading the source.
+        var exception = Should.Throw<NotSupportedException>(
+            () => Query().Where(c => c.Name.Length == 5));
+
+        exception.Message.ShouldContain("no filter matching");
+        exception.Message.ShouldContain("Supported forms are");
+        exception.Message.ShouldContain("Contains/StartsWith/EndsWith");
     }
 
     [Test]
