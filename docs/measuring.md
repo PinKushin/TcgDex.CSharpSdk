@@ -96,53 +96,72 @@ this repo: reverting `EscapeDataString` to prove the traversal tests could fail,
 narrowing the GraphQL escape range, making `Where` drop its filters. Those were
 done by hand on a dozen specific claims. Stryker does it everywhere.
 
-### Baseline
+### Where it stands
 
-Full run, 11 minutes:
+Full run, ~11 minutes:
 
-| Outcome | Count |
-|---|---|
-| Killed | 497 |
-| **Survived** | **140** |
-| Timeout | 11 |
-| No coverage | 4 |
-| Ignored / compile error | 243 |
+| Outcome | First run | Now |
+|---|---:|---:|
+| Killed | 497 | **561** |
+| **Survived** | **140** | **83** |
+| Timeout | 11 | 5 |
+| No coverage | 4 | 3 |
+| **Mutation score** | **77.91%** | **86.81%** |
 
-**Mutation score 77.91%**, against 99.77% line coverage. **144 mutants the suite
-would not catch.** That gap is the honest measure of the test suite, and it is
-the number to quote rather than the coverage percentage.
+Line coverage did not move (99.77%): every one of those 57 newly-killed mutants
+was in code the suite already executed. That is the entire point of the exercise
+— coverage said the lines ran, and mutation testing said whether running them
+proved anything.
 
-Where the survivors are matters more than the total:
+Per file, after the sweep:
 
-| Survivors | Score | File |
-|---:|---:|---|
-| 24 | 64% | `TcgDexTransport.cs` |
-| 22 | 67% | `Querying/CardFilter.cs` |
-| 19 | 65% | `Caching/TcgDexCachingHandler.cs` |
-| 13 | 79% | `GraphQlTransport.cs` |
-| 8 | 74% | `Caching/MemoryTcgDexResponseCache.cs` |
-| 8 | 67% | `Http/BoundedContent.cs` |
-| 8 | 84% | `Querying/ExpressionTranslator.cs` |
-| 7 | 53% | `TcgDexClient.cs` |
-| … | | |
-| 1 | 95% | `Models/Attack.cs` |
-| 1 | 94% | `Models/Card.cs` |
-| 1 | 95% | `Querying/CardQuery.cs` |
+| File | Before | After |
+|---|---:|---:|
+| `Querying/CardFilter.cs` | 67% | **100%** |
+| `Caching/MemoryTcgDexResponseCache.cs` | 71% | **97%** |
+| `TcgDexClient.cs` | 53% | **93%** |
+| `GraphQlTransport.cs` | 79% | **92%** |
+| `TcgDexTransport.cs` | 64% | **76%**\* |
+| `Http/BoundedContent.cs` | 63% | **79%** |
+| `Caching/TcgDexCachingHandler.cs` | 65% | **70%** |
 
-**The tests are strongest where the code is simplest.** Models and the query
-builder score 93–95%; the transport, the filter serializer and the caching
-handler — the most complex and most consequential code in the SDK — sit at
-64–67%. That is the inverse of where verification effort should be concentrated,
-and it is invisible in a coverage report, where all of these read as fully
-covered.
+\* The transport reads lower here than the 85% measured in isolation. Scoring a
+single file runs only the mutants in it; a full run includes mutants elsewhere
+that the same tests cover, which shifts the denominator. Compare like with like.
 
-`Querying/QueryFilter.cs` is the counter-example and shows the ceiling is
-reachable: **35 mutants, 35 killed, 0 survived — 100%.**
+### What the remaining 83 are
 
-Some survivors will be equivalent mutants that no test could kill. Others are
-real gaps. Telling them apart is manual work, one file at a time, and the table
-above is the order to do it in.
+Mostly not gaps. The recurring shapes, in rough order of frequency:
 
+- **`.ConfigureAwait(false)` flipped to `true`.** No observable difference
+  without a synchronization context. Unkillable, and the single largest group —
+  ten of the caching handler's sixteen.
+- **Guards the public API validates first.** `TcgDexClient` checks its arguments
+  before the transport or handler sees them, so the inner `Guard.NotNull` calls
+  cannot be reached with null through any public path.
+- **Ternary and catch collapses** where the mutated branch throws into a `catch`
+  that produces the same result anyway.
+- **Non-deterministic tie-breaks**, such as the LRU eviction comparison, which
+  depends on dictionary ordering and so cannot be pinned by any test.
+
+The two files still at 70–76% are dominated by the first two categories. Their
+realistic ceilings are around 75% and 85%; pushing past that would mean writing
+tests for the metric rather than for behaviour.
+
+### Thresholds
+
+```json
+"thresholds": { "high": 90, "low": 85, "break": 80 }
+```
+
+Raised from `60` once the score cleared 80 with headroom, the same ratchet the
+coverage gate uses. Verified in the failing direction rather than assumed:
+running one file with `--break-at 85` against its 79.17% exits with code 2 and
+"Final mutation score is below threshold break. Crashing...".
+
+Unlike the coverage gate this is **not enforced in CI** — a full run takes
+minutes to tens of minutes against roughly two seconds for the unit tests, so it
+stays a deliberate periodic and pre-release check.
 ### Worked example: `TcgDexTransport.cs`, 64% to 85%
 
 Twenty-four survivors, triaged rather than blindly tested. Fourteen were real

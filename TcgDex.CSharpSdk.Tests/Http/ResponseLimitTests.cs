@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
 using TcgDex;
 using TcgDex.Querying;
 
@@ -173,6 +174,121 @@ public sealed class ResponseLimitTests
     // with a bit stack rather than by recursing, and these models are shallow,
     // so there is no stack to exhaust — System.Text.Json's 64-level MaxDepth is
     // a backstop, not the thing standing between this SDK and a crash.
+
+    // ----- the boundary itself -----
+
+    [Test]
+    public void Rest_ResponseExactlyAtTheLimit_IsAccepted()
+    {
+        // The limit is a maximum, not a threshold to stay under. Mutation
+        // testing flipped `>` to `>=` here and nothing noticed, which would
+        // reject a response of exactly MaxResponseBytes — an off-by-one that
+        // only ever fires on the one payload size nobody tests by accident.
+        var card = ValidCard();
+        var exactLength = System.Text.Encoding.UTF8.GetByteCount(card);
+
+        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, card);
+
+        var result = CreateClient(handler, exactLength).Cards
+            .GetAsync("swsh3-136", CancellationToken.None).Result;
+
+        result.ShouldNotBeNull().Name.ShouldBe("Furret");
+    }
+
+    [Test]
+    public void Rest_ResponseOneByteOverTheLimit_IsRejected()
+    {
+        // The other side of the same boundary. Without this the `>` could
+        // become `>=` in the opposite direction — accepting one byte too many —
+        // and the test above would still pass.
+        var card = ValidCard();
+        var oneByteShort = System.Text.Encoding.UTF8.GetByteCount(card) - 1;
+
+        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, card);
+
+        Should.ThrowAsync<TcgDexApiException>(async () =>
+            await CreateClient(handler, oneByteShort).Cards
+                .GetAsync("swsh3-136", CancellationToken.None)).Result.ShouldNotBeNull();
+    }
+
+    // ----- the two ways a body can be found too large -----
+
+    [Test]
+    public void Rest_AnHonestContentLength_IsRejectedBeforeReadingTheBody()
+    {
+        // A truthful Content-Length over the limit is refused up front, without
+        // transferring the body. The message says "declared" precisely because
+        // nothing was read — that word is the only evidence from outside that
+        // the early exit happened rather than the streaming check.
+        var handler = new RecordingHandler()
+            .RespondWith(HttpStatusCode.OK, OversizedCard(64 * 1024));
+
+        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+            await CreateClient(handler, 32768).Cards
+                .GetAsync("swsh3-136", CancellationToken.None)).Result;
+
+        exception.Message.ShouldContain("declared");
+    }
+
+    [Test]
+    public void Rest_AnUndeclaredLength_IsRejectedWhileReading()
+    {
+        // No Content-Length, so the limit can only be enforced by counting
+        // bytes as they arrive. The message says "exceeded" rather than
+        // "declared", which is what distinguishes this path from the one above.
+        var handler = new RecordingHandler().RespondWith(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new UnknownLengthContent(OversizedCard(64 * 1024)),
+            });
+
+        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+            await CreateClient(handler, 32768).Cards
+                .GetAsync("swsh3-136", CancellationToken.None)).Result;
+
+        exception.Message.ShouldContain("exceeded");
+    }
+
+    /// <summary>
+    /// Content that refuses to report its length, as a chunked response does.
+    /// </summary>
+    /// <remarks>
+    /// StreamContent over a MemoryStream is not good enough here: the stream is
+    /// seekable, so a Content-Length is computed and the early rejection fires
+    /// instead of the streaming one. Overriding TryComputeLength to return
+    /// false is what actually models a body of unknown size.
+    /// </remarks>
+    private sealed class UnknownLengthContent(string body) : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context)
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(body);
+            return stream.WriteAsync(bytes, 0, bytes.Length);
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+    }
+
+    [Test]
+    public void Rest_TheLimitMessage_NamesTheOptionThatSetsIt()
+    {
+        // Someone hitting this needs to know which knob to turn. Without the
+        // assertion the whole explanatory half of the message can be blanked
+        // while the exception type and the number survive.
+        var handler = new RecordingHandler()
+            .RespondWith(HttpStatusCode.OK, OversizedCard(64 * 1024));
+
+        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+            await CreateClient(handler, 32768).Cards
+                .GetAsync("swsh3-136", CancellationToken.None)).Result;
+
+        exception.Message.ShouldContain(nameof(TcgDexOptions.MaxResponseBytes));
+        exception.Message.ShouldContain("Raise that limit");
+    }
 
     [Test]
     public void GraphQl_ResponseOverTheLimit_Throws()

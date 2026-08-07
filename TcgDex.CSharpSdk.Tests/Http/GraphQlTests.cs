@@ -4,7 +4,9 @@ using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using TcgDex;
+using TcgDex.Tests.Diagnostics;
 using TcgDex.Querying;
 
 /// <summary>
@@ -215,4 +217,140 @@ public sealed class GraphQlTests
 
         cards.ShouldHaveSingleItem().Name.ShouldBe("Furret");
     }
-}
+
+    // ----- boundaries that fire on empty collections -----
+
+    [Test]
+    public async Task AnEmptyErrorsArray_IsNotTreatedAsAFailure()
+    {
+        // `Errors is { Count: > 0 }` versus `>= 0`. A server that returns an
+        // empty errors array alongside good data is reporting success, and
+        // treating that as a failure would break every such response. Only a
+        // present-but-empty array distinguishes the two — null and non-empty
+        // both behave the same either way.
+        var handler = new RecordingHandler().RespondWith(
+            HttpStatusCode.OK,
+            """{"data":{"cards":[]},"errors":[]}""");
+
+        var cards = await CreateClient(handler).Cards.SearchDetailedAsync(
+            new CardFilter { Name = "Furret" },
+            cancellationToken: CancellationToken.None);
+
+        cards.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void ReportedErrors_AreJoinedIntoTheException()
+    {
+        // Every message, separated — not just the first, and not run together.
+        // A server reporting two problems should surface both.
+        var handler = new RecordingHandler().RespondWith(
+            HttpStatusCode.OK,
+            """{"errors":[{"message":"first problem"},{"message":"second problem"}]}""");
+
+        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+            await CreateClient(handler).Cards.SearchDetailedAsync(
+                new CardFilter { Name = "Furret" },
+                cancellationToken: CancellationToken.None)).Result;
+
+        exception.Message.ShouldContain("first problem");
+        exception.Message.ShouldContain("second problem");
+        exception.Message.ShouldContain("; ");
+    }
+
+    [Test]
+    public async Task WhenNothingIsDropped_NoWarningIsLogged()
+    {
+        // `dropped > 0` versus `>= 0`. The mutated form warns about zero
+        // dropped entries on every successful search — noise that would train
+        // a consumer to ignore the warning that matters.
+        var log = new RecordingLogger(LogLevel.Trace);
+
+        var handler = new RecordingHandler().RespondWith(
+            HttpStatusCode.OK,
+            """{"data":{"cards":[{"id":"swsh3-136","name":"Furret","category":"Pokemon","localId":"136","set":{"id":"swsh3","name":"Darkness Ablaze"}}]}}""");
+
+        var client = new TcgDexClient(new HttpClient(handler), new TcgDexOptions(), log.Factory);
+
+        var cards = await client.Cards.SearchDetailedAsync(
+            new CardFilter { Name = "Furret" },
+            cancellationToken: CancellationToken.None);
+
+        cards.Count.ShouldBe(1);
+        log.Entries.ShouldNotContain(e => e.Level >= LogLevel.Warning);
+    }
+
+    // ----- argument separators -----
+
+    [Test]
+    public async Task ASingleArgument_CarriesNoLeadingComma()
+    {
+        // The separator is only written between arguments. With the guard
+        // removed the document opens with a stray comma, which the server
+        // rejects — and no test looked at a single-argument query.
+        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+
+        var query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret" });
+
+        query.ShouldNotContain("(,");
+        query.ShouldNotContain("(filters:{name:\"Furret\"},)");
+    }
+
+    [Test]
+    public async Task FiltersAndPaging_AreSeparatedFromEachOther()
+    {
+        // And with more than one argument the separator must actually appear,
+        // or the document runs them together into nonsense.
+        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+
+        var query = await CaptureQueryAsync(
+            handler,
+            new CardFilter { Name = "Furret" },
+            page: 2,
+            itemsPerPage: 50);
+
+        query.ShouldContain("},pagination:");
+    }
+
+    // ----- failure messages -----
+
+    [Test]
+    public void AnHttpFailure_NamesTheStatusCode()
+    {
+        var handler = new RecordingHandler().RespondWith(HttpStatusCode.BadGateway, "{}");
+
+        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+            await CreateClient(handler).Cards.SearchDetailedAsync(
+                new CardFilter { Name = "Furret" },
+                cancellationToken: CancellationToken.None)).Result;
+
+        exception.Message.ShouldContain("502");
+        exception.Message.ShouldContain("GraphQL");
+    }
+
+    [Test]
+    public void ANetworkFailure_SaysSo()
+    {
+        var handler = new RecordingHandler()
+            .RespondWith(_ => throw new HttpRequestException("connection reset"));
+
+        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+            await CreateClient(handler).Cards.SearchDetailedAsync(
+                new CardFilter { Name = "Furret" },
+                cancellationToken: CancellationToken.None)).Result;
+
+        exception.Message.ShouldContain("could not be completed");
+    }
+
+    [Test]
+    public void AMalformedBody_SaysItWasNotValidJson()
+    {
+        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "<html>nope</html>");
+
+        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+            await CreateClient(handler).Cards.SearchDetailedAsync(
+                new CardFilter { Name = "Furret" },
+                cancellationToken: CancellationToken.None)).Result;
+
+        exception.Message.ShouldContain("not valid JSON");
+    }}

@@ -248,4 +248,97 @@ public sealed class MemoryCacheTests
         public ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default)
             => default;
     }
-}
+
+    // ----- the public contract of a cache anyone can implement against -----
+
+    private static CachedResponse SampleResponse(DateTimeOffset storedAt) => new()
+    {
+        Body = System.Text.Encoding.UTF8.GetBytes("{}"),
+        StoredAt = storedAt,
+    };
+
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase("   ")]
+    public void GetAsync_WithABlankKey_Throws(string? key)
+    {
+        // MemoryTcgDexResponseCache is public and ITcgDexResponseCache is an
+        // extension point, so these guards are contract rather than internal
+        // defensiveness — a caller really can reach them. Nothing tested any of
+        // the three methods with a bad key.
+        var cache = new MemoryTcgDexResponseCache();
+
+        Should.Throw<ArgumentException>(() => cache.GetAsync(key!).AsTask().Wait());
+    }
+
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase("   ")]
+    public void SetAsync_WithABlankKey_Throws(string? key)
+    {
+        var cache = new MemoryTcgDexResponseCache();
+
+        Should.Throw<ArgumentException>(() =>
+            cache.SetAsync(key!, SampleResponse(UnixEpoch), TimeSpan.FromMinutes(1))
+                .AsTask().Wait());
+    }
+
+    [Test]
+    public void SetAsync_WithANullResponse_Throws()
+    {
+        var cache = new MemoryTcgDexResponseCache();
+
+        Should.Throw<ArgumentNullException>(() =>
+            cache.SetAsync("k", null!, TimeSpan.FromMinutes(1)).AsTask().Wait());
+    }
+
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase("   ")]
+    public void RemoveAsync_WithABlankKey_Throws(string? key)
+    {
+        var cache = new MemoryTcgDexResponseCache();
+
+        Should.Throw<ArgumentException>(() => cache.RemoveAsync(key!).AsTask().Wait());
+    }
+
+    [Test]
+    public void EveryMethod_ObservesCancellation()
+    {
+        // Each entry point checks the token before doing any work. An
+        // implementation that ignored it would look identical in every other
+        // test, because none of them cancel.
+        var cache = new MemoryTcgDexResponseCache();
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+
+        Should.Throw<OperationCanceledException>(
+            () => cache.GetAsync("k", cancelled.Token).AsTask().Wait());
+
+        Should.Throw<OperationCanceledException>(
+            () => cache.SetAsync("k", SampleResponse(UnixEpoch), TimeSpan.FromMinutes(1), cancelled.Token)
+                .AsTask().Wait());
+
+        Should.Throw<OperationCanceledException>(
+            () => cache.RemoveAsync("k", cancelled.Token).AsTask().Wait());
+    }
+
+    [Test]
+    public async Task AnEntryExactlyAtItsExpiry_IsTreatedAsExpired()
+    {
+        // The boundary, which `>=` versus `>` decides. An entry whose lifetime
+        // has exactly elapsed is gone, not still valid — and with distinct
+        // timestamps every other test passes either way, so only landing
+        // precisely on the expiry distinguishes them.
+        var time = new FakeTimeProvider();
+        var cache = new MemoryTcgDexResponseCache(timeProvider: time);
+
+        var ttl = TimeSpan.FromMinutes(5);
+        await cache.SetAsync("k", SampleResponse(time.GetUtcNow()), ttl);
+
+        // The entry is retained past freshness for revalidation, so advancing
+        // by the retention multiple is what lands on the absolute expiry.
+        time.Advance(TimeSpan.FromMinutes(5 * 12));
+
+        (await cache.GetAsync("k")).ShouldBeNull();
+    }}
