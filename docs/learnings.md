@@ -491,6 +491,48 @@ time bomb.
 
 ---
 
+## Benchmarking against a competitor, and losing
+
+The other public C# TCGdex SDK accepts an injected `HttpClient`, which is the
+only reason an honest comparison is possible — without it the sole option is
+measuring over the live API, which reports TCGdex's servers and the local
+connection rather than either library.
+
+Same stub transport, same recorded payload, caching off on both. The result:
+
+| | This SDK | `TCGdex` | Ratio |
+|---|---:|---:|---:|
+| Fetch + deserialize a card | 29.1 µs / 43.3 KB | 16.8 µs / 12.2 KB | **0.58× / 0.28×** |
+| Build a filtered query | 3,100 ns / 4,744 B | 135 ns / 416 B | **0.04× / 0.09×** |
+
+**The obvious excuse does not apply.** A leaner model on their side would
+explain the fetch result; their `CardModel` exposes 37 properties against this
+SDK's 22, so if anything they deserialize more.
+
+Two different lessons in those two rows.
+
+The query row is **a real cost that does not matter**. This SDK translates an
+expression tree the compiler checks; theirs takes strings it cannot. 3 µs
+against 135 ns is the price of `c.Hp > 100` failing to compile when misspelled
+rather than failing at runtime — and it is charged once per request against a
+20–50 ms round trip, so it is 0.01% of the work. Worth stating plainly in both
+directions: real difference, irrelevant consequence.
+
+The fetch row is **a real cost that does matter**, and the honest response is to
+fix it rather than explain it. 43 KB to deserialize a ~10 KB payload is more
+copying than the job needs, and the leading suspect is code added in this same
+session: `BoundedContent` enforces the response-size limit by buffering into a
+`MemoryStream`, calling `ToArray()`, converting to a `string`, and only then
+deserializing — at least two full copies before parsing starts. A safety feature
+paid for in allocations, which nobody noticed until something measured it.
+
+The general point: a benchmark that only ever flatters the thing that
+commissioned it is marketing. This one was written expecting a mixed result,
+produced a clean loss on both axes, and is published with the harness so anyone
+can rerun it. That is what makes the numbers elsewhere in these docs worth
+anything.
+
+---
 ## 99.77% line coverage, 77.91% mutation score
 
 The two numbers measure different things, and only one of them is about whether

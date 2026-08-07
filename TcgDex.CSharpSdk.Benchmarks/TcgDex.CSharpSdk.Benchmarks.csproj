@@ -16,12 +16,15 @@
     <!-- Benchmark methods are public instance methods by requirement, and the
          class is instantiated by BenchmarkDotNet rather than by us.
          CA1822: benchmark methods do not use instance state but cannot be static.
-         CS1591: benchmarks are not public API and carry no XML docs. -->
-    <NoWarn>$(NoWarn);CA1822;CS1591</NoWarn>
+         CS1591: benchmarks are not public API and carry no XML docs.
+         CA1707: benchmark names use Operation_Subject so BenchmarkDotNet's
+         report groups and labels them readably. -->
+    <NoWarn>$(NoWarn);CA1822;CS1591;CA1707</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" />
+    <PackageReference Include="TCGdex" />
   </ItemGroup>
 
   <ItemGroup>

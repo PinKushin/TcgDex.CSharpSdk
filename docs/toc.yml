@@ -32,6 +32,8 @@
       href: coverage.md
     - name: Benchmarks and mutation testing
       href: measuring.md
+    - name: Compared with the other C# SDK
+      href: comparison.md
     - name: Roadmap
       href: roadmap.md
     - name: Publishing
