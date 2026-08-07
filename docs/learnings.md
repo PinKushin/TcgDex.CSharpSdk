@@ -491,6 +491,41 @@ time bomb.
 
 ---
 
+## Eliminating explanations beats optimising guesses
+
+Six attempts to speed up deserialization, five of which did nothing. Recorded
+together because the pattern is more useful than any single result:
+
+| Attempt | Effect |
+|---|---|
+| Deserialize from UTF-8 bytes, not a decoded string | 43.3 → 34.6 KB |
+| **Rent the read chunk from `ArrayPool`** | **34.6 → 18.6 KB** |
+| Pre-size the response buffer from `Content-Length` | none |
+| Pre-size the pricing dictionary | *worse* |
+| Remove `PropertyNameCaseInsensitive` | none |
+| `ValueTextEquals` instead of `GetString` for metadata keys | 2% allocations, no time |
+
+The one that mattered was not a clever technique. It was noticing that a
+**16 KB per-request scratch buffer was larger than the 2.9 KB payload it was
+reading**. Twice, pre-sizing a buffer — the most obviously correct optimisation
+available — measured as nothing or as a regression.
+
+Then Newtonsoft.Json settled the rest as a *control* rather than a candidate. It
+is a wholly independent implementation, not a wrapper over System.Text.Json, so
+running the identical model through it eliminated two explanations at once: the
+model shape is not pathological (Newtonsoft is slower still, and needs no
+converters), and the serializer choice is not wrong (source generation
+comfortably beats it). What was left — source generation losing to
+System.Text.Json's own reflection path — is narrow, understood, and kept on
+purpose, because reflection breaks Native AOT.
+
+The lesson is about order. Every one of the five failures was a plausible guess
+acted on before the cost had been located; the one success and both eliminations
+came from measuring where the time actually was first. Deserialization turned
+out to be **86% of the request path**, which nothing before the benchmark had
+established.
+
+---
 ## Benchmarking against a competitor, and losing
 
 The other public C# TCGdex SDK accepts an injected `HttpClient`, which is the
