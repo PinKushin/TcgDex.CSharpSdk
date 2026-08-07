@@ -292,12 +292,28 @@ dotnet test TcgDex.CSharpSdk.Tests # unit tests, offline
 dotnet test TcgDex.CSharpSdk.IntegrationTests --filter "TestCategory=Integration"
 ```
 
-Coverage is gated in CI and the same check runs locally:
+Coverage is gated in CI and the same check runs locally. **Run this before
+pushing** — it is the gate most easily forgotten, because everything else is
+green by the time you get here:
 
 ```bash
 dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj   --collect:"XPlat Code Coverage" --settings coverlet.runsettings   --results-directory ./TestResults
 pwsh ./scripts/Check-Coverage.ps1
 ```
+
+`--settings coverlet.runsettings` is not optional. Without it the
+source-generated files swamp the hand-written ones and the number means nothing
+— 1,455 lines counted against the real 986.
+
+Two further gates that are not part of a normal push:
+
+- **The public API is pinned.** Adding, removing or changing anything public
+  fails `PublicApiTests` until the diff is accepted into
+  `TcgDex.CSharpSdk.Tests/PublicApi.approved.cs`. That commit is the record of
+  what consumers are promised.
+- **Mutation testing and fuzzing** run periodically rather than per push. See
+  [`docs/measuring.md`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/docs/measuring.md)
+  for both, including how to run the fuzzer locally under WSL.
 
 Unit tests run against recorded API responses in
 `TcgDex.CSharpSdk.Tests/Fixtures`, so they need no network. Integration tests
