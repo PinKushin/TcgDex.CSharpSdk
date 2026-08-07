@@ -100,64 +100,81 @@ done by hand on a dozen specific claims. Stryker does it everywhere.
 
 Full run, ~11 minutes:
 
-| Outcome | First run | Now |
+| Outcome | Baseline | Now |
 |---|---:|---:|
-| Killed | 497 | **561** |
-| **Survived** | **140** | **83** |
-| Timeout | 11 | 5 |
-| No coverage | 4 | 3 |
-| **Mutation score** | **77.91%** | **86.81%** |
+| Killed | 497 | **575** |
+| **Survived** | **140** | **63** |
+| Timeout | 11 | 12 |
+| No coverage | 4 | 0 |
+| **Mutation score** | **77.91%** | **90.03%** |
 
-Line coverage did not move (99.77%): every one of those 57 newly-killed mutants
-was in code the suite already executed. That is the entire point of the exercise
-— coverage said the lines ran, and mutation testing said whether running them
-proved anything.
+Line coverage did not move across any of that work — 99.77% before and after.
+Every one of those 78 newly-killed mutants was in code the suite already
+executed. Coverage said the lines ran; mutation testing said whether running
+them proved anything.
 
-Per file, after the sweep:
+Per file:
 
-| File | Before | After |
+| File | Baseline | Now |
 |---|---:|---:|
 | `Querying/CardFilter.cs` | 67% | **100%** |
 | `Caching/MemoryTcgDexResponseCache.cs` | 71% | **97%** |
+| `Caching/TcgDexCacheOptions.cs` | 83% | **97%** |
 | `TcgDexClient.cs` | 53% | **93%** |
+| `Models/CardImage.cs` | 93% | **93%** |
 | `GraphQlTransport.cs` | 79% | **92%** |
-| `TcgDexTransport.cs` | 64% | **76%**\* |
-| `Http/BoundedContent.cs` | 63% | **79%** |
+| `Querying/ExpressionTranslator.cs` | 84% | **88%** |
+| `Resources/Resources.cs` | 82% | **85%** |
+| `Serialization/TcgPlayerPricingConverter.cs` | 77% | **85%** |
+| `Http/BoundedContent.cs` | 63% | **83%** |
+| `TcgDexTransport.cs` | 64% | **81%** |
+| `TcgDexServiceCollectionExtensions.cs` | 60% | **80%** |
 | `Caching/TcgDexCachingHandler.cs` | 65% | **70%** |
 
-\* The transport reads lower here than the 85% measured in isolation. Scoring a
-single file runs only the mutants in it; a full run includes mutants elsewhere
-that the same tests cover, which shifts the denominator. Compare like with like.
+### The single most common real gap
 
-### What the remaining 83 are
+Across every file, the same shape kept appearing: **tests asserted the exception
+type and never its message.**
 
-Mostly not gaps. The recurring shapes, in rough order of frequency:
+`TcgDexApiException` is the SDK's only error contract, so its text is all that
+separates "the network died" from "the body was not JSON" from "that resource is
+missing" for someone reading a log. The query translator's rejections are worse
+still — half of each message is the *remedy*, and asserting only the field name
+let the actionable half be deleted silently. One test was even named
+`OrWithMismatchedOperators_NamesBothOperators` and asserted neither operator.
+
+If you write one kind of test after reading this, assert the message.
+
+### What the remaining 63 are
+
+Mostly not gaps. In rough order of frequency:
 
 - **`.ConfigureAwait(false)` flipped to `true`.** No observable difference
   without a synchronization context. Unkillable, and the single largest group —
-  ten of the caching handler's sixteen.
+  around eleven of the caching handler's sixteen.
 - **Guards the public API validates first.** `TcgDexClient` checks its arguments
-  before the transport or handler sees them, so the inner `Guard.NotNull` calls
-  cannot be reached with null through any public path.
+  before the transport or handler sees them. Note the contrast: the same shape
+  in `MemoryTcgDexResponseCache` and `TcgDexCacheOptions` *was* a real gap,
+  because those types are public and their interface is an extension point.
 - **Ternary and catch collapses** where the mutated branch throws into a `catch`
   that produces the same result anyway.
 - **Non-deterministic tie-breaks**, such as the LRU eviction comparison, which
-  depends on dictionary ordering and so cannot be pinned by any test.
+  depends on dictionary ordering.
 
-The two files still at 70–76% are dominated by the first two categories. Their
-realistic ceilings are around 75% and 85%; pushing past that would mean writing
-tests for the metric rather than for behaviour.
+`TcgDexCachingHandler` at 70% is the floor and is dominated by the first
+category; its realistic ceiling is around 75%. Pushing past that means writing
+tests for the metric rather than for behaviour, which is where this stops.
 
 ### Thresholds
 
 ```json
-"thresholds": { "high": 90, "low": 85, "break": 80 }
+"thresholds": { "high": 95, "low": 90, "break": 85 }
 ```
 
-Raised from `60` once the score cleared 80 with headroom, the same ratchet the
-coverage gate uses. Verified in the failing direction rather than assumed:
-running one file with `--break-at 85` against its 79.17% exits with code 2 and
-"Final mutation score is below threshold break. Crashing...".
+Ratcheted 60 → 80 → 85 as the score cleared each with headroom, the same way the
+coverage gate moved. Verified in the failing direction rather than assumed:
+running one file with `--break-at` above its score exits with code 2 and "Final
+mutation score is below threshold break. Crashing...".
 
 Unlike the coverage gate this is **not enforced in CI** — a full run takes
 minutes to tens of minutes against roughly two seconds for the unit tests, so it
