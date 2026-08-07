@@ -1,6 +1,8 @@
 namespace TcgDex.AotSmokeTest;
 
 using System.Text.Json.Serialization.Metadata;
+using System.Threading;
+using System.Threading.Tasks;
 using TcgDex.Models;
 using TcgDex.Querying;
 using TcgDex.Serialization;
@@ -43,7 +45,12 @@ internal static class Program
           "weaknesses": [{ "type": "Fighting", "value": "×2" }],
           "variants": { "normal": true, "reverse": true, "holo": false,
                         "firstEdition": false, "wPromo": false },
-          "legal": { "standard": false, "expanded": true }
+          "legal": { "standard": false, "expanded": true },
+          "pricing": {
+            "cardmarket": { "unit": "EUR", "updated": "2026-08-06T00:00:00Z", "avg": 0.11 },
+            "tcgplayer": { "unit": "USD", "updated": "2026-08-06T00:00:00Z",
+                           "normal": { "marketPrice": 0.12, "lowPrice": 0.02 } }
+          }
         }
         """;
 
@@ -57,6 +64,7 @@ internal static class Program
         Check(failures, "expression-tree query translation", ExpressionTreeTranslation);
         Check(failures, "captured variable without Expression.Compile", CapturedVariable);
         Check(failures, "options validation", OptionsValidation);
+        Check(failures, "contract modifier for optional pricing", PricingContractModifier);
 
         if (failures.Count > 0)
         {
@@ -113,6 +121,85 @@ internal static class Program
         return card.Set.Name == "Darkness Ablaze"
             ? null
             : $"nested set did not deserialize: '{card.Set.Name}'";
+    }
+
+    /// <summary>
+    /// <see cref="TcgDexOptions.DeserializePricing"/> off, which is the only
+    /// place the SDK customises a source-generated contract at runtime.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>JsonTypeInfoResolver.WithAddedModifier</c> is documented as AOT-safe,
+    /// and "documented as safe" is the same class of claim as "source generation
+    /// is faster on every call" — which this project already had to retract
+    /// after measuring it. The modifier walks a generated contract and swaps a
+    /// property's converter; if trimming ever removed the metadata that depends
+    /// on, this is where it would surface.
+    /// </para>
+    /// <para>
+    /// Both directions are checked. A modifier that silently did nothing would
+    /// pass a test that only looked at the default.
+    /// </para>
+    /// </remarks>
+    private static string? PricingContractModifier()
+    {
+        // Driven through the public client rather than the internal contract
+        // factory, so this covers the path a consumer actually takes — and, as a
+        // side effect, exercises the deserialization cache under AOT too.
+        var kept = Fetch(new TcgDexOptions());
+        var skipped = Fetch(new TcgDexOptions { DeserializePricing = false });
+
+        if (kept?.Pricing is null)
+        {
+            return "pricing was not populated by default";
+        }
+
+        if (skipped is null)
+        {
+            return "the card did not deserialize with DeserializePricing off";
+        }
+
+        if (skipped.Pricing is not null)
+        {
+            return "pricing was populated even with DeserializePricing off";
+        }
+
+        // The rest of the card must survive having one property re-converted.
+        return skipped.Name == "Furret"
+            ? null
+            : $"the modified contract broke the rest of the card: '{skipped.Name}'";
+    }
+
+    /// <summary>Fetches the embedded card through a client with a stub transport.</summary>
+    private static Card? Fetch(TcgDexOptions options)
+    {
+        using var http = new System.Net.Http.HttpClient(new StubHandler(CardJson));
+        using var client = new TcgDexClient(http, options);
+
+        return client.Cards.GetAsync("swsh3-136", CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    /// <summary>Answers every request with the embedded card, tagged so the cache engages.</summary>
+    private sealed class StubHandler(string body) : System.Net.Http.HttpMessageHandler
+    {
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(
+            System.Net.Http.HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            var response = new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new System.Net.Http.StringContent(
+                    body,
+                    System.Text.Encoding.UTF8,
+                    "application/json"),
+            };
+
+            response.Headers.TryAddWithoutValidation("ETag", "W/\"aot\"");
+
+            return Task.FromResult(response);
+        }
     }
 
     private static string? PolymorphicDamageConverter()
