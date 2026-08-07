@@ -115,4 +115,27 @@ public class SerializationBenchmarks
     /// <summary>A card with no attacks, so no polymorphic damage to normalise.</summary>
     [Benchmark]
     public Card? WithoutAttacks()
-        => JsonSerializer.Deserialize(_withoutAttacks, _cardTypeInfo!);}
+        => JsonSerializer.Deserialize(_withoutAttacks, _cardTypeInfo!);
+    /// <summary>
+    /// The same model through Newtonsoft.Json, as a control.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Not a candidate — Newtonsoft is not trim- or AOT-safe, so it could not
+    /// be adopted here whatever it measures. It is a **diagnostic**: it is a
+    /// fully independent implementation rather than a wrapper over
+    /// System.Text.Json, so if it lands near the same number then the cost is
+    /// this SDK's model shape rather than its serializer.
+    /// </para>
+    /// <para>
+    /// It has no equivalent of the two custom converters, and does not need
+    /// them: Newtonsoft coerces a JSON number into a string property on its
+    /// own, and maps the dynamic pricing keys through its dictionary handling.
+    /// That leniency is exactly what System.Text.Json declines to do, which is
+    /// why this SDK writes the converters — so this row does slightly less
+    /// work, and is a floor rather than a like-for-like.
+    /// </para>
+    /// </remarks>
+    [Benchmark]
+    public Card? NewtonsoftBased()
+        => Newtonsoft.Json.JsonConvert.DeserializeObject<Card>(_cardJson);}

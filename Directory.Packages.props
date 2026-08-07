@@ -46,6 +46,12 @@
        graph. MIT licensed. -->
   <ItemGroup>
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+    <!-- Benchmark-only, to answer whether the deserialization cost is this
+         SDK's model shape or its choice of serializer. Newtonsoft.Json is a
+         fully independent implementation, not a wrapper over
+         System.Text.Json. MIT licensed; never referenced by the SDK, and not
+         adoptable anyway since it is not trim- or AOT-safe. -->
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <!-- The other public C# TCGdex SDK, referenced only by the benchmark
          project so the comparison runs both through the same stub transport.
          MIT licensed. Never referenced by the SDK itself. -->

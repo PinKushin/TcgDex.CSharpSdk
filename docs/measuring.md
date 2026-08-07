@@ -45,7 +45,16 @@ source-generated baseline:
 | Source-generated, type info hoisted | 0.99 | 1.00 |
 | **Reflection-based** | **0.81** | **0.66** |
 
-Reflection is **faster and lighter** for this workload.
+Reflection is **faster and lighter** for this workload. Newtonsoft.Json, measured
+as a control, is slower than both — 26.18 µs and 16.62 KB against source
+generation's 22.12 µs and 10.95 KB. It is not a candidate (not trim- or AOT-safe)
+and it is not a wrapper over System.Text.Json but a wholly separate
+implementation, which is what makes it useful here: it rules out the model shape
+as the explanation, since an independent serializer on the identical type is
+slower still, and needs no custom converters to do it.
+
+The anomaly is therefore narrow. Source generation beats Newtonsoft and loses
+only to System.Text.Json's own reflection path on these models.
 
 Precisely what this does and does not overturn. The claim in the SDK's own
 source — that source generation "avoids the reflection cost on the first call
