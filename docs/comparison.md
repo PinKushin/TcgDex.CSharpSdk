@@ -191,8 +191,33 @@ of the gap is mostly deliberate:
    work the other SDK does not do, in exchange for typed access to fields whose
    shape varies.
 
-Neither is a reason to stop looking. 18.6 KB for a ~10 KB payload is defensible;
-it is not obviously optimal.
+Neither is a reason to stop looking, and a second correction is due here: an
+earlier version of this page called it "a ~10 KB payload". The card fixture is
+**2,938 bytes**. Allocating 18.6 KB to handle it is 6.4× the payload, which is
+not defensible — the wrong figure made it look better than it is.
+
+### Where the deserialization time goes
+
+Isolated by stripping one block from the same card, at full precision
+(StdDev ~0.3 µs):
+
+| Deserializing the full card | Time | Allocated |
+|---|---:|---:|
+| As shipped | 23.04 µs | 11.17 KB |
+| With the `pricing` block removed | 18.35 µs | 8.97 KB |
+| Reflection, same model | 17.26 µs | 7.40 KB |
+
+**`TcgPlayerPricingConverter` accounts for 4.7 µs and 2.2 KB — 20% of both.**
+It is hand-written code, which makes it the first place to look rather than the
+last, and it is paid on every card whether or not the caller reads pricing.
+
+The remaining ~5.8 µs between source generation and reflection is
+System.Text.Json internals. That one stays: source generation is what makes the
+SDK trim- and AOT-safe, and no amount of it being slower here changes that.
+
+Deserialization is roughly 86% of the whole request path — the transport, the
+logging, the activity and the URI construction together account for about
+3.5 µs. Anything spent optimising elsewhere is spent in the wrong place.
 
 ---
 
