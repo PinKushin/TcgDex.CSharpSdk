@@ -241,6 +241,94 @@ public sealed class LoggingTests
 
     // ----- tracing -----
 
+    /// <summary>
+    /// Builds a listener that records every stopped SDK activity.
+    /// </summary>
+    private static (ActivityListener Listener, List<Activity> Recorded) ListenForActivities()
+    {
+        var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == TcgDexActivity.SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+        };
+
+        var recorded = new List<Activity>();
+        listener.ActivityStopped = recorded.Add;
+        ActivitySource.AddActivityListener(listener);
+
+        return (listener, recorded);
+    }
+
+    [Test]
+    public void ANetworkFailure_MarksTheActivityAsError()
+    {
+        // The existing error-marking test uses a 502, which reaches the failure
+        // path through a *response*. This reaches it through an *exception*,
+        // which is a different call site — and one where removing the
+        // RecordFailure call went unnoticed.
+        var (listener, recorded) = ListenForActivities();
+        using var _ = listener;
+
+        var handler = new RecordingHandler()
+            .RespondWith(_ => throw new HttpRequestException("connection reset"));
+
+        var (client, _) = Build(handler);
+
+        Should.ThrowAsync<TcgDexApiException>(async () =>
+            await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Wait();
+
+        var activity = recorded.ShouldHaveSingleItem();
+        activity.Status.ShouldBe(ActivityStatusCode.Error);
+    }
+
+    [Test]
+    public void ATimeout_MarksTheActivityAsError()
+    {
+        // The other exception-shaped failure, and the other RecordFailure call.
+        var (listener, recorded) = ListenForActivities();
+        using var _ = listener;
+
+        var handler = new RecordingHandler()
+            .RespondWith(_ => throw new TaskCanceledException("timed out"));
+
+        var (client, _) = Build(handler);
+
+        Should.ThrowAsync<TcgDexApiException>(async () =>
+            await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Wait();
+
+        var activity = recorded.ShouldHaveSingleItem();
+        activity.Status.ShouldBe(ActivityStatusCode.Error);
+    }
+
+    [Test]
+    public async Task TheLoggedDuration_IsAPlausibleNumberOfMilliseconds()
+    {
+        // The elapsed time is computed by hand from Stopwatch timestamps, and
+        // arithmetic mutations there produced values in the billions while
+        // every test still passed — nothing asserted the number at all.
+        //
+        // A range rather than an exact value: the point is to catch a broken
+        // scale factor, not to measure the machine.
+        var handler = new RecordingHandler()
+            .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
+
+        var (client, log) = Build(handler);
+        await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+
+        var text = log.Entries.Single(e => e.Message.Contains("returned 200 in")).Message;
+
+        // "... returned 200 in 3ms"
+        // Substring rather than Split: the Split(string) overload is .NET Core
+        // 2.0+ and this suite also runs on net472, while the array overload
+        // trips CA1861 on a literal argument.
+        var start = text.LastIndexOf(" in ", StringComparison.Ordinal) + " in ".Length;
+        var digits = text.Substring(start).Replace("ms", string.Empty);
+        var milliseconds = long.Parse(digits, System.Globalization.CultureInfo.InvariantCulture);
+
+        milliseconds.ShouldBeGreaterThanOrEqualTo(0);
+        milliseconds.ShouldBeLessThan(60_000);
+    }
+
     [Test]
     public async Task AnOperation_EmitsAnActivityWithSemanticTags()
     {

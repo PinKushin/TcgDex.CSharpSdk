@@ -143,6 +143,44 @@ Some survivors will be equivalent mutants that no test could kill. Others are
 real gaps. Telling them apart is manual work, one file at a time, and the table
 above is the order to do it in.
 
+### Worked example: `TcgDexTransport.cs`, 64% to 85%
+
+Twenty-four survivors, triaged rather than blindly tested. Fourteen were real
+gaps and are now killed by `TransportDetailTests` plus three additions to
+`LoggingTests`. The pattern in every one of them: **the old tests asserted the
+exception type but never its message.**
+
+`TcgDexApiException` is the single error contract for the whole SDK, so its text
+is the only thing distinguishing "the network died" from "the body was not JSON"
+from "that resource is missing" for someone reading a log. A mutant that blanked
+a message left every test passing.
+
+Two findings worth keeping:
+
+- **`ReasonPhrase = null` does not stick** on a known status code — .NET
+  substitutes the standard phrase, so the final `?? "no detail supplied"`
+  fallback is unreachable that way. It needs a non-standard status. Not
+  contrived: HTTP/2 removed reason phrases from the protocol, so a real HTTP/2
+  response reaches that branch for any status.
+- **The activity-failure calls have two call sites**, and the existing test only
+  covered one. A 502 reaches the failure path through a *response*; a dropped
+  connection reaches it through an *exception*. Removing `RecordFailure` from
+  the exception path went unnoticed.
+
+### The ten that remain are equivalent, and that is the ceiling
+
+Not laziness — none can be killed by any test:
+
+| Mutation | Why unkillable |
+|---|---|
+| `.ConfigureAwait(false)` to `true` (×4) | No observable difference without a synchronization context |
+| `Guard.NotNull(...)` removed (×3) | `TcgDexClient` validates first; no public path reaches the transport's own guard |
+| Ternary and catch-block collapses (×3) | Forcing `Deserialize("   ")` throws `JsonException`, which the next `catch` turns back into `null` — identical behaviour |
+
+This is why the break threshold sits at 60 rather than near the coverage gate. A
+file can be thoroughly tested and still not reach 100%, and pretending otherwise
+produces tests written for the metric instead of for the behaviour.
+
 ### Thresholds, and why they are below the coverage gate
 
 ```json
