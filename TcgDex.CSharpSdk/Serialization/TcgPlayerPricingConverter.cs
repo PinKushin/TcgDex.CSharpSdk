@@ -19,6 +19,12 @@ public sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing>
     private const string UnitProperty = "unit";
     private const string UpdatedProperty = "updated";
 
+    /// <summary>The two metadata keys as UTF-8, for allocation-free matching.</summary>
+    private static readonly byte[] UnitPropertyUtf8 = System.Text.Encoding.UTF8.GetBytes(UnitProperty);
+
+    /// <inheritdoc cref="UnitPropertyUtf8" />
+    private static readonly byte[] UpdatedPropertyUtf8 = System.Text.Encoding.UTF8.GetBytes(UpdatedProperty);
+
     /// <inheritdoc />
     public override TcgPlayerPricing? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
@@ -31,44 +37,58 @@ public sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing>
 
         string? unit = null;
         DateTimeOffset? updated = null;
+
+        // No capacity hint. Sizing it for four printings was measured and made
+        // allocations worse, not better — a card carries one to three, and the
+        // extra buckets cost more than the resize they avoided.
         var printings = new Dictionary<string, TcgPlayerPrice>(StringComparer.Ordinal);
+
+        // Resolved once rather than per printing.
+        var priceTypeInfo = PriceTypeInfo(options);
 
         while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
         {
             // Utf8JsonReader guarantees a PropertyName here: the loop exits on
             // EndObject, and malformed JSON fails inside the reader before
             // reaching this point.
-            var name = reader.GetString()!;
+            //
+            // The two metadata keys are matched against UTF-8 without decoding
+            // them. GetString allocates, and for `unit` and `updated` the
+            // string is only ever compared and thrown away — so it is called
+            // below for printing names alone, where the value is genuinely
+            // needed as a dictionary key.
+            var isUnit = reader.ValueTextEquals(UnitPropertyUtf8);
+            var isUpdated = !isUnit && reader.ValueTextEquals(UpdatedPropertyUtf8);
+            var name = isUnit || isUpdated ? null : reader.GetString()!;
+
             reader.Read();
 
-            switch (name)
+            if (isUnit)
             {
-                case UnitProperty:
-                    unit = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
-                    break;
+                unit = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
+                continue;
+            }
 
-                case UpdatedProperty:
-                    updated = reader.TokenType == JsonTokenType.Null
-                        ? null
-                        : reader.GetDateTimeOffset();
-                    break;
+            if (isUpdated)
+            {
+                updated = reader.TokenType == JsonTokenType.Null
+                    ? null
+                    : reader.GetDateTimeOffset();
+                continue;
+            }
 
-                default:
-                    // Any other property is a printing name, and its value is a
-                    // price block (or null when the source has no data for it).
-                    if (reader.TokenType == JsonTokenType.Null)
-                    {
-                        break;
-                    }
+            // Any other property is a printing name, and its value is a price
+            // block (or null when the source has no data for it).
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                continue;
+            }
 
-                    var price = JsonSerializer.Deserialize(ref reader, PriceTypeInfo(options));
+            var price = JsonSerializer.Deserialize(ref reader, priceTypeInfo);
 
-                    if (price is not null)
-                    {
-                        printings[name] = price;
-                    }
-
-                    break;
+            if (price is not null)
+            {
+                printings[name!] = price;
             }
         }
 
