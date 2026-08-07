@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using TcgDex.Caching;
 using TcgDex.Diagnostics;
 using TcgDex.Models;
 using TcgDex.Serialization;
@@ -41,6 +42,12 @@ internal sealed class TcgDexTransport
     /// </summary>
     private readonly JsonSerializerOptions _jsonOptions;
 
+    /// <summary>
+    /// Retained parses, or <see langword="null"/> when disabled. See
+    /// <see cref="TcgDexOptions.MaxDeserializedCacheEntries"/>.
+    /// </summary>
+    private readonly DeserializedResponseCache? _deserialized;
+
     internal TcgDexTransport(HttpClient httpClient, TcgDexOptions options, ILogger? logger = null)
     {
         Guard.NotNull(httpClient);
@@ -59,6 +66,10 @@ internal sealed class TcgDexTransport
         _languageBase = new Uri(options.BaseAddress, options.Language + "/");
         _maxResponseBytes = options.MaxResponseBytes;
         _jsonOptions = TcgDexJsonContracts.For(options);
+
+        _deserialized = options.MaxDeserializedCacheEntries > 0
+            ? new DeserializedResponseCache(options.MaxDeserializedCacheEntries)
+            : null;
 
         // Both endpoints are checked here rather than in Validate(): this is
         // advice, not a rule, and Validate has no logger to give it through.
@@ -115,11 +126,29 @@ internal sealed class TcgDexTransport
             return await HandleFailureAsync<T>(uri, response, activity, cancellationToken).ConfigureAwait(false);
         }
 
+        // Checked before the body is read, not just before it is parsed: on a
+        // hit there is nothing to read either.
+        var etag = response.Headers.ETag?.ToString();
+
+        if (_deserialized is not null && _deserialized.TryGet<T>(uri, etag, out var cached))
+        {
+            _logger.ReusedDeserializedResponse(uri, typeof(T).Name);
+
+            return cached;
+        }
+
         var body = await BoundedContent
             .ReadAsBytesAsync(response.Content, _maxResponseBytes, uri, cancellationToken)
             .ConfigureAwait(false);
 
-        return Deserialize<T>(body, uri);
+        var value = Deserialize<T>(body, uri);
+
+        if (value is not null)
+        {
+            _deserialized?.Set(uri, etag, value);
+        }
+
+        return value;
     }
 
     /// <summary>

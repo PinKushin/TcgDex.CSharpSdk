@@ -99,6 +99,25 @@ internal static partial class TcgDexLog
         Uri uri,
         string typeName);
 
+    /// <summary>
+    /// A response whose <c>ETag</c> matched a model already parsed, so the parse
+    /// was skipped.
+    /// </summary>
+    /// <remarks>
+    /// Trace rather than Debug, and separate from <c>CacheHit</c>: this says the
+    /// deserialization was avoided, which is a different saving from avoiding
+    /// the request. Both can happen on one call, and someone tuning cache sizes
+    /// needs to tell them apart.
+    /// </remarks>
+    [LoggerMessage(
+        EventId = 1007,
+        Level = LogLevel.Trace,
+        Message = "TCGdex reused the parsed {TypeName} for {Uri}; the ETag was unchanged")]
+    internal static partial void ReusedDeserializedResponse(
+        this ILogger logger,
+        Uri uri,
+        string typeName);
+
     // ----- 1100: caching -----
 
     [LoggerMessage(
