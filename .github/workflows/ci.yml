@@ -74,6 +74,19 @@ jobs:
       - name: Verify the package builds
         run: dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj --configuration Release --no-build --output ./artifacts
 
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-results
+          path: "**/TestResults/**"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: nupkg
+          path: ./artifacts/*.nupkg
+
   # The netstandard2.0 assembly is a contract that never executes on its own, so
   # without this job it ships build-verified and never run. .NET Framework
   # resolves that asset, which makes a net472 run the only way to execute
@@ -112,18 +125,15 @@ jobs:
           --logger "trx;LogFileName=framework-tests.trx"
           --results-directory ./TestResults
 
+      # Distinct artifact name from the ubuntu job's. Two jobs uploading to the
+      # same name is an error on upload-artifact v4+, and this job produces no
+      # package, so it uploads results only.
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: unit-test-results
+          name: framework-test-results
           path: "**/TestResults/**"
-
-      - name: Upload package
-        uses: actions/upload-artifact@v7
-        with:
-          name: nupkg
-          path: ./artifacts/*.nupkg
 
   # Proves the AOT-compatibility claim. Runs on Windows because that is where
   # the SDK is developed, and the linker quirks are platform-specific.
