@@ -426,6 +426,42 @@ public sealed class CachingHandlerTests
         cache.Removed.ShouldContain(CardUrl);
     }
 
+    // ----- which time-to-live a path gets -----
+
+    [TestCase("https://api.tcgdex.net/v2/en/cards/swsh3-136", true, TestName = "Ttl_SingleCard")]
+    [TestCase("https://api.tcgdex.net/v2/en/cards/exu-%21", true, TestName = "Ttl_SingleCardOddId")]
+    [TestCase("https://api.tcgdex.net/v2/en/cards", false, TestName = "Ttl_CardList")]
+    [TestCase("https://api.tcgdex.net/v2/en/cards/", false, TestName = "Ttl_CardsWithTrailingSlashOnly")]
+    [TestCase("https://api.tcgdex.net/v2/en/sets/swsh3", false, TestName = "Ttl_Set")]
+    public void ASingleCardPath_GetsThePricingLifetime(string url, bool isSingleCard)
+    {
+        // A single card carries pricing and so gets a shorter lifetime than
+        // anything else. The detection is `indexOf("/cards/") >= 0 && there is
+        // something after it`, and every part of that was unprotected: the
+        // index comparison, the arithmetic, and the segment being searched for.
+        //
+        // The trailing-slash case is the one that separates the two halves —
+        // "/cards/" is present but nothing follows it, so it is a list rather
+        // than a card.
+        var options = new TcgDexCacheOptions
+        {
+            PricingTimeToLive = TimeSpan.FromSeconds(30),
+            DefaultTimeToLive = TimeSpan.FromHours(1),
+        };
+
+        var actual = options.GetTimeToLive(new Uri(url));
+
+        actual.ShouldBe(isSingleCard ? TimeSpan.FromSeconds(30) : TimeSpan.FromHours(1));
+    }
+
+    [Test]
+    public void GetTimeToLive_WithANullUri_Throws()
+    {
+        // TcgDexCacheOptions is public and GetTimeToLive is virtual for callers
+        // who want their own policy, so this guard is part of that contract.
+        Should.Throw<ArgumentNullException>(() => new TcgDexCacheOptions().GetTimeToLive(null!));
+    }
+
     // ----- policy -----
 
     [Test]

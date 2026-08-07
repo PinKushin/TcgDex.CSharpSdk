@@ -170,4 +170,16 @@ public sealed class SerializationTests
         restored.Id.ShouldBe(original.Id);
         restored.Sets.Count.ShouldBe(original.Sets.Count);
     }
-}
+
+    [Test]
+    public void FlexibleString_GivenAnUnsupportedToken_SaysWhatItFound()
+    {
+        // damage is polymorphic across string, number and null, so the failure
+        // message has to name the token actually received — otherwise a caller
+        // hitting an unexpected shape learns only that parsing failed.
+        var exception = Should.Throw<JsonException>(() =>
+            Deserialize<Attack>("""{"name":"Tackle","damage":["not","a","scalar"]}"""));
+
+        exception.Message.ShouldContain("StartArray");
+        exception.Message.ShouldContain("string, number or null");
+    }}
