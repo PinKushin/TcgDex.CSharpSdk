@@ -119,6 +119,37 @@ public sealed class GraphQlTests
     }
 
     [Test]
+    public async Task SearchDetailed_EscapesControlCharactersInFilterValues()
+    {
+        // Not an injection route — only a quote or a backslash can break out of
+        // a string literal, and both are handled above. This is about producing a
+        // *valid* query: the GraphQL grammar forbids raw control characters inside
+        // a string, so passing one through unescaped turns a caller's odd input
+        // into a syntax error from the server rather than a clean result.
+        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+
+        // Built from char codes rather than written as literals: control bytes
+        // pasted into a source file are invisible and get mangled in transit.
+        var hostile = "Furret" + (char)0x08 + (char)0x0C + (char)0x01 + (char)0x1F;
+
+        var query = await CaptureQueryAsync(handler, new CardFilter { Name = hostile });
+
+        // Backspace and form feed have dedicated escapes in the grammar;
+        // everything else below U+0020 has to go out as a \u escape.
+        query.ShouldContain(@"Furret\b\f");
+
+        // The \u forms for the two without dedicated escapes. Asserted as the
+        // hex portion so this file never contains a backslash-u sequence that
+        // an editor or a pipe might reinterpret.
+        query.ShouldContain("u0001");
+        query.ShouldContain("u001F");
+
+        // And no raw control byte survives, or the escaping achieved nothing.
+        query.ShouldNotContain(((char)0x08).ToString());
+        query.ShouldNotContain(((char)0x01).ToString());
+    }
+
+    [Test]
     public async Task SearchDetailed_WithNoFilter_OmitsTheArgumentList()
     {
         var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);

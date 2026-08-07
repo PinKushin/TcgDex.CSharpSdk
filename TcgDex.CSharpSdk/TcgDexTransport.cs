@@ -52,6 +52,21 @@ internal sealed class TcgDexTransport
         // language segment rather than replace it.
         _languageBase = new Uri(options.BaseAddress, options.Language + "/");
         _maxResponseBytes = options.MaxResponseBytes;
+
+        // Both endpoints are checked here rather than in Validate(): this is
+        // advice, not a rule, and Validate has no logger to give it through.
+        // Checked once at construction rather than per request, so a misconfigured
+        // client says so immediately instead of once per call.
+        WarnIfInsecure(options.BaseAddress);
+        WarnIfInsecure(options.GraphQlEndpoint);
+    }
+
+    private void WarnIfInsecure(Uri uri)
+    {
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.InsecureEndpoint(uri);
+        }
     }
 
     /// <summary>

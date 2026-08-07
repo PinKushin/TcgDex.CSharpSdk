@@ -139,6 +139,23 @@ internal static partial class TcgDexLog
         Message = "TCGdex client configured for language '{Language}' against {BaseAddress}")]
     internal static partial void ClientConfigured(this ILogger logger, string language, Uri baseAddress);
 
+    /// <remarks>
+    /// Warning rather than a validation failure. A plaintext base address is
+    /// almost always a mistake — it exposes every request and response to
+    /// anyone on the path, and this SDK trusts the response body enough to
+    /// deserialize it. But it is not always a mistake: pointing at
+    /// <c>http://localhost</c> for a stub server is a documented, legitimate
+    /// use, and rejecting it outright would break that with no way around it.
+    /// So this is loud and ignorable rather than fatal.
+    /// </remarks>
+    [LoggerMessage(
+        EventId = 1201,
+        Level = LogLevel.Warning,
+        Message = "TCGdex is configured with a non-HTTPS endpoint ({Uri}). Requests and responses " +
+                  "travel in plaintext and can be read or altered in transit; use https unless this " +
+                  "is a local test server.")]
+    internal static partial void InsecureEndpoint(this ILogger logger, Uri uri);
+
     // ----- 1300: GraphQL -----
 
     [LoggerMessage(
