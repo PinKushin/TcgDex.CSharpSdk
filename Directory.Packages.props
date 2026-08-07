@@ -58,8 +58,21 @@
     <PackageVersion Include="TCGdex" Version="0.1.0" />
   </ItemGroup>
 
+  <!-- Fuzzing, run on a schedule rather than per push. Instruments the SDK
+       assembly and drives it with libFuzzer. MIT licensed, its own
+       non-packable project, never shipped. -->
+  <ItemGroup>
+    <PackageVersion Include="SharpFuzz" Version="2.3.0" />
+  </ItemGroup>
+
   <!-- Test-only dependencies. -->
   <ItemGroup>
+    <!-- Renders the compiled public surface as C# so a test can compare it to a
+         checked-in baseline. This is what Polly and Serilog use; the Roslyn
+         PublicApiAnalyzers alternative needs 1,500 entries hand-written with
+         nullability annotations and has no supported way to generate them
+         outside an IDE. MIT licensed, test-only, never shipped. -->
+    <PackageVersion Include="PublicApiGenerator" Version="11.4.6" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="NUnit" Version="4.6.1" />
     <PackageVersion Include="NUnit3TestAdapter" Version="6.2.0" />

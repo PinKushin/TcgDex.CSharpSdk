@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Coverage-guided fuzzing of the one path that consumes untrusted input:
+       an HTTP response body from a server this SDK does not control.
+
+       Separate from the test suite on purpose. A fuzzer runs for minutes or
+       hours and finds inputs nobody wrote down, which is the opposite shape
+       from a gate that must answer in seconds on every push. The cheap,
+       deterministic version of this question lives in
+       MalformedResponseTests and runs every time; this one goes deeper on a
+       schedule.
+
+       net10.0 only, and never packed: SharpFuzz instruments the assembly under
+       test, so this is a tool rather than a deliverable. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>TcgDex.Fuzz</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+
+    <!-- The fuzz target is a single entry point with no public API and no XML
+         docs to publish. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SharpFuzz" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TcgDex.CSharpSdk\TcgDex.CSharpSdk.csproj" />
+  </ItemGroup>
+
+  <!-- The recorded responses double as the seed corpus. A fuzzer given random
+       bytes spends its whole budget discovering that JSON starts with a brace;
+       seeded with real payloads it starts from structurally valid input and
+       mutates towards the interesting failures. -->
+  <ItemGroup>
+    <None Include="..\TcgDex.CSharpSdk.Tests\Fixtures\**\*.json"
+          Link="corpus\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

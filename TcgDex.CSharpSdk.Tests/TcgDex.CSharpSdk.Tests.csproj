@@ -40,6 +40,23 @@
     <PackageReference Include="coverlet.collector" />
   </ItemGroup>
 
+  <!-- The public-surface approval test runs on net10.0 only. PublicApiGenerator
+       does not support netstandard2.0 or net472 consumers, and one baseline per
+       target framework would mean three files describing overlapping surfaces —
+       net10.0 is the richest and a superset, so it catches every change. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="PublicApiGenerator" />
+  </ItemGroup>
+
+  <!-- The baseline is C# by extension and data by purpose: it describes the
+       SDK's surface rather than being part of this project's. Compiling it
+       would redeclare every public type in the assembly under test. Kept as a
+       .cs file anyway, because that is what makes a diff readable in review. -->
+  <ItemGroup>
+    <Compile Remove="PublicApi.*.cs" />
+    <None Include="PublicApi.approved.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\TcgDex.CSharpSdk\TcgDex.CSharpSdk.csproj" />
   </ItemGroup>

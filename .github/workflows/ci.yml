@@ -87,6 +87,46 @@ jobs:
           name: nupkg
           path: ./artifacts/*.nupkg
 
+  # macOS is claimed by inference otherwise: the package targets net8.0 and
+  # net10.0, which run there, and nothing proved it. Free and unlimited on
+  # GitHub-hosted runners for public repositories — no Apple Developer
+  # membership is involved, since that is for code signing and the App Store,
+  # not for running tests.
+  #
+  # Unit tests only. Coverage and the package gate belong to the ubuntu job;
+  # repeating them here would double CI time to re-prove what is already proven.
+  macos-test:
+    name: Unit test on macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore -warnaserror
+
+      - name: Unit tests
+        run: >
+          dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj
+          --configuration Release --no-build
+          --logger "trx;LogFileName=macos-tests.trx"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-test-results
+          path: ./TestResults/*.trx
+
   # The netstandard2.0 assembly is a contract that never executes on its own, so
   # without this job it ships build-verified and never run. .NET Framework
   # resolves that asset, which makes a net472 run the only way to execute
