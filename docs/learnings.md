@@ -194,7 +194,7 @@ everyone to ignore the one place a real finding would appear.
 
 ---
 
-## A green CI run is not a silent one
+## A passing CI run can still be reporting a problem
 
 Adding `net472` to the test project broke CI on every push and I did not notice,
 because Actions was degraded at the time and I read the missing result as the
@@ -204,18 +204,30 @@ host*, taking the net8.0 and net10.0 results down with it. The test project now
 targets `net472` only on Windows, with a dedicated `windows-latest` job so the
 framework stays covered in CI rather than only locally.
 
-Then a run went green while quietly doing the wrong thing. The fix above had
+Then every job passed while CI quietly did the wrong thing. The fix above had
 been anchored on the ubuntu job's `pack` step, which moved that job's two upload
-steps into the new Windows job: the package and test results silently stopped
-being uploaded, and the only symptom was an annotation — *No files were found
-with the provided path* — attributed to a job that had no business emitting it.
-Nothing failed.
+steps into the new Windows job. The package and test results stopped being
+uploaded, and the only evidence was an annotation:
 
-That is the argument for treating **CI annotations as build output**. A green
-tick meant artifacts had stopped being produced, and a deprecation notice
-(CodeQL Action v3) would otherwise have sat in the log for four months. Both are
-now zero, checked with
-`gh api repos/{owner}/{repo}/check-runs/{id}/annotations --jq 'length'`.
+```
+No files were found with the provided path: ./artifacts/*.nupkg.
+No artifacts will be uploaded.
+```
+
+Nothing failed, because `upload-artifact` treats "nothing matched" as a warning
+rather than an error — and the annotation was attached to a job that had no
+business uploading a package in the first place.
+
+**A passing status only means no step returned a non-zero exit code.** It does
+not mean the run was clean. Here it meant artifacts had silently stopped being
+produced; elsewhere in the same session it meant a deprecation notice (CodeQL
+Action v3, removed December 2026) that would otherwise have sat in the log for
+four months. Both are the same failure to read past the tick, which is why
+annotations are treated as build output in this repo and held at zero:
+
+```bash
+gh api repos/{owner}/{repo}/check-runs/{job-id}/annotations --jq 'length'
+```
 
 ---
 
