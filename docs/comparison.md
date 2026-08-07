@@ -229,8 +229,11 @@ logging, the activity and the URI construction together account for about
   package cannot; it has ETag revalidation, `IAsyncEnumerable` pagination,
   `ILogger`/`ActivitySource` observability, and verified Native AOT support.
   None of that makes it faster at the two things measured above.
-- **Correctness**, which the test suite covers — 447 unit tests across three
-  frameworks and a 90.03% mutation score.
+- **Correctness**, which the test suite covers — 451 unit tests across three
+  frameworks and an 89.21% mutation score.
+- **Payload size.** Everything above is one card of 2,938 bytes. On the 2.3 MB
+  unpaginated card list the source-generation penalty holds at the same ratio
+  rather than washing out; see [`measuring.md`](measuring.md).
 
 Being slower at deserialization is still a fair criticism of this SDK. It is
 less fair than it was a day ago, and it stopped being fair to call it careless.
