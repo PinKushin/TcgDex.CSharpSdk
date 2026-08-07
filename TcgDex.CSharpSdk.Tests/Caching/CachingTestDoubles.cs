@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using TcgDex.Caching;
 
 /// <summary>
 /// A controllable clock, so freshness and expiry are tested by advancing time
@@ -32,6 +33,64 @@ internal sealed class FakeTimeProvider : TimeProvider
 /// Counting requests is the point — every claim the cache makes is really a
 /// claim about how many calls got through.
 /// </remarks>
+/// <summary>
+/// An <see cref="HttpResponseMessage"/> that records whether it was disposed.
+/// </summary>
+/// <remarks>
+/// The caching handler disposes the responses it consumes — the 304 it
+/// revalidates with, and the 200 whose body it has already copied into the
+/// cache. Both leak a connection if the call goes missing, and a leak is
+/// invisible to every assertion about status codes and bodies, which is why
+/// mutation testing found those two Dispose() calls unprotected.
+/// </remarks>
+internal sealed class TrackedResponse : HttpResponseMessage
+{
+    internal TrackedResponse(HttpStatusCode status)
+        : base(status)
+    {
+    }
+
+    internal bool WasDisposed { get; private set; }
+
+    protected override void Dispose(bool disposing)
+    {
+        WasDisposed = true;
+        base.Dispose(disposing);
+    }
+}
+
+/// <summary>
+/// Wraps a cache and records which keys were removed.
+/// </summary>
+/// <remarks>
+/// Eviction on a failed response has no effect observable through the client:
+/// the entry being evicted is already stale, so the next request revalidates
+/// either way. It still matters — <see cref="ITcgDexResponseCache"/> is a
+/// public extension point, and an implementation backed by Redis or disk is
+/// entitled to be told the entry is gone rather than keeping it forever.
+/// Asserting the interaction is the only way to pin that down.
+/// </remarks>
+internal sealed class RecordingCache(ITcgDexResponseCache inner) : ITcgDexResponseCache
+{
+    internal List<string> Removed { get; } = [];
+
+    public ValueTask<CachedResponse?> GetAsync(string key, CancellationToken cancellationToken = default)
+        => inner.GetAsync(key, cancellationToken);
+
+    public ValueTask SetAsync(
+        string key,
+        CachedResponse response,
+        TimeSpan timeToLive,
+        CancellationToken cancellationToken = default)
+        => inner.SetAsync(key, response, timeToLive, cancellationToken);
+
+    public ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default)
+    {
+        Removed.Add(key);
+        return inner.RemoveAsync(key, cancellationToken);
+    }
+}
+
 internal sealed class CountingHandler : HttpMessageHandler
 {
     private readonly ConcurrentQueue<Func<HttpRequestMessage, Task<HttpResponseMessage>>> _responses = new();
@@ -67,6 +126,20 @@ internal sealed class CountingHandler : HttpMessageHandler
             });
         }
 
+        return this;
+    }
+
+    /// <summary>Queues a response whose disposal the caller can observe.</summary>
+    internal CountingHandler RespondTracked(TrackedResponse response, string body, string? etag)
+    {
+        response.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+
+        if (etag is not null)
+        {
+            response.Headers.TryAddWithoutValidation("ETag", etag);
+        }
+
+        _responses.Enqueue(_ => Task.FromResult<HttpResponseMessage>(response));
         return this;
     }
 
