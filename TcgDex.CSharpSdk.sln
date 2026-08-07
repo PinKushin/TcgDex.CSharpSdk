@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TcgDex.CSharpSdk.Integratio
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TcgDex.CSharpSdk.AotSmokeTest", "TcgDex.CSharpSdk.AotSmokeTest\TcgDex.CSharpSdk.AotSmokeTest.csproj", "{99C3CCDC-07C1-4B62-9492-E1250794614B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TcgDex.CSharpSdk.Benchmarks", "TcgDex.CSharpSdk.Benchmarks\TcgDex.CSharpSdk.Benchmarks.csproj", "{4860A7A8-8B16-4287-8D28-82405FDC010B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,18 @@ Global
 		{99C3CCDC-07C1-4B62-9492-E1250794614B}.Release|x64.Build.0 = Release|Any CPU
 		{99C3CCDC-07C1-4B62-9492-E1250794614B}.Release|x86.ActiveCfg = Release|Any CPU
 		{99C3CCDC-07C1-4B62-9492-E1250794614B}.Release|x86.Build.0 = Release|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Debug|x64.Build.0 = Debug|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Debug|x86.Build.0 = Debug|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Release|x64.ActiveCfg = Release|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Release|x64.Build.0 = Release|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Release|x86.ActiveCfg = Release|Any CPU
+		{4860A7A8-8B16-4287-8D28-82405FDC010B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

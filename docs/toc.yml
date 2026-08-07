@@ -30,6 +30,8 @@
   items:
     - name: Test coverage
       href: coverage.md
+    - name: Benchmarks and mutation testing
+      href: measuring.md
     - name: Roadmap
       href: roadmap.md
     - name: Publishing

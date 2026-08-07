@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Turns the SDK's performance claims into numbers. Allocation discipline
+       and "the query builder never calls Expression.Compile()" were design
+       decisions argued from first principles; until something measured them
+       they were reasoning, not evidence.
+
+       Run in Release only — BenchmarkDotNet refuses a Debug build, and rightly:
+       a Debug measurement is noise presented as data. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>TcgDex.Benchmarks</RootNamespace>
+    <IsPackable>false</IsPackable>
+
+    <!-- Benchmark methods are public instance methods by requirement, and the
+         class is instantiated by BenchmarkDotNet rather than by us.
+         CA1822: benchmark methods do not use instance state but cannot be static.
+         CS1591: benchmarks are not public API and carry no XML docs. -->
+    <NoWarn>$(NoWarn);CA1822;CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TcgDex.CSharpSdk\TcgDex.CSharpSdk.csproj" />
+  </ItemGroup>
+
+  <!-- The same recorded responses the unit tests use, so a deserialization
+       measurement reflects real payload shapes rather than a tidy sample. -->
+  <ItemGroup>
+    <None Include="..\TcgDex.CSharpSdk.Tests\Fixtures\**\*.json"
+          Link="Fixtures\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
