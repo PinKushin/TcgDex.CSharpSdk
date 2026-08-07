@@ -114,6 +114,7 @@ namespace TcgDex
         public string Language { get; set; }
         public int MaxDeserializedCacheEntries { get; set; }
         public long MaxResponseBytes { get; set; }
+        public System.TimeSpan Timeout { get; set; }
         public void Validate() { }
     }
 }

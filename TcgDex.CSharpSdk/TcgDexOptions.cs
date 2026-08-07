@@ -55,6 +55,41 @@ public sealed class TcgDexOptions
     public long MaxResponseBytes { get; set; } = 32L * 1024 * 1024;
 
     /// <summary>
+    /// How long one request may take, headers and body together. Defaults to
+    /// 30 seconds. Use <see cref="System.Threading.Timeout.InfiniteTimeSpan"/>
+    /// to remove the limit.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Without this the ceiling is <see cref="HttpClient"/>'s own default of
+    /// <b>100 seconds</b> — a value nobody chose, which leaves a caller blocked
+    /// for over a minute and a half on an endpoint that has stopped answering.
+    /// The live API returns its largest response, the 2.3 MB unpaginated card
+    /// list, in well under a second, so 30 seconds is around forty times the
+    /// observed worst case and still well clear of a slow mobile connection.
+    /// </para>
+    /// <para>
+    /// <b>Applied through a linked
+    /// <see cref="System.Threading.CancellationTokenSource"/> rather than
+    /// <see cref="HttpClient.Timeout"/>.</b> Callers may supply their own
+    /// <see cref="HttpClient"/> and share it with the rest of their
+    /// application, so setting a property on it would reach outside this SDK —
+    /// and <see cref="HttpClient"/> throws if a request has already been sent
+    /// on it. The linked source also spans the body read, which
+    /// <see cref="HttpClient.Timeout"/> would cover but a timeout scoped to
+    /// sending alone would not: the transport reads headers first and streams
+    /// the body afterwards.
+    /// </para>
+    /// <para>
+    /// An expiry becomes <see cref="TcgDexApiException"/>, in keeping with the
+    /// single error contract. Cancellation the *caller* requested stays an
+    /// <see cref="OperationCanceledException"/>, because that is theirs to
+    /// observe rather than a fault to report.
+    /// </para>
+    /// </remarks>
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
     /// Whether <see cref="Models.Card.Pricing"/> is populated. Defaults to
     /// <see langword="true"/>.
     /// </summary>
@@ -152,6 +187,20 @@ public sealed class TcgDexOptions
                 $"MaxResponseBytes cannot be negative, but was {MaxResponseBytes}. " +
                 "Use zero to remove the limit.",
                 nameof(MaxResponseBytes));
+        }
+
+        // InfiniteTimeSpan is -1 milliseconds, so it has to be admitted before
+        // the non-positive check rather than falling foul of it. Matching
+        // HttpClient's own convention rather than inventing a second one, such
+        // as treating zero as "no limit" the way MaxResponseBytes does — zero
+        // there is unambiguous, whereas a zero timeout reads as "give up
+        // immediately" and would silently break every request.
+        if (Timeout != System.Threading.Timeout.InfiniteTimeSpan && Timeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentException(
+                $"Timeout must be positive, but was {Timeout}. Use " +
+                "Timeout.InfiniteTimeSpan to remove the limit.",
+                nameof(Timeout));
         }
 
         if (MaxDeserializedCacheEntries < 0)

@@ -42,6 +42,9 @@ internal sealed class TcgDexTransport
     /// </summary>
     private readonly JsonSerializerOptions _jsonOptions;
 
+    /// <summary>Ceiling on one request. See <see cref="TcgDexOptions.Timeout"/>.</summary>
+    private readonly TimeSpan _timeout;
+
     /// <summary>
     /// Retained parses, or <see langword="null"/> when disabled. See
     /// <see cref="TcgDexOptions.MaxDeserializedCacheEntries"/>.
@@ -65,6 +68,7 @@ internal sealed class TcgDexTransport
         // language segment rather than replace it.
         _languageBase = new Uri(options.BaseAddress, options.Language + "/");
         _maxResponseBytes = options.MaxResponseBytes;
+        _timeout = options.Timeout;
         _jsonOptions = TcgDexJsonContracts.For(options);
 
         _deserialized = options.MaxDeserializedCacheEntries > 0
@@ -115,7 +119,15 @@ internal sealed class TcgDexTransport
         var timestamp = Stopwatch.GetTimestamp();
         _logger.SendingRequest("GET", uri);
 
-        using var response = await SendAsync(uri, activity, cancellationToken).ConfigureAwait(false);
+        // The budget covers the body as well as the headers. Responses are read
+        // with ResponseHeadersRead, so a server that answers and then stops
+        // sending would otherwise sit until HttpClient.Timeout — the 100-second
+        // default this option exists to replace.
+        using var budget = CreateBudget(cancellationToken);
+        var deadline = budget?.Token ?? cancellationToken;
+
+        using var response = await SendAsync(uri, activity, deadline, cancellationToken)
+            .ConfigureAwait(false);
 
         var elapsed = (long)ElapsedSince(timestamp).TotalMilliseconds;
         activity?.AddTag("http.response.status_code", (int)response.StatusCode);
@@ -123,7 +135,7 @@ internal sealed class TcgDexTransport
 
         if (!response.IsSuccessStatusCode)
         {
-            return await HandleFailureAsync<T>(uri, response, activity, cancellationToken).ConfigureAwait(false);
+            return await HandleFailureAsync<T>(uri, response, activity, deadline).ConfigureAwait(false);
         }
 
         // Checked before the body is read, not just before it is parsed: on a
@@ -137,11 +149,32 @@ internal sealed class TcgDexTransport
             return cached;
         }
 
-        var body = await BoundedContent
-            .ReadAsBytesAsync(response.Content, _maxResponseBytes, uri, cancellationToken)
-            .ConfigureAwait(false);
+        // The read is guarded as well as the send. A body that stops arriving
+        // mid-stream expires the same deadline, and without this the
+        // TaskCanceledException escapes raw — breaking the one-error contract at
+        // the exact moment a caller is least able to reason about it. Found by
+        // a test rather than by inspection: the send path had been guarded since
+        // the beginning and the read path never had.
+        byte[] bodyBuffer;
+        int bodyOffset;
+        int bodyCount;
 
-        var value = Deserialize<T>(body, uri);
+        try
+        {
+            var body = await BoundedContent
+                .ReadAsBytesAsync(response.Content, _maxResponseBytes, uri, deadline)
+                .ConfigureAwait(false);
+
+            bodyBuffer = body.Array!;
+            bodyOffset = body.Offset;
+            bodyCount = body.Count;
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw TimedOut(uri, activity, ex);
+        }
+
+        var value = Deserialize<T>(new ArraySegment<byte>(bodyBuffer, bodyOffset, bodyCount), uri);
 
         if (value is not null)
         {
@@ -173,9 +206,72 @@ internal sealed class TcgDexTransport
             "expected always to be available.");
     }
 
+    /// <summary>
+    /// Reports an expiry the SDK imposed, identically wherever it happened.
+    /// </summary>
+    /// <param name="uri">The resource being fetched.</param>
+    /// <param name="activity">The span to record the failure on, if any.</param>
+    /// <param name="ex">The cancellation that ended the request.</param>
+    /// <returns>The exception to throw, so call sites read as <c>throw</c>.</returns>
+    /// <remarks>
+    /// Shared because the send and the body read are two ways to hit the same
+    /// deadline, and a caller reading a log should not be able to tell which one
+    /// it was from the wording. Naming the configured value matters more: it is
+    /// the number they would change.
+    /// </remarks>
+    private TcgDexApiException TimedOut(Uri uri, Activity? activity, Exception ex)
+    {
+        _logger.RequestTimedOut(ex, uri);
+        TcgDexActivity.RecordFailure(activity, ex);
+
+        return new TcgDexApiException(
+            $"The request to '{uri}' timed out after {_timeout}. Raise " +
+            $"{nameof(TcgDexOptions)}.{nameof(TcgDexOptions.Timeout)} if this endpoint " +
+            "is legitimately this slow.",
+            ex);
+    }
+
+    /// <summary>
+    /// A source that expires after <see cref="TcgDexOptions.Timeout"/>, or
+    /// <see langword="null"/> when the limit is infinite.
+    /// </summary>
+    /// <param name="cancellationToken">The caller's token, linked into it.</param>
+    /// <returns>The budget, which the caller disposes.</returns>
+    /// <remarks>
+    /// Returning null rather than an un-cancelled source for the infinite case
+    /// keeps that path free of a timer and an allocation, and makes "no limit"
+    /// visible at the use site rather than hidden inside a sentinel.
+    /// </remarks>
+    private CancellationTokenSource? CreateBudget(CancellationToken cancellationToken)
+    {
+        if (_timeout == System.Threading.Timeout.InfiniteTimeSpan)
+        {
+            return null;
+        }
+
+        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        source.CancelAfter(_timeout);
+
+        return source;
+    }
+
+    /// <param name="uri">The resource being fetched.</param>
+    /// <param name="activity">The span to record a failure on, if any.</param>
+    /// <param name="deadline">
+    /// The effective token: the caller's, plus this SDK's timeout.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// The caller's token alone. Kept separate because it is what distinguishes
+    /// the two ways a request can end early — an expiry this SDK imposed is a
+    /// fault to report, while cancellation the caller asked for is theirs to
+    /// observe. Testing <paramref name="deadline"/> instead would report every
+    /// caller cancellation as a timeout.
+    /// </param>
+    /// <returns>The response, for the caller to dispose.</returns>
     private async Task<HttpResponseMessage> SendAsync(
         Uri uri,
         Activity? activity,
+        CancellationToken deadline,
         CancellationToken cancellationToken)
     {
         try
@@ -183,7 +279,7 @@ internal sealed class TcgDexTransport
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
 
             return await _httpClient
-                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline)
                 .ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
@@ -197,10 +293,7 @@ internal sealed class TcgDexTransport
         {
             // Cancellation requested by the caller is theirs to observe; this
             // branch is specifically a client-side timeout, which is a fault.
-            _logger.RequestTimedOut(ex, uri);
-            TcgDexActivity.RecordFailure(activity, ex);
-
-            throw new TcgDexApiException($"The request to '{uri}' timed out.", ex);
+            throw TimedOut(uri, activity, ex);
         }
     }
 
