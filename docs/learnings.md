@@ -871,6 +871,14 @@ boundary.
   DLL. A test then fails only on whichever target framework rebuilt for some
   other reason, which reads exactly like flakiness. Touch the file after
   restoring.
+- **A failed publish leaves the previous binary in place, and running it looks
+  like success.** Adding a check to the Native AOT smoke test produced a
+  compile error; the command that followed ran the *old* executable, which
+  printed "All checks passed" for the six checks it knew about. The seventh was
+  simply absent, and nothing said so. Same shape as the trap above and worse,
+  because the output is reassuring rather than confusing. **Read the build
+  output, not the program output** — or delete the artefact before rebuilding,
+  which is the version that cannot be forgotten.
 - **`StreamContent` over a `MemoryStream` computes a `Content-Length`**, because
   the stream is seekable. Testing the "unknown length" path needs an
   `HttpContent` whose `TryComputeLength` returns `false` — otherwise the early
