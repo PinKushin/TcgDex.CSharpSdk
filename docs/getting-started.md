@@ -41,6 +41,25 @@ builder.Services
     .AddStandardResilienceHandler();
 ```
 
+## Skipping pricing
+
+Every card carries a `pricing` block, and it is the most expensive part of one
+to deserialize — **3.86 µs and 2.12 KB of a 24.79 µs, 18.38 KB fetch**. If your
+application never reads prices, turn it off:
+
+```csharp
+builder.Services.AddTcgDex(options => options.DeserializePricing = false);
+```
+
+`Card.Pricing` is then `null` for every card. It defaults to **on** for exactly
+that reason: with it off you cannot tell a card the API has no prices for from
+one where the option was set, so this is opt out rather than opt in. Against a
+network round trip of 20–50 ms the saving is around 0.02% of a request — turn it
+off because you do not want the data, not because you want the microseconds.
+
+The API cannot be asked to leave it out; `fields=`, `select=` and friends all
+return the same bytes, so this is saved in the parse rather than on the wire.
+
 ## Without a container
 
 ```csharp

@@ -6,7 +6,7 @@ State at `43ff3be`: the SDK covers the full TCGdex REST surface, builds clean on
 | | |
 |---|---|
 | Tests | **451 unit × 3 frameworks + 149 integration** |
-| Mutation score | **89.21%**, break threshold 85 |
+| Mutation score | **~88%**, break threshold 85 |
 | Line coverage | **99.76%**, gated at 99.5 |
 | Branch coverage | **96.06%**, gated at 95 |
 | Warnings | zero — compiler, analyzers, DocFX, CI annotations |
