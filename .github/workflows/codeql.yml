@@ -40,16 +40,16 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
             8.0.x
             10.0.x
 
       - name: Initialise CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: csharp
           # Query suite and the generated-file exclusion both live in the config
@@ -65,6 +65,6 @@ jobs:
         run: dotnet build TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj -c Release -f net10.0
 
       - name: Analyse
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:csharp"
