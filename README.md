@@ -284,6 +284,13 @@ In this repository:
 - [`docs/learnings.md`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/docs/learnings.md)
   — non-obvious behaviour discovered while building it.
 
+## Security
+
+Found a vulnerability? **Report it privately** through
+[GitHub Security Advisories](https://github.com/PinKushin/TcgDex.CSharpSdk/security/advisories/new)
+rather than opening an issue — see [`SECURITY.md`](SECURITY.md), which also sets
+out what this library actually exposes and what is not in scope.
+
 ## Contributing
 
 ```bash

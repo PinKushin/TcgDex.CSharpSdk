@@ -1,0 +1,82 @@
+version: 2
+
+# NuGetAudit already fails the build on a known-vulnerable package, which is
+# detection. This is maintenance: it moves versions before an advisory exists,
+# and it watches the GitHub Actions that nothing else does.
+#
+# Everything is grouped. Ungrouped, a quiet week is six action bumps and a busy
+# one is a dozen package PRs, and a review queue nobody reads is the same as no
+# review at all.
+updates:
+  # ----- GitHub Actions -----
+  #
+  # The reason this entry matters more than it looks. Actions are pinned by
+  # major tag (`@v7`), so they float silently within a major and then stop
+  # dead when one is retired — the failure arrives on GitHub's schedule rather
+  # than ours. This repository's own policy is that deprecation notices get
+  # fixed when they appear, not when they break, and without Dependabot nothing
+  # surfaces them.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      # Off the hour, matching the CI cron, so this does not join the queue
+      # every scheduled job in the world starts in.
+      time: "06:40"
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+    labels: ["dependencies", "github-actions"]
+
+  # ----- NuGet -----
+  #
+  # Versions live in Directory.Packages.props under central package management,
+  # which Dependabot understands and edits in place.
+  #
+  # Runtime dependencies are pinned per target framework to the *lowest* version
+  # that satisfies each, because a library's floor becomes every consumer's
+  # floor — a net8.0 app should not be forced onto the 10.x Microsoft.Extensions
+  # graph by taking a dependency on this. Dependabot does not know that, so
+  # **a major bump on Microsoft.Extensions.* needs a human decision, not a
+  # merge.** Grouping them separately is what makes that visible.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:40"
+    open-pull-requests-limit: 5
+    groups:
+      # Test and tooling packages: no consumer ever sees these, so they can move
+      # freely and are the safe half of the queue.
+      test-and-tooling:
+        patterns:
+          - "Microsoft.NET.Test.Sdk"
+          - "NUnit*"
+          - "Shouldly"
+          - "coverlet.*"
+          - "PublicApiGenerator"
+          - "BenchmarkDotNet"
+          - "SharpFuzz"
+          - "Newtonsoft.Json"
+          - "TCGdex"
+      # Everything shipped. Separate because these set the floor for consumers
+      # and a major here is a decision rather than an update.
+      runtime:
+        patterns: ["*"]
+        exclude-patterns:
+          - "Microsoft.NET.Test.Sdk"
+          - "NUnit*"
+          - "Shouldly"
+          - "coverlet.*"
+          - "PublicApiGenerator"
+          - "BenchmarkDotNet"
+          - "SharpFuzz"
+          - "Newtonsoft.Json"
+          - "TCGdex"
+    commit-message:
+      prefix: "deps"
+    labels: ["dependencies", "nuget"]
