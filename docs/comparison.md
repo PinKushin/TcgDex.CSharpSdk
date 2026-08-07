@@ -5,8 +5,8 @@ by luizaraujodev ([source](https://github.com/luizaraujodev/tcgdex-csharp-sdk)),
 MIT licensed, published 2026-03-02, targeting `net10.0`.
 
 This page exists because performance claims are cheap and measurements are not.
-**This SDK is slower on every timing measured here, and allocates less on all
-but one.**
+**This SDK is slower at every cold operation measured here, allocates less on all
+but one, and is an order of magnitude faster on a warm cache hit.**
 
 > **This page was wrong until 2026-08-07, in its own disfavour.** It claimed
 > caching was off on both sides. The other SDK caches *by default*, and the
@@ -89,6 +89,19 @@ All four workloads, both SDKs, caching genuinely off. Bold marks the winner.
 | Time | 2,741 ns | **98 ns** |
 | Allocated | 4,664 B | **416 B** |
 
+**A warm cache hit, all the way to a `Card`:**
+
+| | This SDK | `TCGdex` |
+|---|---:|---:|
+| Time | **1.40 µs** | 15.29 µs |
+| Allocated | **2.12 KB** | 12.22 KB |
+
+The one decisive win, and it is architectural rather than incremental. Both SDKs
+cache the response body — theirs a decoded string, ours bytes — so before this
+layer existed both re-parsed on every hit and this row read 25.71 µs against
+15.29 µs. Retaining the deserialized model against its `ETag` makes it **10.9×**
+the other way. See [`caching.md`](caching.md).
+
 **Storing into a response cache, replacing an existing entry:**
 
 | | This SDK | `TCGdex` |
@@ -96,9 +109,11 @@ All four workloads, both SDKs, caching genuinely off. Bold marks the winner.
 | Time | 96.6 ns | **47.4 ns** |
 | Allocated | 48 B | **0 B** |
 
-So: **slower on every timing**, by 1.13–1.34× on a fetch, 1.19× on the list,
+So: **slower on every cold timing**, by 1.13–1.34× on a fetch, 1.19× on the list,
 2× on a cache store and 28× on query building. **Lighter on allocations
-everywhere except query building**, by 27% on a card and 39% on the list.
+everywhere except query building**, by 27% on a card and 39% on the list. And
+**10.9× faster on a warm cache hit**, which is the shape most applications
+actually run in.
 
 The allocation reversal is the part that changed. This page previously reported
 0.66× — this SDK allocating half again as much as theirs — and that was their
@@ -325,7 +340,8 @@ logging, the activity and the URI construction together account for about
   to lose because there is nothing to compare against.
 
 Being slower at deserialization is still a fair criticism of this SDK, and it is
-the one to make: every timing row above is a loss. What is no longer fair is the
-allocation claim, which this page had backwards, and the suggestion that the
-SDK is careless with memory — it allocates 27% less on a card and 39% less on
-the list.
+the one to make: every *cold* timing row above is a loss. What is no longer fair
+is the allocation claim, which this page had backwards, nor the suggestion that
+the SDK is careless with memory — it allocates 27% less on a card and 39% less
+on the list. And on the path a long-running application spends most of its time
+in, a warm cache hit, it is 10.9× faster.
