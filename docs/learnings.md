@@ -632,6 +632,11 @@ Same stub transport, same recorded payload, caching off on both. The result:
 | Fetch + deserialize a card | 29.1 µs / 43.3 KB | 16.8 µs / 12.2 KB | **0.58× / 0.28×** |
 | Build a filtered query | 3,100 ns / 4,744 B | 135 ns / 416 B | **0.04× / 0.09×** |
 
+*(Those are the numbers as first measured. Both rows moved later — the fetch row
+twice, once from fixing this SDK and once from fixing the harness. Current
+figures are in [`comparison.md`](comparison.md); the history is kept here
+because the corrections are the point of the section.)*
+
 **A first attempt at explaining it away was wrong, and is worth recording as
 such.** The claim was that their `CardModel` exposes 37 properties against this
 SDK's 22, so they must deserialize more. Both numbers were miscounted — their
@@ -663,8 +668,32 @@ deserializing — at least two full copies before parsing started. A safety
 feature paid for in allocations, which nobody noticed until something measured
 it.
 
-That was fixed, and the row now reads **25.3 µs / 18.6 KB against 15.3 µs /
-12.2 KB** — 0.60× time and 0.66× allocations. Still a loss, and a smaller one.
+That was fixed, and the row read **25.3 µs / 18.6 KB against 15.3 µs / 12.2 KB**
+— a smaller loss on both axes.
+
+**Then the harness turned out to be lying, in this SDK's disfavour.** Its stated
+rule was "caching off on both". The other SDK caches *by default* — a fresh
+client already carries a `MemoryTCGDexCache` and `CacheTTL = 3600` — and the
+benchmark asked for the same card id every iteration, so from the second call
+onward it answered from memory while this SDK ran its whole transport. Counting
+requests at the handler settled it in one run: **three calls, one request.**
+
+With `CacheTTL = 0` actually set, the row is **24.79 µs / 18.38 KB against
+18.57 µs / 25.12 KB**. Time is still a loss. **The allocation column reverses**:
+this SDK allocates 27% less, where the page had been reporting 50% more.
+
+Three lessons, and the third is the one worth keeping:
+
+- **A stated fairness rule that nobody executed is worth less than no rule**,
+  because it reads to a reader as evidence that a check happened.
+- **Check the other library's defaults, not its API surface.** Nothing in the
+  constructor signature suggests a cache; it is assigned in the field
+  initialiser.
+- **A benchmark can be wrong in your favour, and that is harder to catch.**
+  Every other correction in this document was found because a number looked too
+  good. This one sat unexamined for weeks because the result was unflattering,
+  and an unflattering number feels like proof of honesty rather than something
+  to verify. It is not.
 
 **A second correction belongs here, because it was published before it was
 checked.** The paragraph above originally described this as "43 KB to
@@ -698,10 +727,16 @@ files it reached **90.03%**, and *line coverage did not move at all*. Every one
 of the newly-killed mutants was in code the suite already executed. Coverage
 said the lines ran; mutation testing said whether running them proved anything.
 
-It is **89.21%** now, and the drop is the more useful half of the story: that is
-the first full run since a round of performance work, which changed code without
-changing its tests. A mutation score is not a certificate earned once — it
-decays exactly when code moves and tests do not.
+It is around **88%** now, and the drop is the more useful half of the story:
+that is the first full run since a round of performance work, which changed code
+without changing its tests. A mutation score is not a certificate earned once —
+it decays exactly when code moves and tests do not.
+
+Two decimal places would be false precision, and finding that out was worth more
+than the number. Two consecutive runs on identical code returned 89.21% and
+88.05%: a **timeout counts as killed**, and six mutants flipped between
+`Timeout` and `Survived` depending on machine load. A busier machine scores
+higher.
 
 The distribution was more useful than the total. Models and the query builder
 scored 93–95%; the transport, the GraphQL filter and the caching handler — the

@@ -177,11 +177,26 @@ Full run, ~10 minutes:
 
 | Outcome | Baseline | After the sweep | Now |
 |---|---:|---:|---:|
-| Killed + timeout | 508 | 587 | **612** |
-| **Survived** | **140** | **63** | **72** |
+| Killed + timeout | 508 | 587 | **604** |
+| **Survived** | **140** | **63** | **80** |
 | No coverage | 4 | 0 | 2 |
 | Total mutants | 652 | 650 | 686 |
-| **Mutation score** | **77.91%** | **90.03%** | **89.21%** |
+| **Mutation score** | **77.91%** | **90.03%** | **~88%** |
+
+### The score is not deterministic, so do not quote decimals
+
+Two consecutive full runs on identical code and identical tests returned
+**89.21%** and **88.05%**. Nothing changed between them.
+
+The cause is that **a timeout counts as killed**. Six mutants — the ones that
+make `BoundedContent` size a buffer absurdly, plus a removed guard — flipped
+between `Timeout` and `Survived` depending on how loaded the machine was. A
+*busier* machine therefore scores *higher*, which is the opposite of any useful
+signal.
+
+So the honest figure is "around 88%", the gate is set well below at 85, and the
+90.03% high-water mark recorded earlier was partly this same flattery. Quoting
+this metric to two decimal places, as the rows above did, was false precision.
 
 Line coverage did not move across any of that work — 99.77% before and after.
 Every one of those newly-killed mutants was in code the suite already executed.

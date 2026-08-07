@@ -55,6 +55,37 @@ public sealed class TcgDexOptions
     public long MaxResponseBytes { get; set; } = 32L * 1024 * 1024;
 
     /// <summary>
+    /// Whether <see cref="Models.Card.Pricing"/> is populated. Defaults to
+    /// <see langword="true"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The <c>pricing</c> block is the most expensive part of a card to
+    /// deserialize — measured at <b>4.7 µs and 2.2 KB of a 23 µs card</b>,
+    /// roughly a fifth of both — and it is paid whether or not anything reads
+    /// it. The API has no way to ask for a card without it: every field-
+    /// selection form tried against the live service returned the identical
+    /// 2,940 bytes, so this cannot be saved on the wire, only in the parse.
+    /// </para>
+    /// <para>
+    /// Set to <see langword="false"/> in an application that never reads
+    /// prices. The property is dropped from the deserialization contract, so
+    /// System.Text.Json skips the block as an unknown field rather than building
+    /// it and discarding it.
+    /// </para>
+    /// <para>
+    /// <b>It defaults to on, and the reason is not performance.</b> With it off,
+    /// <c>card.Pricing</c> is <see langword="null"/> for every card — which is
+    /// indistinguishable from a card the API genuinely has no prices for. That
+    /// turns a configuration choice into a silently wrong answer, so it is opt
+    /// out rather than opt in. Against a network round trip of 20–50 ms the
+    /// 4.7 µs is around 0.02% of a request; turn it off because the data is
+    /// unwanted, not because it is slow.
+    /// </para>
+    /// </remarks>
+    public bool DeserializePricing { get; set; } = true;
+
+    /// <summary>
     /// Throws when the options cannot produce valid requests.
     /// </summary>
     /// <exception cref="ArgumentException">
