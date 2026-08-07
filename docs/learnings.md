@@ -505,9 +505,19 @@ Same stub transport, same recorded payload, caching off on both. The result:
 | Fetch + deserialize a card | 29.1 µs / 43.3 KB | 16.8 µs / 12.2 KB | **0.58× / 0.28×** |
 | Build a filtered query | 3,100 ns / 4,744 B | 135 ns / 416 B | **0.04× / 0.09×** |
 
-**The obvious excuse does not apply.** A leaner model on their side would
-explain the fetch result; their `CardModel` exposes 37 properties against this
-SDK's 22, so if anything they deserialize more.
+**A first attempt at explaining it away was wrong, and is worth recording as
+such.** The claim was that their `CardModel` exposes 37 properties against this
+SDK's 22, so they must deserialize more. Both numbers were miscounted — their
+file declares five classes and the 37 summed all of them, while the 22 missed
+eight backing-field properties spanning two lines. Counted properly it is about
+30 each. **Reaching for the flattering explanation first, and getting it wrong,
+is exactly the failure mode a published benchmark is supposed to prevent.**
+
+The real difference is a design choice: their model stores the polymorphic
+`damage` and `level` fields as raw `JsonElement`, while this SDK converts them
+to usable types. That work has not been avoided on their side, only moved into
+every consumer — which is a fair thing to say, and still does not account for
+the whole gap.
 
 Two different lessons in those two rows.
 

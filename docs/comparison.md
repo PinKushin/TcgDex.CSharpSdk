@@ -80,16 +80,77 @@ Two things worth keeping from that:
   is a reminder that the intuitive optimisation and the effective one are often
   different, and only measurement tells them apart.
 
-### The obvious excuse does not apply
+### Correction: the models are the same size
 
-A leaner model would explain the fetch result — less to populate, less to
-allocate. It is not the explanation: their `CardModel` exposes **37** properties
-to this SDK's **22**. If anything they deserialize more.
+An earlier version of this page said their `CardModel` exposes 37 properties to
+this SDK's 22, and concluded they deserialize more. **Both numbers were wrong.**
+Their file declares five classes, so the 37 summed `CardModel` with four nested
+model types; the 22 missed eight properties on this side that use a
+backing-field pattern and span two lines.
 
-Nor is it AOT. Their `ModelBase.Fill` resolves each property with
-`GetType().GetProperty(...)` — reflection, per property, per object, which is not
-trim- or AOT-safe and is normally *slower* than source generation. They are ahead
-despite that, not because of it.
+Counted properly it is **about 30 each**. Model size explains nothing, in either
+direction.
+
+### Not AOT either
+
+Their `ModelBase.Fill` resolves each property with
+`GetType().GetProperty(ToPascalCase(name))` — reflection, per property, per
+object. That is not trim- or AOT-safe, and per-property reflection is normally
+*slower* than source generation. They are ahead despite that technique, not
+because of it.
+
+### Where the difference actually is
+
+Two fields, and it is a design choice rather than an optimisation:
+
+```csharp
+// Theirs
+public JsonElement? DamageJson { get; set; }
+public JsonElement? LevelJson { get; set; }
+```
+
+Those are the polymorphic fields, stored raw. `attacks[].damage` really is
+polymorphic in the live API — `xy1-1` returns the number `60`, `swsh1-1` returns
+the string `"50+"` because printed damage can carry a modifier — and `level`
+behaves the same way. Their model keeps the `JsonElement` and hands the problem
+to the caller.
+
+This SDK converts instead. `FlexibleStringConverter` normalises both shapes to
+`string?` so `attack.Damage` is always usable, and `Attack.BaseDamage` parses the
+leading digits to `int?` for numeric comparison.
+`TcgPlayerPricingConverter` does the equivalent for pricing, whose printing keys
+vary by card — `normal` and `reverse-holofoil` on `swsh3-136`, `holofoil` on
+`base1-4` — collecting unrecognised keys into a dictionary so an unanticipated
+printing is not silently dropped.
+
+**So part of the measured gap is work that has not been avoided, only moved.**
+To get from their `DamageJson` to a number a consumer writes roughly what the
+converter does:
+
+```csharp
+int? baseDamage = card.Attacks?[0].DamageJson switch
+{
+    { ValueKind: JsonValueKind.Number } e => e.GetInt32(),
+    { ValueKind: JsonValueKind.String } e => ParseLeadingDigits(e.GetString()),
+    _ => null,
+};
+```
+
+— per call site, per field, in every application, untested. The same applies to
+pricing, where the caller has to enumerate properties and skip the two metadata
+keys themselves.
+
+**This is an explanation, not a defence.** Two things follow from it and only one
+is comfortable:
+
+- The comparison is not measuring identical work, and this page should say so
+  rather than presenting the ratio bare. Work done once in a library beats the
+  same work repeated in every consumer, and it does not show up on their side of
+  the table at all.
+- It still does not account for the whole gap. Two converters on a card with a
+  handful of attacks is not 10 µs of work. Source generation measuring slower
+  than reflection for these models covers more of it, and some remains
+  unexplained. Being slower is not excused by being more convenient.
 ## Reading the query result
 
 Deliberately not equivalent work. This SDK translates a **LINQ expression tree**,
