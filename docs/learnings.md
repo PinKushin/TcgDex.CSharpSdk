@@ -618,6 +618,58 @@ evict the entry just written. A clear-then-store sequence — the obvious thing 
 consumer does — would silently lose data.
 
 ---
+## A multiplexed fuzz harness needs a seed per mode, and your natural seeds won't give you one
+
+The fuzz target selects between seven modes on the first byte of the input —
+card, card list, set, enumeration, problem details, GraphQL, query building. The
+corpus was seeded with the recorded API responses, which is the right instinct:
+a fuzzer given random bytes spends its whole budget rediscovering that JSON
+starts with a brace.
+
+Except **every recorded response starts with `{` or `[`**. `0x7B` is 123 and
+`0x5B` is 91, so `123 % 7 = 4` and `91 % 7 = 0` — the seeds only ever reached
+two of the seven modes, and the fuzzer had to find the other five by mutating
+the selector byte itself. It managed, slowly, which is why nothing looked
+broken.
+
+Writing one seed per fixture *per mode* starts the run above where the
+mis-seeded one finished:
+
+| Harness | Features at init | at end |
+|---|---:|---:|
+| One mode | 641 | 1,757 |
+| Seven modes, raw seeds | 1,196 | 2,705 |
+| **Seven modes, seeded per mode** | **3,085** | **3,990** |
+
+The generalisation: **whenever a harness dispatches on part of its input, check
+what your seeds actually dispatch to.** Real-world seed data is not uniformly
+distributed — that is exactly why it makes good seed data — so it will cluster
+on one branch, and the clustering is invisible unless you compute it.
+
+This was found by running the fuzzer locally, not by reading the harness. The
+modulo arithmetic is right there in the source and means nothing until you know
+what byte the fixtures start with.
+
+---
+## Guessing at a performance explanation, again
+
+The local fuzzer ran at roughly half CI's throughput, and the explanation
+offered was that the repository lives on `/mnt/c`, where WSL's filesystem bridge
+is slow — so moving it into the WSL filesystem would roughly double it.
+
+Measured, that is wrong in both parts. The fuzz loop never touches `/mnt/c`: the
+instrumented assembly and the corpus were already under `/tmp`, and only the
+build reads the source tree. And running the whole thing from `~` changes
+nothing — 7,321 exec/s from `/tmp` against 7,751 and 7,254 from `~`.
+
+The real cause is still unknown, and saying so is the correct end state. What is
+not acceptable is what happened first: **substituting a plausible mechanism for
+a measurement, in a document whose entire value is that its numbers were
+measured.** This is the same failure as the model-property miscount and the
+"~10 KB payload" earlier in this file. Three times now, always in the same
+shape — an explanation that sounded right, offered before it was checked.
+
+---
 ## A wall clock is the wrong ordering for an LRU
 
 Recency was stamped with `TimeProvider.GetUtcNow()`, which reads as the obvious

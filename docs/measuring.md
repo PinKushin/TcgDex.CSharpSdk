@@ -461,27 +461,44 @@ the run *above where the mis-seeded one finished*.
 
 No crashes in any run.
 
+The most recent CI run, over 180 seconds, and the first to restore a cached
+corpus rather than start from seeds alone:
+
+| | |
+|---|---|
+| Corpus restored | **397** from cache, seeded up to 516 |
+| Executions | 1,819,735 at ~10,050/s |
+| Features | 3,111 → **4,162** |
+| Minimised to | **396** inputs, no coverage lost |
+| Crashes | **none** |
+
 **Read `cov: 8` in the libFuzzer output as normal, not broken.** That counts
 edges in the tiny native `libfuzzer-dotnet` shim. The .NET signal arrives as
 `ft:` — features from the shared-memory bitmap SharpFuzz fills — and the proof
-the instrumentation is live is that the corpus grew 55×. Without coverage
-feedback a corpus does not grow at all.
+the instrumentation is live is that **`ft:` climbs and the corpus grows**.
+Without coverage feedback neither moves.
 
 A crash is written to `findings/` as the exact bytes that caused it, which makes
 it a regression fixture rather than a bug report.
 
 ### Running it locally
 
-The toolchain is Linux-first, so on Windows this needs WSL. Two things bite,
-both verified on Ubuntu 26.04:
+The toolchain is Linux-first, so on Windows this needs WSL. **Everything below
+has been run end to end on Ubuntu 26.04 under WSL2** — around 8,800 executions
+per second against CI's 10,000, close enough that a local run is a real check
+rather than a smoke test.
+
+Setup, once:
 
 ```bash
-# 1. clang is the only step needing root. Everything else is per-user.
-sudo apt-get install --yes clang
+# clang is the only step needing root. Run apt-get update first: a stale index
+# reports a candidate version that cannot then be fetched, which reads as a
+# broken mirror and is not one.
+sudo apt-get update && sudo apt-get install --yes clang
 
-# 2. If .NET came from dotnet-install.sh rather than a package, DOTNET_ROOT
-#    must be exported or `sharpfuzz` fails with "Download the .NET runtime" —
-#    its apphost looks for a system install and does not find ~/.dotnet.
+# Export DOTNET_ROOT when .NET came from dotnet-install.sh rather than a
+# package, or `sharpfuzz` fails with "Download the .NET runtime" — its apphost
+# looks for a system install and does not find ~/.dotnet.
 export DOTNET_ROOT="$HOME/.dotnet"
 export PATH="$DOTNET_ROOT:$DOTNET_ROOT/tools:$PATH"
 
@@ -490,16 +507,42 @@ curl -sSL -o libfuzzer-dotnet.cc \
 clang -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet
 
 dotnet tool install --global SharpFuzz.CommandLine
-dotnet publish TcgDex.CSharpSdk.Fuzz -c Release -o fuzz-out
-sharpfuzz fuzz-out/TcgDex.CSharpSdk.dll
-./libfuzzer-dotnet --target_path=fuzz-out/TcgDex.CSharpSdk.Fuzz \
-  -max_total_time=300 -artifact_prefix=findings/ corpus
 ```
 
-`sharpfuzz` rewrites the assembly in place, so a successful instrumentation is
-visible as size growth — **377,856 to 582,144 bytes** here. If the file does not
-grow, the fuzzer will still run and will find nothing, because it is exploring
-blind.
+Then per run:
+
+```bash
+dotnet publish TcgDex.CSharpSdk.Fuzz -c Release -o ~/fz/out
+sharpfuzz ~/fz/out/TcgDex.CSharpSdk.dll
+
+# One seed per fixture per mode, for the reason above. Without this most of the
+# harness goes unreached.
+mkdir -p ~/fz/corpus ~/fz/findings
+for fixture in ~/fz/out/corpus/*.json; do
+  name=$(basename "$fixture" .json)
+  for mode in 0 1 2 3 4 5 6; do
+    printf "$(printf '\\%03o' "$mode")" | cat - "$fixture" > ~/fz/corpus/"$name-m$mode.bin"
+  done
+done
+
+cd ~/fz && ~/libfuzzer-dotnet --target_path=$HOME/fz/out/TcgDex.CSharpSdk.Fuzz \
+  -max_total_time=300 -artifact_prefix=findings/ -print_final_stats=1 corpus
+```
+
+Three things that cost time here:
+
+- **`sharpfuzz` rewrites the assembly in place**, so successful instrumentation
+  is visible as size growth — **377,856 to 582,144 bytes**. It is also *per
+  build*: a fresh `dotnet publish` silently un-instruments the assembly, and the
+  fuzzer will then run at full speed and find nothing. Re-run `sharpfuzz` after
+  every publish.
+- **Working directory does not matter.** An earlier version of this page claimed
+  running from the WSL filesystem rather than `/mnt/c` would roughly double
+  throughput. Measured, it does nothing: 7,321 exec/s from `/tmp` against 7,751
+  and 7,254 from `~`. The fuzz loop never touches `/mnt/c` — only the build
+  does. The remaining gap to CI is not filesystem, and has not been diagnosed.
+- **`/tmp` does not survive.** WSL shuts down when idle and clears it, so a
+  setup left there will be gone by the next session. Use `~`.
 
 `libfuzzer-dotnet` is built from source rather than downloaded prebuilt, which
 is the same supply-chain position this repository takes for its dependencies.
