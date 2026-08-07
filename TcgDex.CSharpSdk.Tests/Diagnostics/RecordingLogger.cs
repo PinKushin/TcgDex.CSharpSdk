@@ -18,6 +18,12 @@ internal sealed class RecordingLogger(LogLevel minimum) : ILogger, ILoggerProvid
 {
     internal List<LogEntry> Entries { get; } = [];
 
+    /// <summary>
+    /// Category names the SDK asked for. Consumers filter on this, so it is
+    /// part of the observable surface rather than an implementation detail.
+    /// </summary>
+    internal List<string> Categories { get; } = [];
+
     /// <summary>How many times a message was materialised into a string.</summary>
     internal int FormatterInvocations { get; private set; }
 
@@ -56,7 +62,11 @@ internal sealed class RecordingLogger(LogLevel minimum) : ILogger, ILoggerProvid
             // Single fixed provider by design.
         }
 
-        public ILogger CreateLogger(string categoryName) => logger;
+        public ILogger CreateLogger(string categoryName)
+        {
+            logger.Categories.Add(categoryName);
+            return logger;
+        }
 
         public void Dispose()
         {
