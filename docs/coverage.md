@@ -2,15 +2,15 @@
 
 **Goal: reach and hold ~100% line coverage of hand-written SDK code.**
 
-**Current: 99.77% line (873/875) and 96.35% branch (449/466).** Both are gated in
+**Current: 99.77% line (882/884) and 96.60% branch (455/471).** Both are gated in
 CI. The 2 uncovered lines are provably unreachable — see [Why not 100%](#why-not-100) below.
 
 | | Line | Branch | Unit tests | Integration tests |
 |---|---|---|---|---|
 | Baseline (`f45e496`) | 83.2% | — | 113 | 22 |
-| Now | **99.77%** | **96.35%** | **359** | **149** |
+| Now | **99.77%** | **96.60%** | **422** | **149** |
 
-The unit tests run on `net472`, `net8.0` and `net10.0` — 1077 executions of 359
+The unit tests run on `net472`, `net8.0` and `net10.0` — 1266 executions of 422
 tests. Coverage is collected from the `net8.0` and `net10.0` runs only: coverlet
 does not instrument the .NET Framework run, so **code compiled solely for
 `netstandard2.0` is invisible to the gate**. That is why such code is kept to a

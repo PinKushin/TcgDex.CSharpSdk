@@ -7,9 +7,9 @@
     "target-framework": "net10.0",
     "reporters": ["html", "progress", "cleartext"],
     "thresholds": {
-      "high": 85,
-      "low": 70,
-      "break": 60
+      "high": 90,
+      "low": 85,
+      "break": 80
     },
     "mutate": [
       "**/*.cs",
