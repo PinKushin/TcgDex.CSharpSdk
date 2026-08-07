@@ -46,6 +46,10 @@
        graph. MIT licensed. -->
   <ItemGroup>
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+    <!-- The other public C# TCGdex SDK, referenced only by the benchmark
+         project so the comparison runs both through the same stub transport.
+         MIT licensed. Never referenced by the SDK itself. -->
+    <PackageVersion Include="TCGdex" Version="0.1.0" />
   </ItemGroup>
 
   <!-- Test-only dependencies. -->
