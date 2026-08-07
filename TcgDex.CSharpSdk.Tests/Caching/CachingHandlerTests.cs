@@ -308,6 +308,124 @@ public sealed class CachingHandlerTests
         task.Status.ShouldBe(TaskStatus.RanToCompletion);
     }
 
+    // ----- responses the handler consumes are disposed -----
+
+    [Test]
+    public async Task ARevalidated304_IsDisposedRatherThanLeaked()
+    {
+        // The 304 exists only to say "your copy is still good". Its body is
+        // empty and nothing reads it, so failing to dispose leaks the
+        // connection back to the pool late — invisible to every assertion about
+        // status codes and bodies, which is why this call went unprotected.
+        var time = new FakeTimeProvider();
+        var (_, client, inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"swsh3-136"}""", Etag);
+
+        var tracked = new TrackedResponse(HttpStatusCode.NotModified);
+        inner.RespondTracked(tracked, string.Empty, Etag);
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+        await GetAsync(client);
+
+        tracked.WasDisposed.ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task ACachedResponse_IsDisposedOnceItsBodyHasBeenCopied()
+    {
+        // The body is copied into the cache and a fresh response is built for
+        // the caller, so the original is the handler's to dispose. Same leak,
+        // different path — and the more common one, since it runs on every
+        // cache miss.
+        var (_, client, inner) = Build();
+
+        var tracked = new TrackedResponse(HttpStatusCode.OK);
+        inner.RespondTracked(tracked, "{\"id\":\"a\"}", Etag);
+
+        await GetAsync(client);
+
+        tracked.WasDisposed.ShouldBeTrue();
+    }
+
+    // ----- what waiters see when the leader does not produce a cache entry ---
+
+    [Test]
+    public void WhenTheLeaderFails_EveryWaiterSeesTheFailure()
+    {
+        // Coalescing means one request fetches and the rest wait on its result.
+        // If the leader throws and the shared task is never faulted, the
+        // waiters hang forever on a task nobody completes — a deadlock, not an
+        // error. Asserting each one throws is what distinguishes those.
+        var (_, client, inner) = Build();
+
+        inner.Throw(new HttpRequestException("network down"), repeat: 8);
+
+        var attempts = Enumerable.Range(0, 8)
+            .Select(_ => Should.ThrowAsync<HttpRequestException>(() => GetAsync(client)))
+            .ToArray();
+
+        var all = Task.WhenAll(attempts);
+
+        Should.NotThrow(() => all.Wait(TimeSpan.FromSeconds(10)));
+        all.Status.ShouldBe(TaskStatus.RanToCompletion);
+    }
+
+    [Test]
+    public async Task WhenTheLeaderGetsAnError_WaitersAreNotServedACachedBody()
+    {
+        // The leader receives a 500, which is never cached, so the shared
+        // result is "no cache entry" rather than a body. A mutant that treated
+        // that as a cache hit would hand every waiter a response built from
+        // null.
+        var (_, client, inner) = Build();
+
+        inner.Respond(HttpStatusCode.InternalServerError, "boom", null);
+        inner.Respond(HttpStatusCode.InternalServerError, "boom", null);
+
+        using var first = await client.GetAsync(CardUrl, CancellationToken.None);
+        using var second = await client.GetAsync(CardUrl, CancellationToken.None);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
+        second.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
+
+        // Both reached the network: an error is not cached, so the second call
+        // must not be served from a stored entry.
+        inner.Requests.Count.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task AnErrorResponse_EvictsTheEntryFromTheCache()
+    {
+        // Asserted against the cache rather than through the client, and the
+        // first version of this test is the reason. Going through the client
+        // proves nothing: the entry being evicted is already stale, so the next
+        // request revalidates whether or not it was removed. That test passed
+        // with the eviction deleted — it could not fail.
+        //
+        // The eviction still matters. ITcgDexResponseCache is a public
+        // extension point, and an implementation backed by Redis or disk is
+        // entitled to be told an entry is gone rather than holding it forever.
+        var time = new FakeTimeProvider();
+        var cache = new RecordingCache(new MemoryTcgDexResponseCache(timeProvider: time));
+
+        var inner = new CountingHandler();
+        var handler = new TcgDexCachingHandler(cache, new TcgDexCacheOptions(), time)
+        {
+            InnerHandler = inner,
+        };
+
+        using var client = new HttpClient(handler);
+
+        inner.Respond(HttpStatusCode.InternalServerError, "boom", null);
+
+        using var response = await client.GetAsync(CardUrl, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
+        cache.Removed.ShouldContain(CardUrl);
+    }
+
     // ----- policy -----
 
     [Test]
