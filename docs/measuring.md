@@ -446,13 +446,23 @@ it a regression fixture rather than a bug report.
 
 ### Running it locally
 
-The toolchain is Linux-first, so on Windows this needs WSL:
+The toolchain is Linux-first, so on Windows this needs WSL. Two things bite,
+both verified on Ubuntu 26.04:
 
 ```bash
+# 1. clang is the only step needing root. Everything else is per-user.
 sudo apt-get install --yes clang
+
+# 2. If .NET came from dotnet-install.sh rather than a package, DOTNET_ROOT
+#    must be exported or `sharpfuzz` fails with "Download the .NET runtime" —
+#    its apphost looks for a system install and does not find ~/.dotnet.
+export DOTNET_ROOT="$HOME/.dotnet"
+export PATH="$DOTNET_ROOT:$DOTNET_ROOT/tools:$PATH"
+
 curl -sSL -o libfuzzer-dotnet.cc \
   https://raw.githubusercontent.com/Metalnem/libfuzzer-dotnet/master/libfuzzer-dotnet.cc
 clang -fsanitize=fuzzer libfuzzer-dotnet.cc -o libfuzzer-dotnet
+
 dotnet tool install --global SharpFuzz.CommandLine
 dotnet publish TcgDex.CSharpSdk.Fuzz -c Release -o fuzz-out
 sharpfuzz fuzz-out/TcgDex.CSharpSdk.dll
@@ -460,5 +470,24 @@ sharpfuzz fuzz-out/TcgDex.CSharpSdk.dll
   -max_total_time=300 -artifact_prefix=findings/ corpus
 ```
 
+`sharpfuzz` rewrites the assembly in place, so a successful instrumentation is
+visible as size growth — **377,856 to 582,144 bytes** here. If the file does not
+grow, the fuzzer will still run and will find nothing, because it is exploring
+blind.
+
 `libfuzzer-dotnet` is built from source rather than downloaded prebuilt, which
 is the same supply-chain position this repository takes for its dependencies.
+
+### The corpus is cached, not committed
+
+The corpus is the fuzzer's memory: an input is kept only because it reached code
+no earlier input reached. Restarting from the 17 recorded responses every week
+would mean spending most of each budget rediscovering what the last run already
+found — the first run climbed 641 features to 1,757 and grew 17 inputs to 496.
+
+So the workflow restores it from `actions/cache` and saves it again, and runs
+`-merge=1` afterwards to keep the smallest set that preserves the same coverage.
+Committing it instead would put 1.3 MB in the repository that grows every week,
+for a file nobody reads. Minimisation is skipped when the fuzz step failed: a
+crash means there is evidence to collect, and rewriting the corpus first would
+be tidying it away.

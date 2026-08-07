@@ -14,7 +14,7 @@ using TcgDex.Models;
 /// printing not anticipated here, so every unrecognised property is collected
 /// into <see cref="TcgPlayerPricing.Printings"/> instead.
 /// </remarks>
-public sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing>
+internal sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing>
 {
     private const string UnitProperty = "unit";
     private const string UpdatedProperty = "updated";

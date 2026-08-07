@@ -65,14 +65,38 @@ jobs:
       - name: Instrument the SDK
         run: sharpfuzz fuzz-out/TcgDex.CSharpSdk.dll
 
-      # The recorded API responses are the seed corpus. Copied out of the
-      # publish output so the fuzzer can write new inputs beside them without
-      # touching the repository.
-      - name: Prepare the corpus
+      # The corpus is the fuzzer's memory, not test data: an input is kept only
+      # because it reached code no earlier input reached. Starting from the 17
+      # recorded responses every week means spending most of each budget
+      # rediscovering paths the last run already found — the first run climbed
+      # from 641 features to 1,757 and grew the corpus 17 to 496, and almost all
+      # of that would be repeated.
+      #
+      # Cached rather than committed. Committing it would add 1.3 MB to the
+      # repository that grows every single week, for a file nobody reads.
+      #
+      # The key changes every run so each one saves a new entry, and
+      # restore-keys falls back to the most recent previous corpus. A cache miss
+      # is not a failure: the seeds below still make the run useful, it just
+      # starts further back.
+      - name: Restore the corpus
+        uses: actions/cache@v4
+        with:
+          path: corpus
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-
+
+      # The recorded API responses seed it. Copied every run rather than only on
+      # a cache miss, so a corpus minimised by libFuzzer cannot lose the known
+      # good inputs — cp will not overwrite what is already there with identical
+      # content, and adding a seed twice costs nothing.
+      - name: Seed the corpus
         run: |
           mkdir -p corpus findings
-          cp fuzz-out/corpus/*.json corpus/
-          echo "seeded with $(ls corpus | wc -l) recorded responses"
+          restored=$(ls corpus | wc -l)
+          cp -n fuzz-out/corpus/*.json corpus/ 2>/dev/null || true
+          echo "restored $restored from cache, now $(ls corpus | wc -l) inputs"
 
       - name: Fuzz
         env:
@@ -84,6 +108,25 @@ jobs:
             -artifact_prefix=findings/ \
             -print_final_stats=1 \
             corpus
+
+      # Without this the cached corpus grows every week and each run spends more
+      # of its budget loading inputs than mutating them. -merge=1 keeps the
+      # smallest set that preserves the coverage the whole corpus reaches, so
+      # what carries forward is the knowledge rather than the volume.
+      #
+      # Skipped when the fuzz step failed: a crash means there is a finding to
+      # collect, and rewriting the corpus first would be tidying up the evidence.
+      - name: Minimise the corpus
+        if: success()
+        run: |
+          before=$(ls corpus | wc -l)
+          mkdir -p corpus-min
+          ./libfuzzer-dotnet \
+            --target_path=fuzz-out/TcgDex.CSharpSdk.Fuzz \
+            -merge=1 corpus-min corpus 2>&1 | tail -3
+          rm -rf corpus
+          mv corpus-min corpus
+          echo "minimised $before inputs to $(ls corpus | wc -l)"
 
       # A crash is written as the exact bytes that caused it, which is a
       # regression fixture rather than a bug report. Uploaded on failure as
