@@ -141,21 +141,143 @@ public sealed class MemoryCacheTests
         Should.Throw<ArgumentOutOfRangeException>(() => new MemoryTcgDexResponseCache(-1));
     }
 
-    [TestCase("")]
-    [TestCase("   ")]
-    public void ABlankKey_IsRejected(string key)
+    [Test]
+    public async Task WhenFull_OneOverflowEvictsAWholeBatch()
     {
-        var cache = new MemoryTcgDexResponseCache();
+        // Eviction scans every entry to find the oldest, so doing it once per
+        // store makes every write O(MaxEntries) — measured at 14 µs on the
+        // default bound of 512 and 49 µs at 4096. Evicting a batch amortises
+        // that scan over many stores, at the cost of the cache settling just
+        // below its bound rather than exactly at it.
+        var time = new FakeTimeProvider();
+        var cache = new MemoryTcgDexResponseCache(maxEntries: 16, timeProvider: time);
 
-        Should.ThrowAsync<ArgumentException>(async () => await cache.GetAsync(key));
-        Should.ThrowAsync<ArgumentException>(async () => await cache.RemoveAsync(key));
-        Should.ThrowAsync<ArgumentException>(async () => await cache.SetAsync(key, Response(), TimeSpan.FromMinutes(1)));
+        for (var i = 0; i < 16; i++)
+        {
+            await cache.SetAsync($"key-{i}", Response(), TimeSpan.FromHours(1));
+            time.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        await cache.SetAsync("overflow", Response(), TimeSpan.FromHours(1));
+
+        // 16 / 8 = 2 evicted from 17, so 15 remain.
+        cache.Count.ShouldBe(15);
+        (await cache.GetAsync("key-0")).ShouldBeNull("oldest, so first out");
+        (await cache.GetAsync("key-1")).ShouldBeNull("second oldest, so also in the batch");
+        (await cache.GetAsync("key-2")).ShouldNotBeNull("third oldest, so outside the batch");
+        (await cache.GetAsync("overflow")).ShouldNotBeNull("just stored");
     }
 
     [Test]
-    public void ANullResponse_IsRejected()
-        => Should.ThrowAsync<ArgumentNullException>(async () =>
-            await new MemoryTcgDexResponseCache().SetAsync("a", null!, TimeSpan.FromMinutes(1)));
+    public async Task ASmallBoundStillEvictsOneAtATime()
+    {
+        // A batch of MaxEntries/8 rounds to zero below eight, and evicting
+        // nothing would let the cache grow without limit — the floor of one is
+        // what stops that, and nothing else tests a bound that small.
+        var time = new FakeTimeProvider();
+        var cache = new MemoryTcgDexResponseCache(maxEntries: 2, timeProvider: time);
+
+        await cache.SetAsync("a", Response(), TimeSpan.FromHours(1));
+        time.Advance(TimeSpan.FromSeconds(1));
+        await cache.SetAsync("b", Response(), TimeSpan.FromHours(1));
+        time.Advance(TimeSpan.FromSeconds(1));
+        await cache.SetAsync("c", Response(), TimeSpan.FromHours(1));
+
+        cache.Count.ShouldBe(2);
+        (await cache.GetAsync("a")).ShouldBeNull("oldest");
+    }
+
+    [Test]
+    public async Task AfterClear_TheNextStoreSurvives()
+    {
+        // Clear has to reset the tracked entry count as well as the entries.
+        // If it does not, the cache believes it is still full, the next store
+        // trips the bound, and eviction removes the only entry there is —
+        // the one just written. Mutation testing found this: deleting the reset
+        // left every existing test passing.
+        var cache = new MemoryTcgDexResponseCache(maxEntries: 3);
+
+        await cache.SetAsync("a", Response(), TimeSpan.FromHours(1));
+        await cache.SetAsync("b", Response(), TimeSpan.FromHours(1));
+        await cache.SetAsync("c", Response(), TimeSpan.FromHours(1));
+
+        cache.Clear();
+
+        await cache.SetAsync("d", Response(), TimeSpan.FromHours(1));
+
+        cache.Count.ShouldBe(1);
+        (await cache.GetAsync("d")).ShouldNotBeNull("stored after the clear, so nothing should have evicted it");
+    }
+
+    [Test]
+    public async Task RepeatedlyStoringTheSameKey_EvictsNothing()
+    {
+        // Replacing an entry is not growth. Nothing asserted that before, and
+        // it is exactly what breaks if the bound is checked against a counter
+        // that is incremented per store rather than per insert — a cache would
+        // then evict its own live entries while sitting well under its limit.
+        var cache = new MemoryTcgDexResponseCache(maxEntries: 3);
+
+        await cache.SetAsync("a", Response(), TimeSpan.FromHours(1));
+        await cache.SetAsync("b", Response(), TimeSpan.FromHours(1));
+        await cache.SetAsync("c", Response(), TimeSpan.FromHours(1));
+
+        for (var i = 0; i < 20; i++)
+        {
+            await cache.SetAsync("a", Response(), TimeSpan.FromHours(1));
+        }
+
+        cache.Count.ShouldBe(3);
+        (await cache.GetAsync("a")).ShouldNotBeNull();
+        (await cache.GetAsync("b")).ShouldNotBeNull();
+        (await cache.GetAsync("c")).ShouldNotBeNull();
+    }
+
+    [Test]
+    public async Task RemovedEntries_FreeRoomWithoutEviction()
+    {
+        // The other half of the same contract: a removal has to be accounted
+        // for, or the cache believes it is full when it is not and evicts on a
+        // store that had room.
+        var cache = new MemoryTcgDexResponseCache(maxEntries: 3);
+
+        await cache.SetAsync("a", Response(), TimeSpan.FromHours(1));
+        await cache.SetAsync("b", Response(), TimeSpan.FromHours(1));
+        await cache.SetAsync("c", Response(), TimeSpan.FromHours(1));
+        await cache.RemoveAsync("a");
+        await cache.SetAsync("d", Response(), TimeSpan.FromHours(1));
+
+        cache.Count.ShouldBe(3);
+        (await cache.GetAsync("b")).ShouldNotBeNull("nothing should have been evicted");
+        (await cache.GetAsync("c")).ShouldNotBeNull("nothing should have been evicted");
+        (await cache.GetAsync("d")).ShouldNotBeNull();
+    }
+
+    [Test]
+    public async Task RepeatedOverflow_NeverExceedsTheBound()
+    {
+        // The bound is the whole point of the class: a batch that miscounted,
+        // or a scan that removed nothing because every entry shared a
+        // timestamp, would leak memory rather than fail visibly.
+        var cache = new MemoryTcgDexResponseCache(maxEntries: 32);
+
+        for (var i = 0; i < 500; i++)
+        {
+            await cache.SetAsync($"key-{i}", Response(), TimeSpan.FromHours(1));
+            cache.Count.ShouldBeLessThanOrEqualTo(32);
+        }
+
+        cache.Count.ShouldBeGreaterThan(0);
+    }
+
+    // Two tests stood here — ABlankKey_IsRejected and ANullResponse_IsRejected —
+    // and both could not fail. Each called Should.ThrowAsync from a void test
+    // method and discarded the returned Task, so when the guard did *not* throw
+    // the resulting faulted task was never observed and the test still passed.
+    // GetAsync_WithABlankKey_Throws and its siblings below cover the same
+    // contract, over all three methods and a null key as well, by blocking on
+    // the call. These were removed rather than repaired because keeping both
+    // would have duplicated working tests with weaker ones.
 
     [Test]
     public async Task ConcurrentWrites_DoNotCorruptTheCache()
