@@ -216,6 +216,19 @@ public sealed class TransportTests
     }
 
     [Test]
+    public void Options_DefaultMaxResponseBytes_Is32MiB()
+    {
+        // The default is a security control — it is what bounds peak memory
+        // against a hostile or misconfigured endpoint, decompressed. Nothing
+        // asserted it, so mutation testing could rewrite `32L * 1024 * 1024`
+        // into a different ceiling entirely with the suite green.
+        //
+        // The number is spelled out rather than recomputed from the same
+        // expression, which would restate the bug rather than catch it.
+        new TcgDexOptions().MaxResponseBytes.ShouldBe(33_554_432);
+    }
+
+    [Test]
     public void Options_WithSupportedLanguage_AreAccepted()
     {
         foreach (var language in TcgDexLanguages.All)

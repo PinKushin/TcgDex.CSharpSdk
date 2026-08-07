@@ -208,10 +208,21 @@ public sealed class TypedCacheTests
 
     [Test]
     public void TheDefault_IsEnabled()
-        => new TcgDexOptions().MaxDeserializedCacheEntries.ShouldBeGreaterThan(0);
+        => new TcgDexOptions().MaxDeserializedCacheEntries.ShouldBe(64);
 
     [Test]
     public void ANegativeBound_IsRejected()
-        => Should.Throw<ArgumentException>(
+    {
+        // The message is asserted, not just the type. Mutation testing found
+        // both halves of this text deletable with the suite green, which is the
+        // single commonest real gap in this project: someone reading a log gets
+        // the exception type from the stack trace anyway, and the only thing
+        // telling them *which knob* and *what value* is the text.
+        var error = Should.Throw<ArgumentException>(
             () => new TcgDexOptions { MaxDeserializedCacheEntries = -1 }.Validate());
+
+        error.Message.ShouldContain(nameof(TcgDexOptions.MaxDeserializedCacheEntries));
+        error.Message.ShouldContain("-1", customMessage: "the offending value belongs in the message");
+        error.Message.ShouldContain("zero to disable", customMessage: "the remedy is half the message");
+    }
 }
