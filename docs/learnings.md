@@ -156,6 +156,69 @@ should too.
 
 ---
 
+## CodeQL: `paths-ignore` does not work for compiled languages
+
+The first scan produced **212 alerts, 211 of them in `*.g.cs` files** emitted by
+System.Text.Json's generator — `cs/useless-cast-to-self`, none with a security
+severity. Zero findings in hand-written code.
+
+The obvious fix does not work. `paths-ignore: "**/*.g.cs"` loads correctly — the
+init log says *Using configuration file input from workflow* — and changes
+nothing, because **for compiled languages CodeQL cannot exclude files the
+compiler pulls into the build**, and the generator emits into `obj/` during
+`dotnet build`. Confirming the config had loaded before blaming the pattern is
+what turned this from guesswork into a two-line fix.
+
+`query-filters` is the mechanism that works:
+
+```yaml
+query-filters:
+  - exclude:
+      id: cs/useless-cast-to-self
+```
+
+Excluding a whole rule is only acceptable because nothing is lost: redundant
+casts in code we own are caught by IDE0004 under `TreatWarningsAsErrors`, so the
+check still exists where its results are actionable.
+
+The one genuine finding was **declined, not fixed**. `cs/linq/missed-where`
+wanted `CatalogEndpoints.Any(e => …)` in place of a `foreach`; the LINQ form
+reads better and allocates a delegate and a closure per call, on the caching
+path, in an SDK that keeps allocations off the hot path deliberately. It is
+dismissed as *won't fix* with that reason and documented at the method, rather
+than the rule being excluded repo-wide — so a real instance elsewhere still
+surfaces.
+
+The point of all this is the Security tab: alerts nobody can act on train
+everyone to ignore the one place a real finding would appear.
+
+---
+
+## A green CI run is not a silent one
+
+Adding `net472` to the test project broke CI on every push and I did not notice,
+because Actions was degraded at the time and I read the missing result as the
+outage. GitHub's ubuntu runners have no mono, and **vstest does not skip a
+framework it cannot host** — it aborts the whole run with *Could not find 'mono'
+host*, taking the net8.0 and net10.0 results down with it. The test project now
+targets `net472` only on Windows, with a dedicated `windows-latest` job so the
+framework stays covered in CI rather than only locally.
+
+Then a run went green while quietly doing the wrong thing. The fix above had
+been anchored on the ubuntu job's `pack` step, which moved that job's two upload
+steps into the new Windows job: the package and test results silently stopped
+being uploaded, and the only symptom was an annotation — *No files were found
+with the provided path* — attributed to a job that had no business emitting it.
+Nothing failed.
+
+That is the argument for treating **CI annotations as build output**. A green
+tick meant artifacts had stopped being produced, and a deprecation notice
+(CodeQL Action v3) would otherwise have sat in the log for four months. Both are
+now zero, checked with
+`gh api repos/{owner}/{repo}/check-runs/{id}/annotations --jq 'length'`.
+
+---
+
 ## An SDK has two untrusted inputs, and hardening one is not hardening both
 
 Worth separating, because the defences are unrelated:
