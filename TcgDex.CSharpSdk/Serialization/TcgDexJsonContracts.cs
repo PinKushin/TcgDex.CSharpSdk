@@ -70,6 +70,25 @@ internal static class TcgDexJsonContracts
             : WithoutPricing;
     }
 
+    /// <remarks>
+    /// <para>
+    /// The property loop is a <c>foreach</c> rather than
+    /// <c>typeInfo.Properties.Where(p =&gt; …)</c>, which CodeQL's
+    /// <c>cs/linq/missed-where</c> suggests. The LINQ form allocates a delegate
+    /// and an iterator to save nothing — the body is a single assignment — and
+    /// this sits on the serialization path, where the SDK keeps allocations
+    /// down deliberately. Kept as a loop on purpose; the alert is dismissed
+    /// rather than silenced repo-wide, so a genuine instance of that rule
+    /// elsewhere still surfaces.
+    /// </para>
+    /// <para>
+    /// If that alert reappears, it has almost certainly not come back on its
+    /// own: CodeQL keys an alert to its location, so any edit that moves these
+    /// lines closes the dismissed alert and opens a new numbered one for
+    /// identical code. Re-dismiss it rather than rewriting the loop. The same
+    /// note is on <c>TcgDexCacheOptions.IsCatalogPath</c>, for the same reason.
+    /// </para>
+    /// </remarks>
     private static JsonSerializerOptions BuildWithoutPricing()
     {
         // No cast to IJsonTypeInfoResolver: JsonSerializerContext implements it,
