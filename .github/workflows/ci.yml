@@ -71,6 +71,21 @@ jobs:
           -Threshold 99.5
           -BranchThreshold 95
 
+      # The integration project holds JsonShape, the comparison engine every
+      # fixture-drift verdict is derived from. Its own tests need no network, so
+      # gating them behind the weekly live job would mean the thing that decides
+      # whether the API changed was itself only checked once a week.
+      #
+      # TestCategory!=Integration is what separates them: the live fixtures
+      # inherit the category from LiveApiFixture, JsonShapeTests does not.
+      - name: Offline tests in the integration project
+        run: >
+          dotnet test TcgDex.CSharpSdk.IntegrationTests/TcgDex.CSharpSdk.IntegrationTests.csproj
+          --configuration Release --no-build
+          --filter "TestCategory!=Integration"
+          --logger "trx;LogFileName=integration-offline.trx"
+          --results-directory ./TestResults
+
       - name: Verify the package builds
         run: dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj --configuration Release --no-build --output ./artifacts
 
