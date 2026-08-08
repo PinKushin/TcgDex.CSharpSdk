@@ -56,6 +56,28 @@ that language's own list endpoint rather than assuming a shared id resolves.
 Names are genuinely localised where the pool is shared — `swsh3-136` is *Furret* in `en`,
 *Fouinar* in `fr`, and *Wiesenior* in `de`.
 
+**The enumeration endpoints are per-language, in values and in size.** `/categories` returns
+translated values, so they cannot be compared across languages:
+
+| Language | `/categories` |
+|---|---|
+| `en`, `ja`, `ko`, `id`, `th`, `zh-tw`, `zh-cn`, `es-mx` | `Energy`, `Pokemon`, `Trainer` |
+| `fr` | `Dresseur`, `Pokémon`, `Énergie` |
+| `es` | `Energía`, `Entrenador`, `Pokémon` |
+| `it` | `Allenatore`, `Energia`, `Pokémon` |
+| `de` | `Energie`, `Pokémon`, `Trainer` |
+| `pt` | `Energia`, `Pokémon`, `Treinador` |
+| **`pt-br`** | **`Pokemon`, `Trainer` — two, not three** |
+
+`pt-br` is not missing data. These endpoints report the values that language's cards *actually
+use*, and `pt-br`'s pool is **TCG Pocket only** — all 11 of its sets are Pocket sets (`A1`,
+`A1a`, `A2`, `A2a`, `A2b`, `A3`, `A4a`, `B1a`, `B2`, `B2a`, `P-A`) against 218 for `en`. Pocket
+has no Energy cards; energy there is a game mechanic rather than a collectible card, so
+`?category=eq:Energy` in `pt-br` correctly returns `[]`.
+
+**Consequence:** never hard-code an enumeration result, and never assume one language's catalogue
+size matches another's. Fetch `/categories` in the language you are querying.
+
 ---
 
 ## 2. Errors
@@ -367,6 +389,23 @@ serie  (id: ID, filters: SerieFilters): Serie
    `Int cannot represent non-integer value: "gt:100"`. No ranges, OR, wildcards, or null checks.
 3. **No pricing.** `Card` has no `pricing` field, and `DetailedVariants` exposes only
    `type`, `subtype`, `size`, `stamp`, `foil` — no `variantId`, no `pricing`.
+4. **A broad filter can fail outright on a schema/data mismatch.** Verified 2026-08-08:
+
+   ```
+   POST /v2/graphql  { cards(filters: { rarity: "Common" }) { … attacks { name } } }
+
+   Cannot return null for non-nullable field AttacksListItem.name.
+   ```
+
+   The schema declares `AttacksListItem.name` non-nullable, but some cards have attacks with no
+   name. GraphQL cannot return a partial list for a non-nullable field, so the *entire query*
+   errors rather than omitting the offending card. A narrow filter that happens to miss those
+   cards succeeds, which makes this look intermittent — it is not; it is determined by whether
+   the result set contains an unnamed attack.
+
+   The same cards deserialize without complaint over REST, which types the field as optional.
+   **Consequence:** a caller cannot rely on `SearchDetailedAsync` for broad filters, and the SDK
+   surfaces the error as `TcgDexApiException` rather than pretending to a partial result.
 
 ### Where GraphQL wins
 

@@ -15,7 +15,30 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Which assembly you get** ([`docs/getting-started.md`](docs/getting-started.md))
+  — a resolution table for the three shipped targets. `netstandard2.0` is why
+  the NuGet listing shows so many compatible frameworks; it is the universal
+  fallback rather than something to enable. Notes that **`net6.0` and `net7.0`
+  resolve `netstandard2.0`**, not `net8.0`, so its two behavioural differences
+  apply to them.
+
+- **Two verified API findings** ([`docs/api-info.md`](docs/api-info.md)):
+  - A broad GraphQL filter can fail outright with
+    `Cannot return null for non-nullable field AttacksListItem.name` — the schema
+    declares the field non-nullable while some cards have unnamed attacks, so the
+    whole query errors rather than omitting the card. REST types the same field
+    as optional and is unaffected.
+  - The enumeration endpoints are per-language in **values and size**.
+    `/categories` is translated, and `pt-br` returns two entries rather than
+    three because its pool is TCG Pocket only — Pocket has no Energy cards.
+
+### Fixed
+
+- The install page claimed the package targets ".NET 8 and .NET 10", omitting
+  `netstandard2.0` — the target that reaches .NET Framework, Unity and everything
+  between.
 
 ## [0.1.1] - 2026-08-08
 
