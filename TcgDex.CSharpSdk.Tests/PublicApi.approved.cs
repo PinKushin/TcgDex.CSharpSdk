@@ -166,6 +166,7 @@ namespace TcgDex.Models
         public string? Illustrator { get; init; }
         public string? Image { get; init; }
         public TcgDex.Models.Legality? Legal { get; init; }
+        [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.FlexibleStringConverter?))]
         public required string LocalId { get; init; }
         public required string Name { get; init; }
         public TcgDex.Models.Pricing? Pricing { get; init; }
@@ -190,6 +191,7 @@ namespace TcgDex.Models
         public CardBrief() { }
         public required string Id { get; init; }
         public string? Image { get; init; }
+        [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.FlexibleStringConverter))]
         public required string LocalId { get; init; }
         public required string Name { get; init; }
     }

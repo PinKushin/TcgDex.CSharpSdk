@@ -71,6 +71,23 @@ public sealed class SetSerieContractTests
     }
 
     [Test]
+    public void Deserialize_CardList_ToleratesNumericLocalId()
+    {
+        // CardBrief carries its own LocalId, so hardening Card alone would leave
+        // the list endpoint — the one that returns thousands of these at once —
+        // still throwing. A converter applied to one model and not its twin is
+        // exactly the half-fix a test has to catch.
+        string json = Fixture.ReadText("list-cards-brief.json")
+            .Replace("\"localId\":\"21\"", "\"localId\":21");
+
+        json.ShouldContain("\"localId\":21", customMessage: "the fixture edit must actually apply");
+
+        IReadOnlyList<CardBrief> cards = Fixture.Parse<IReadOnlyList<CardBrief>>(json);
+
+        cards[0].LocalId.ShouldBe("21");
+    }
+
+    [Test]
     public void Deserialize_StringEnumeration_ReturnsScalars()
     {
         IReadOnlyList<string> categories = Fixture.Load<IReadOnlyList<string>>("list-categories.json");

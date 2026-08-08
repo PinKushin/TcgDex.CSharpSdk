@@ -21,6 +21,13 @@ public sealed record CardBrief
     /// The card's number within its set. Not necessarily numeric — values such
     /// as <c>"!"</c> and <c>"%3F"</c> occur in older promo sets.
     /// </summary>
+    /// <remarks>
+    /// TCGdex documents this as "String or Number", so an unquoted value is read
+    /// as text rather than throwing. Every card the API currently serves quotes
+    /// it; the converter is here because this property is <c>required</c>, so one
+    /// unquoted value would fail the entire card.
+    /// </remarks>
+    [JsonConverter(typeof(Serialization.FlexibleStringConverter))]
     public required string LocalId { get; init; }
 
     /// <summary>The card's printed name.</summary>

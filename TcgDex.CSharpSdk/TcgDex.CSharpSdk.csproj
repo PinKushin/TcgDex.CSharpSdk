@@ -22,11 +22,17 @@
   <!-- NuGet package metadata. -->
   <PropertyGroup>
     <PackageId>TcgDex.CSharpSdk</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Authors>PinKushin</Authors>
     <Description>A .NET SDK for the TCGdex Pokemon TCG API - strongly typed models, a fluent query builder over the full REST filter syntax, and opt-in GraphQL for projection and nested fetches.</Description>
     <PackageTags>tcgdex;pokemon;tcg;trading-card-game;api-client;sdk</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!--
+      A link rather than the notes themselves: release notes pasted in here have
+      to be edited every release and are the first thing to go stale, whereas
+      this URL is correct for every version without being touched.
+    -->
+    <PackageReleaseNotes>See https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/PinKushin/TcgDex.CSharpSdk</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
