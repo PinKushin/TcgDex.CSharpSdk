@@ -15,7 +15,22 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Unity guide** (`docs/unity.md`) — the 21-assembly `netstandard2.0` dependency
+  closure to vendor, which seven of those are `netstandard2.1` polyfills that can
+  cause duplicate-assembly errors, the `link.xml` needed if managed stripping
+  removes the reflectively-read closure field, and how to use the SDK on WebGL
+  (where `System.Net.Http` is unavailable) via a `UnityWebRequest`-backed
+  `HttpMessageHandler`.
+
+### Changed
+
+- The README no longer claims Unity support flatly. Unity is supported *by
+  construction* — no runtime codegen, no `Expression.Compile()`, no
+  reflection-based serialization, with a Native AOT publish exercising the one
+  reflective path under full trimming — but it has not been run inside a Unity
+  project, and saying so plainly is worth more than the unqualified claim.
 
 ## [0.1.1] - 2026-08-08
 

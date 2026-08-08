@@ -7,8 +7,15 @@ support for dependency injection, trimming and Native AOT.
 [![CI](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/ci.yml/badge.svg)](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/ci.yml)
 
 Targets **.NET 8**, **.NET 10** and **netstandard2.0** — so it runs on modern
-.NET, on **Unity**, and on **.NET Framework 4.6.1+**. No API key required —
-TCGdex is a free, public, read-only API.
+.NET and on **.NET Framework 4.6.1+**. No API key required — TCGdex is a free,
+public, read-only API.
+
+**Unity** is a supported target by construction rather than by test: the
+`netstandard2.0` assembly contains no runtime code generation, no
+`Expression.Compile()` and no reflection-based serialization, and a Native AOT
+publish exercises the one reflective path under full trimming. Nobody has yet
+run it inside a Unity project, so see [`docs/unity.md`](docs/unity.md) for what
+is verified, what is not, and the packaging and stripping caveats Unity adds.
 
 The API surface is identical on every target, async included. One difference is
 worth knowing before you rely on it: connection recycling, which keeps a
