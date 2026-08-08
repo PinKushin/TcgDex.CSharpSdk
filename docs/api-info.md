@@ -392,6 +392,7 @@ them** — that language has no physical coverage at all.
 | `pricing` | populated from CardMarket / TCGplayer | **present but empty**: `{"cardmarket": null, "tcgplayer": null}` |
 | `variants_detailed[].variantId` | a real id, e.g. `endfynwn4n10gzq` | the literal string `generated` |
 | `regulationMark` | present on Standard-legal cards | absent |
+| `weaknesses[].value` | **multiplicative** — `×2` | **additive** — `+20` |
 | Energy cards | yes | **none** — energy is a game mechanic in Pocket, not a collectible card |
 
 `legal` is present on both.
@@ -409,6 +410,10 @@ them** — that language has no physical coverage at all.
   rather than three — see [Languages](#languages). Its card ids will not resolve in `en`.
 - **`boosters` is Pocket-only**, and there is no `/boosters` endpoint (404). The data exists only
   embedded in a card.
+- **Weakness values follow different rules in the two games.** Both are text and the SDK models
+  them the same way, but Pocket adds a flat amount (`+20`) where the physical game multiplies
+  (`×2`). Anything parsing that field to compute damage must branch on the leading character —
+  assuming one game silently produces wrong numbers for the other.
 
 ### Why this matters for the SDK's design
 
