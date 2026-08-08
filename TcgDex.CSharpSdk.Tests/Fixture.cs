@@ -28,12 +28,21 @@ internal static class Fixture
 
     internal static T Load<T>(string fileName)
         where T : notnull
+        => Parse<T>(ReadText(fileName), fileName);
+
+    /// <summary>
+    /// Deserializes JSON through the SDK's own context, for the cases that need
+    /// a recorded response altered — a field retyped to a shape the API's
+    /// published contract allows but its current data does not happen to contain.
+    /// </summary>
+    internal static T Parse<T>(string json, string description = "the supplied JSON")
+        where T : notnull
     {
         JsonTypeInfo<T> typeInfo = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
-        T? result = JsonSerializer.Deserialize(ReadText(fileName), typeInfo);
+        T? result = JsonSerializer.Deserialize(json, typeInfo);
 
         return result ?? throw new InvalidOperationException(
-            $"Fixture '{fileName}' deserialized to null, which means the recorded " +
+            $"Fixture '{description}' deserialized to null, which means the recorded " +
             "response no longer matches the model it is loaded into.");
     }
 }

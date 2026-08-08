@@ -191,6 +191,31 @@ public sealed class CardContractTests
     }
 
     [Test]
+    public void Deserialize_NumericLocalId_ReadsAsText()
+    {
+        // TCGdex documents localId as "String or Number"
+        // (https://tcgdex.dev/reference/card). Every card the live API serves
+        // today quotes it — 0 unquoted occurrences across the full ~2.3 MB card
+        // list — and the GraphQL schema declares it `String!`. So this is not a
+        // shape that was observed; it is the one the published contract permits.
+        //
+        // It is worth tolerating anyway because LocalId is `required`: a single
+        // unquoted value would throw and lose the *whole* card rather than one
+        // field, and the same assumption typed as a number is what broke the
+        // previous SDK on `attacks[].damage`.
+        // Two-argument Replace on purpose: the StringComparison overload does not
+        // exist on net472, which this suite also runs against.
+        string json = Fixture.ReadText("card-pokemon-full.json")
+            .Replace("\"localId\":\"136\"", "\"localId\":136");
+
+        json.ShouldContain("\"localId\":136", customMessage: "the fixture edit must actually apply");
+
+        Card card = Fixture.Parse<Card>(json);
+
+        card.LocalId.ShouldBe("136");
+    }
+
+    [Test]
     public void Deserialize_AbsentCollections_AreEmptyNotNull()
     {
         // System.Text.Json's source generator does not apply property

@@ -52,6 +52,13 @@ public sealed record Card
     public required string Category { get; init; }
 
     /// <summary>The card's number within its set. Not necessarily numeric.</summary>
+    /// <remarks>
+    /// TCGdex documents this as "String or Number", so an unquoted value is read
+    /// as text rather than throwing. Every card the API currently serves quotes
+    /// it; the converter is here because this property is <c>required</c>, so one
+    /// unquoted value would fail the entire card.
+    /// </remarks>
+    [JsonConverter(typeof(Serialization.FlexibleStringConverter))]
     public required string LocalId { get; init; }
 
     /// <summary>The set this card belongs to.</summary>
