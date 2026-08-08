@@ -15,47 +15,26 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
-### Fixed
+Nothing yet.
 
-- The fixture-drift check could report a **false breaking change**. A path whose
-  kind varies across array elements — `attacks[].damage` is genuinely `Number` on
-  one card and `String` on another — had its union built in encounter order, so
-  the same document fingerprinted as `Number|String` or `String|Number` depending
-  on which element came first, and the comparison read that as a retype. Unions
-  are now canonically ordered. This affected only the drift check, never
-  deserialization.
+## [0.1.1] - 2026-08-08
 
 ### Added
 
-- **Tests for `JsonShape`**, the comparison engine every fixture-drift verdict is
-  derived from, which had none. They need no network, so CI now runs the
-  integration project's non-`Integration` tests on every push — previously the
-  code deciding whether the API had changed was itself only exercised in the
-  weekly live job.
-
-- **Unity guide** (`docs/unity.md`) — the 21-assembly `netstandard2.0` dependency
-  closure to vendor, which seven of those are `netstandard2.1` polyfills that can
-  cause duplicate-assembly errors, the `link.xml` needed if managed stripping
-  removes the reflectively-read closure field, and how to use the SDK on WebGL
-  (where `System.Net.Http` is unavailable) via a `UnityWebRequest`-backed
-  `HttpMessageHandler`.
+- **Unity guide** ([`docs/unity.md`](docs/unity.md)) — the 21-assembly
+  `netstandard2.0` dependency closure to vendor, which seven of those are
+  `netstandard2.1` polyfills that can cause duplicate-assembly errors, the
+  `link.xml` needed if managed stripping removes the reflectively-read closure
+  field, and how to use the SDK on WebGL (where `System.Net.Http` is unavailable)
+  via a `UnityWebRequest`-backed `HttpMessageHandler`.
 
 ### Changed
-
-- **A field the API starts serving now fails the weekly drift job** instead of
-  being written to test output. Additive drift was "reported" only to
-  `TestContext.Out` in a job that reported green and nobody opened — which is how
-  `pricing`, `variants_detailed` and `updated` came to be served by TCGdex while
-  the official JS SDK's types omitted all three. Nothing is blocked by this: the
-  drift fixtures run only on a schedule, so no pull request ever sees them.
 
 - The README no longer claims Unity support flatly. Unity is supported *by
   construction* — no runtime codegen, no `Expression.Compile()`, no
   reflection-based serialization, with a Native AOT publish exercising the one
   reflective path under full trimming — but it has not been run inside a Unity
   project, and saying so plainly is worth more than the unqualified claim.
-
-## [0.1.1] - 2026-08-08
 
 ### Fixed
 
