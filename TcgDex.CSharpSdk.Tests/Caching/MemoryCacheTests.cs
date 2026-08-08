@@ -107,7 +107,10 @@ public sealed class MemoryCacheTests
 
         await cache.SetAsync("a", Response(), TimeSpan.Zero);
 
-        (await cache.GetAsync("a")).ShouldNotBeNull();
+        // The ETag specifically, not merely that something came back — carrying
+        // it is the entire reason a zero-TTL entry is worth storing, since it is
+        // what turns the next fetch into a 304 instead of a full download.
+        (await cache.GetAsync("a")).ShouldNotBeNull().ETag.ShouldBe("W/\"x\"");
     }
 
     [Test]

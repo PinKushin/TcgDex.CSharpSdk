@@ -186,8 +186,16 @@ public sealed class ClientTests
         using ServiceProvider provider = services.BuildServiceProvider();
         ITcgDexClient client = provider.GetRequiredService<ITcgDexClient>();
 
-        client.ShouldNotBeNull();
+        // GetRequiredService already throws when nothing is registered, so
+        // asserting the result is non-null restated what the previous line
+        // proved. What is worth checking is that the container built a fully
+        // wired client rather than merely something of the right type.
+        client.ShouldBeOfType<TcgDexClient>();
+
         client.Cards.ShouldNotBeNull();
+        client.Sets.ShouldNotBeNull();
+        client.Series.ShouldNotBeNull();
+        client.Random.ShouldNotBeNull();
         client.Catalog.ShouldNotBeNull();
     }
 

@@ -240,7 +240,12 @@ public sealed class CachingHandlerTests
 
         await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => GetAsync(client)));
 
-        inner.Requests.Count.ShouldBeGreaterThan(1);
+        // Exactly five, not "more than one". This is the paired opposite of the
+        // coalescing test above, which asserts 1 — so together they measure the
+        // direction *and* the size of the effect. "Greater than one" would also
+        // be satisfied by partial coalescing, which is neither behaviour and
+        // would mean the option only half works.
+        inner.Requests.Count.ShouldBe(5, "coalescing off means every caller fetches for itself");
     }
 
     [Test]
