@@ -6,8 +6,38 @@
 dotnet add package TcgDex.CSharpSdk
 ```
 
-Targets .NET 8 and .NET 10. TCGdex is a free, public, read-only API — there is no
-key to configure and no account to create.
+TCGdex is a free, public, read-only API — there is no key to configure and no
+account to create.
+
+### Which assembly you get
+
+The package ships three: `net10.0`, `net8.0` and `netstandard2.0`. NuGet picks
+the closest match automatically — there is nothing to enable, and nothing to
+configure. `netstandard2.0` is what makes the listing show so many compatible
+frameworks: it is the universal fallback, not a fourth target you opt into.
+
+| Your project | Assembly resolved |
+|---|---|
+| `net10.0` and later | `lib/net10.0` |
+| `net8.0`, `net9.0` | `lib/net8.0` |
+| `net6.0`, `net7.0` | `lib/netstandard2.0` |
+| `net5.0`, `netcoreapp2.0`–`3.1` | `lib/netstandard2.0` |
+| `net461`–`net481` | `lib/netstandard2.0` |
+| Unity, Xamarin, Mono, UWP | `lib/netstandard2.0` |
+
+The public API is identical on all three. Two behavioural differences are worth
+knowing before relying on them, and both apply to whoever resolves
+`netstandard2.0` — which includes **`net6.0` and `net7.0`**, since a `net8.0`
+assembly cannot be consumed by an older runtime:
+
+- **Cancelling mid-body is best-effort.** The cancellable `HttpContent` read
+  overloads do not exist there, so a token cancelled while the response body is
+  streaming is observed at the next boundary rather than immediately.
+- **Connection recycling uses a different mechanism.** `SocketsHttpHandler`
+  on modern .NET, `ServicePoint.ConnectionLeaseTimeout` on .NET Framework. Same
+  guarantee — a long-lived client does not pin stale DNS — reached two ways.
+
+Unity has additional packaging considerations; see [Unity](unity.md).
 
 ## With dependency injection
 
