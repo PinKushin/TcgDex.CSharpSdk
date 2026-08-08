@@ -302,7 +302,7 @@ It triggers two ways on purpose: a tag push for routine releases, and
 watching the log — which is what removes any reason to create an API key.
 
 The workflow lives at
-[`.github/workflows/release.yml`](../.github/workflows/release.yml) — **it
+[`.github/workflows/release.yml`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/.github/workflows/release.yml) — **it
 already exists and is committed.** It is deliberately not reproduced here: a
 copy in prose is a copy that drifts, and this document has already been wrong
 once by describing something the repository does not do.
