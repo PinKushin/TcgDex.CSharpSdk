@@ -1,8 +1,28 @@
 # Publishing to NuGet
 
 Written for a first-time publisher. **Nothing here has been done yet** — the
-package builds locally but has never been pushed, and by decision it will not be
-until test coverage is where it should be.
+package builds locally and has never been pushed.
+
+> **Verified 2026-08-07 at `f026f07`.** Everything about *this repository* was
+> re-checked by running it, not by remembering it: the package was packed and
+> its `.nuspec` read, the gates were run, the checklist below is now green apart
+> from the version decision.
+>
+> Everything about *nuget.org* was re-checked against Microsoft's own pages,
+> because [advice about someone else's service is the fastest-rotting kind of
+> doc](learnings.md). Sources and their update dates:
+> [Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing)
+> (2026-08-03),
+> [publish a package](https://learn.microsoft.com/en-us/nuget/nuget-org/publish-a-package)
+> (2026-06-11),
+> [scoped API keys](https://learn.microsoft.com/en-us/nuget/nuget-org/scoped-api-keys)
+> (2026-02-02).
+>
+> One caveat found while doing it: **the API key lifetime change below is not in
+> the Learn documentation**, only in the linked devblogs announcement, and the
+> Learn pages still show a 365-day example. The announcement is the authority
+> here and the dates in it are quoted verbatim — but if the two ever appear to
+> disagree, that is why.
 
 ---
 
@@ -86,9 +106,13 @@ Only if Trusted Publishing is unavailable to your account. **Account → API Key
 | Field | Value |
 |---|---|
 | Key name | something identifiable, e.g. `tcgdex-release` |
-| Expiry | 30 days — see below |
+| Expiry | **the shortest offered** for a one-off manual push; 30 days for a pipeline — see below |
 | Scopes | **Push** only |
 | Glob pattern | `TcgDex.CSharpSdk*` |
+
+For the first manual push the key exists for minutes. Pick the shortest expiry
+the form allows and delete it afterwards anyway — the expiry is the backstop for
+forgetting, not the plan.
 
 Scope it to the glob pattern rather than "all packages". If the key leaks, the
 blast radius is one package rather than your whole account.
@@ -107,6 +131,14 @@ So a key-based release pipeline now means re-issuing a secret every month
 indefinitely. That recurring chore is the reason to do the Trusted Publishing
 setup instead — it is a one-time configuration with no expiry to track.
 
+**What the dates mean if you are publishing right now.** A key created before
+2026-08-17 may still be issued for longer than 30 days, but it dies on
+2026-11-01 regardless of the duration printed on it. So there is no window to
+race for and nothing to rush: for a single manual push the duration is
+irrelevant, and for anything automated the answer is Trusted Publishing either
+way. nuget.org emails the account holder ten days before a key expires, which is
+the only warning you get.
+
 If you do use a key, store it as a GitHub secret named `NUGET_API_KEY`:
 Repository → **Settings → Secrets and variables → Actions → New repository
 secret**. Never put it in a file, a commit, or a workflow literal. If it ever
@@ -117,7 +149,8 @@ un-leak it, because anyone who cloned still has it.
 
 ## Pre-flight checklist
 
-Everything here is already true except the last two:
+**All of it is true as of `f026f07`**, verified by running each check rather
+than by remembering it:
 
 - [x] `PackageId`, `Version`, `Authors`, `Description`, `PackageTags` set
 - [x] `PackageLicenseExpression` (MIT) and `LICENSE.txt` shipped
@@ -129,8 +162,16 @@ Everything here is already true except the last two:
       recorded commit are permanent once published
 - [x] README links absolute, since the package page renders it standalone
 - [x] Security analyzers and `NuGetAudit` enabled, both verified failing
-- [ ] **Test coverage at target** — the current gate, see [`coverage.md`](coverage.md)
-- [ ] **Version decided** — currently `0.1.0`
+- [x] **Coverage gates met** — 99.80% line, 96.58% branch, both above the CI
+      thresholds. See [`coverage.md`](coverage.md)
+- [x] **Public API pinned** — `PublicApiTests` fails on any surface change, so
+      what ships is what was reviewed
+- [x] **Nothing test-only leaked into the package** — the `.nuspec` lists only
+      the three `Microsoft.Extensions.*` runtime dependencies per target. No
+      SharpFuzz, no PublicApiGenerator, no test packages
+- [x] **Packs at 462 KB**, far inside nuget.org's ~250 MB limit, with three
+      `lib` folders and XML docs in each
+- [ ] **Version decided** — currently `0.1.0`, and the only judgement left
 
 ## Choosing the first version
 
@@ -168,11 +209,30 @@ A manual push needs a real API key: Trusted Publishing issues its token to a CI
 job, so there is nothing to exchange from your laptop. Treat that key as
 disposable — create it, push, then delete it on nuget.org the same day.
 
+**Pass the key by environment variable, not on the command line.** A key in
+`--api-key` lands in your shell history, and on Windows in
+`ConsoleHost_history.txt`, where it outlives the "delete it the same day" plan.
+`NUGET_API_KEY` is supported from NuGet 7.6 (.NET SDK 10.0.300), which this repo
+already builds on.
+
 ```bash
-dotnet nuget push ./artifacts/TcgDex.CSharpSdk.0.1.0.nupkg \
-  --api-key <YOUR_KEY> \
+# PowerShell
+$env:NUGET_API_KEY = '<paste-here>'
+dotnet nuget push ./artifacts/TcgDex.CSharpSdk.0.1.0.nupkg `
   --source https://api.nuget.org/v3/index.json
+Remove-Item Env:\NUGET_API_KEY
 ```
+
+```bash
+# bash — the leading space keeps it out of history when HISTCONTROL=ignorespace
+ export NUGET_API_KEY='<paste-here>'
+dotnet nuget push ./artifacts/TcgDex.CSharpSdk.0.1.0.nupkg \
+  --source https://api.nuget.org/v3/index.json
+unset NUGET_API_KEY
+```
+
+On an older SDK, `--api-key` is the only option — in which case delete the key
+on nuget.org immediately after the push rather than at the end of the day.
 
 The `.snupkg` pushes automatically alongside it. Indexing takes a few minutes
 before the package is installable.
@@ -256,15 +316,23 @@ tagging `v0.2.0` while the csproj still says `0.1.0`.
 
 ---
 
-## Before submitting to tcgdex.dev/sdks
+## Getting listed on tcgdex.dev/sdks
 
-TCGdex lists community SDKs. Once published, open a pull request against
-[tcgdex/documentation](https://github.com/tcgdex/documentation) adding this one.
-There is currently **no C#/.NET SDK listed** — Java, JavaScript, Kotlin, PHP,
-TypeScript and Python only — which is the whole reason this project exists.
+**Checked 2026-08-07.** Still **no C#/.NET SDK listed** — Java, JavaScript,
+Kotlin, PHP, TypeScript and Python only, and the *Community SDKs* section is
+empty. This would be the first entry in it.
 
-Worth having in place first: a published package, a README that stands on its
-own, and green CI. All three are the point of the checklist above.
+**The route is Discord, not a pull request.** An earlier version of this page
+said to open a PR against `tcgdex/documentation`; the site itself says *"Contact
+us on Discord to have your SDK added here."* A PR might work, but a message
+where they asked for one will not sit unread in a queue.
+
+Worth having in place before asking: a published package, a README that stands
+on its own, and green CI. All three are the point of the checklist above.
+
+This listing is the reason to publish at all. A package with no distribution is
+a repository with extra steps; a link on the API's own documentation is the only
+place someone looking for a .NET client would actually pass through.
 
 ---
 
