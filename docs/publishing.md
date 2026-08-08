@@ -1,8 +1,29 @@
 # Publishing to NuGet
 
-Written for a first-time publisher. **Nothing here has been done yet** — the
-package builds locally but has never been pushed, and by decision it will not be
-until test coverage is where it should be.
+Written for a first-time publisher. The package builds locally and **has never
+been pushed**. The Trusted Publishing policy is registered and active, and
+`release.yml` is committed — what remains is pressing the button.
+
+> **Verified 2026-08-07 at `f026f07`.** Everything about *this repository* was
+> re-checked by running it, not by remembering it: the package was packed and
+> its `.nuspec` read, the gates were run, the checklist below is now green apart
+> from the version decision.
+>
+> Everything about *nuget.org* was re-checked against Microsoft's own pages,
+> because [advice about someone else's service is the fastest-rotting kind of
+> doc](learnings.md). Sources and their update dates:
+> [Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing)
+> (2026-08-03),
+> [publish a package](https://learn.microsoft.com/en-us/nuget/nuget-org/publish-a-package)
+> (2026-06-11),
+> [scoped API keys](https://learn.microsoft.com/en-us/nuget/nuget-org/scoped-api-keys)
+> (2026-02-02).
+>
+> One caveat found while doing it: **the API key lifetime change below is not in
+> the Learn documentation**, only in the linked devblogs announcement, and the
+> Learn pages still show a 365-day example. The announcement is the authority
+> here and the dates in it are quoted verbatim — but if the two ever appear to
+> disagree, that is why.
 
 ---
 
@@ -64,10 +85,33 @@ Set it up at **nuget.org → your username → Trusted Publishing**, adding a po
 
 | Field | Value |
 |---|---|
+| Policy name | `TcgDex.CSharpSdk release.yml` — see below |
 | Repository Owner | `PinKushin` |
 | Repository | `TcgDex.CSharpSdk` |
 | Workflow File | `release.yml` — **filename only**, no `.github/workflows/` prefix |
 | Environment | leave empty unless the job declares `environment:` |
+
+**On the policy name.** Microsoft's page does not document this field, so treat
+it as an account-level label the way an API key name is — nothing on nuget.org
+appears to surface it, but that is observation rather than a documented
+guarantee, so do not put anything sensitive in it.
+
+Name it after the **repository and workflow**, not the package. A policy is not
+package-scoped: it *"will apply to all packages owned by the selected owner"*,
+constrained by the repository and workflow file. So when a second package
+appears, the repo and workflow are what tell two policies apart, and the package
+name would not.
+
+**`release.yml` exists and is committed**, alongside `ci.yml`, `codeql.yml`,
+`docs.yml` and `fuzz.yml`. Nothing else needs creating before you publish.
+
+If you register a policy before its workflow exists, that is harmless too — a
+policy is a rule about what *would* be trusted, and simply never matches until
+the file is there.
+
+The one thing that must match exactly is the filename. A policy for `release.yml`
+does not trust `publish.yml`, and the failure is a rejected push at the moment
+you are trying to ship rather than anything earlier.
 
 Two behaviours worth knowing in advance:
 
@@ -86,9 +130,13 @@ Only if Trusted Publishing is unavailable to your account. **Account → API Key
 | Field | Value |
 |---|---|
 | Key name | something identifiable, e.g. `tcgdex-release` |
-| Expiry | 30 days — see below |
+| Expiry | **the shortest offered** for a one-off manual push; 30 days for a pipeline — see below |
 | Scopes | **Push** only |
 | Glob pattern | `TcgDex.CSharpSdk*` |
+
+For the first manual push the key exists for minutes. Pick the shortest expiry
+the form allows and delete it afterwards anyway — the expiry is the backstop for
+forgetting, not the plan.
 
 Scope it to the glob pattern rather than "all packages". If the key leaks, the
 blast radius is one package rather than your whole account.
@@ -107,6 +155,14 @@ So a key-based release pipeline now means re-issuing a secret every month
 indefinitely. That recurring chore is the reason to do the Trusted Publishing
 setup instead — it is a one-time configuration with no expiry to track.
 
+**What the dates mean if you are publishing right now.** A key created before
+2026-08-17 may still be issued for longer than 30 days, but it dies on
+2026-11-01 regardless of the duration printed on it. So there is no window to
+race for and nothing to rush: for a single manual push the duration is
+irrelevant, and for anything automated the answer is Trusted Publishing either
+way. nuget.org emails the account holder ten days before a key expires, which is
+the only warning you get.
+
 If you do use a key, store it as a GitHub secret named `NUGET_API_KEY`:
 Repository → **Settings → Secrets and variables → Actions → New repository
 secret**. Never put it in a file, a commit, or a workflow literal. If it ever
@@ -117,7 +173,8 @@ un-leak it, because anyone who cloned still has it.
 
 ## Pre-flight checklist
 
-Everything here is already true except the last two:
+**All of it is true as of `f026f07`**, verified by running each check rather
+than by remembering it:
 
 - [x] `PackageId`, `Version`, `Authors`, `Description`, `PackageTags` set
 - [x] `PackageLicenseExpression` (MIT) and `LICENSE.txt` shipped
@@ -129,8 +186,16 @@ Everything here is already true except the last two:
       recorded commit are permanent once published
 - [x] README links absolute, since the package page renders it standalone
 - [x] Security analyzers and `NuGetAudit` enabled, both verified failing
-- [ ] **Test coverage at target** — the current gate, see [`coverage.md`](coverage.md)
-- [ ] **Version decided** — currently `0.1.0`
+- [x] **Coverage gates met** — 99.80% line, 96.58% branch, both above the CI
+      thresholds. See [`coverage.md`](coverage.md)
+- [x] **Public API pinned** — `PublicApiTests` fails on any surface change, so
+      what ships is what was reviewed
+- [x] **Nothing test-only leaked into the package** — the `.nuspec` lists only
+      the three `Microsoft.Extensions.*` runtime dependencies per target. No
+      SharpFuzz, no PublicApiGenerator, no test packages
+- [x] **Packs at 462 KB**, far inside nuget.org's ~250 MB limit, with three
+      `lib` folders and XML docs in each
+- [ ] **Version decided** — currently `0.1.0`, and the only judgement left
 
 ## Choosing the first version
 
@@ -152,9 +217,36 @@ right way to get real usage before committing.
 
 ## Publishing
 
-### Manual, the first time
+**You almost certainly do not need an API key at all.** Read this before creating
+one.
 
-Do the first publish by hand so you see each step.
+Trusted Publishing exchanges a GitHub OIDC token for a one-hour key, and GitHub
+only issues those tokens *inside a workflow run*. Your laptop cannot mint one, so
+there is genuinely nothing to exchange from a terminal — that part of the
+constraint is real.
+
+What does not follow is that the first release has to happen from a terminal.
+**Add `workflow_dispatch` to the release workflow and press the button.** That
+runs in Actions, so OIDC works, and you get the same "watch it happen, one step
+at a time" that a manual push offers, with a live log — and no long-lived
+credential is ever created, stored, or forgotten about.
+
+So the honest ordering is:
+
+| | Key needed | When it makes sense |
+|---|---|---|
+| **`workflow_dispatch`** | **none** | **Default. Manual control, no credential.** |
+| Tag push | none | Once releases are routine |
+| `dotnet nuget push` from a terminal | yes | Only if Trusted Publishing is not yet enabled on your account |
+
+A failed publish costs nothing and claims nothing — the package ID is only taken
+on a *successful* push — so there is no risk in trying the keyless route first
+and falling back if the policy is not active yet.
+
+### Manual from a terminal — only if Trusted Publishing is unavailable
+
+The rollout is gradual, so if **Trusted Publishing** is not in your nuget.org
+account menu yet, this is the fallback.
 
 ```bash
 dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj -c Release -o ./artifacts
@@ -164,15 +256,34 @@ Inspect the result before pushing — a `.nupkg` is a zip, so open it and confir
 the DLLs, README and licence are all present and there is nothing that should
 not ship.
 
-A manual push needs a real API key: Trusted Publishing issues its token to a CI
-job, so there is nothing to exchange from your laptop. Treat that key as
-disposable — create it, push, then delete it on nuget.org the same day.
+This path needs a real API key, for the reason above: there is no OIDC token to
+exchange outside a workflow run. Treat the key as disposable — create it, push,
+then delete it on nuget.org immediately afterwards.
+
+**Pass the key by environment variable, not on the command line.** A key in
+`--api-key` lands in your shell history, and on Windows in
+`ConsoleHost_history.txt`, where it outlives the "delete it the same day" plan.
+`NUGET_API_KEY` is supported from NuGet 7.6 (.NET SDK 10.0.300), which this repo
+already builds on.
 
 ```bash
-dotnet nuget push ./artifacts/TcgDex.CSharpSdk.0.1.0.nupkg \
-  --api-key <YOUR_KEY> \
+# PowerShell
+$env:NUGET_API_KEY = '<paste-here>'
+dotnet nuget push ./artifacts/TcgDex.CSharpSdk.0.1.0.nupkg `
   --source https://api.nuget.org/v3/index.json
+Remove-Item Env:\NUGET_API_KEY
 ```
+
+```bash
+# bash — the leading space keeps it out of history when HISTCONTROL=ignorespace
+ export NUGET_API_KEY='<paste-here>'
+dotnet nuget push ./artifacts/TcgDex.CSharpSdk.0.1.0.nupkg \
+  --source https://api.nuget.org/v3/index.json
+unset NUGET_API_KEY
+```
+
+On an older SDK, `--api-key` is the only option — in which case delete the key
+on nuget.org immediately after the push rather than at the end of the day.
 
 The `.snupkg` pushes automatically alongside it. Indexing takes a few minutes
 before the package is installable.
@@ -181,60 +292,31 @@ If you would rather never handle a key at all, skip the manual push and let the
 tag-triggered workflow below do the first release too. You lose the chance to
 watch the push happen; you gain having no long-lived credential ever exist.
 
-### Automated, afterwards
+### The release workflow — this is the one to use
 
-Once the manual run has proven the package, publish on tag push. Add
-`.github/workflows/release.yml` — and note the filename must match the **Workflow
-File** in the Trusted Publishing policy exactly:
+Add `.github/workflows/release.yml`. The filename must match the **Workflow
+File** in the Trusted Publishing policy exactly.
 
-```yaml
-name: Release
-on:
-  push:
-    tags: ["v*"]
+It triggers two ways on purpose: a tag push for routine releases, and
+`workflow_dispatch` so the **first** one can be a button you press while
+watching the log — which is what removes any reason to create an API key.
 
-permissions:
-  contents: read
+The workflow lives at
+[`.github/workflows/release.yml`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/.github/workflows/release.yml) — **it
+already exists and is committed.** It is deliberately not reproduced here: a
+copy in prose is a copy that drifts, and this document has already been wrong
+once by describing something the repository does not do.
 
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write   # lets this job request the OIDC token; without it, login fails
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
+Read the file itself; every non-obvious line carries its reason. The parts that
+matter:
 
-      # Never publish something that is not green.
-      - run: dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj -c Release
-
-      # Version comes from the tag, so the tag and the package can never disagree.
-      - name: Pack
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj \
-            -c Release -o ./artifacts -p:Version="$VERSION"
-
-      # Exchange the OIDC token for a one-hour key. Last step before the push:
-      # request it early and it can expire before the push runs.
-      - name: NuGet login
-        uses: NuGet/login@v1
-        id: login
-        with:
-          user: ${{ secrets.NUGET_USER }}   # nuget.org profile name, NOT the email
-
-      - name: Push
-        run: >
-          dotnet nuget push "./artifacts/*.nupkg"
-          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
-          --source https://api.nuget.org/v3/index.json
-          --skip-duplicate
-```
+| | Why |
+|---|---|
+| `id-token: write` | Lets the job request the OIDC token. Missing it is the commonest reason trusted publishing fails first time, and the error is unhelpful. |
+| `Resolve version` runs **before** `Build` | The version has to reach the compile, not just the pack. `dotnet pack --no-build -p:Version=` alone stamps the package while the assembly inside keeps the csproj value — a DLL and a package that disagree. |
+| Semantic-version check | Fails loudly on a typo. NuGet accepts a surprising amount of nonsense as a version, and a published one cannot be withdrawn. |
+| `user: PinKushin` | The nuget.org **profile name**, not an email — the commonest `NuGet/login` failure. Written literally rather than as a secret because it is public: it is the package owner on every package page and in the policy itself. |
+| `--skip-duplicate` | Makes a re-run harmless, which is what lets a tag push follow a dispatch of the same version. |
 
 `NUGET_USER` is a repository secret holding your nuget.org **profile name** —
 not your email address, which is the commonest reason `NuGet/login` fails. It is
@@ -243,28 +325,50 @@ not sensitive; it is a secret only so the workflow file stays copy-pasteable.
 On an API key instead, drop the `NuGet login` step and the `id-token` permission,
 and use `--api-key ${{ secrets.NUGET_API_KEY }}`.
 
-Release with:
+**First release — no key, no tag, nothing to undo if it fails:**
+
+GitHub → **Actions** → **Release** → **Run workflow** → enter `0.1.0` → run.
+Watch the log. If the policy is not active or the login step fails, nothing has
+been published and nothing has been claimed; fix it and press it again.
+
+**Afterwards, tag as usual:**
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-`--skip-duplicate` stops a re-run from failing on an already-published version.
-Deriving the version from the tag removes the commonest release mistake:
-tagging `v0.2.0` while the csproj still says `0.1.0`.
+Tag *after* the dispatch succeeded, so the repository records what actually
+shipped. `--skip-duplicate` means the tag push is harmless even though that
+version already exists.
+
+`--skip-duplicate` stops a re-run from failing on an already-published version,
+which is what makes both the dispatch and the later tag push safe to repeat.
+
+Deriving the version from the tag or the input, rather than from the csproj,
+removes the commonest release mistake: tagging `v0.2.0` while
+`<Version>` still says `0.1.0`. The csproj value then only matters for local
+`dotnet pack`, and the thing you typed is the thing that ships.
 
 ---
 
-## Before submitting to tcgdex.dev/sdks
+## Getting listed on tcgdex.dev/sdks
 
-TCGdex lists community SDKs. Once published, open a pull request against
-[tcgdex/documentation](https://github.com/tcgdex/documentation) adding this one.
-There is currently **no C#/.NET SDK listed** — Java, JavaScript, Kotlin, PHP,
-TypeScript and Python only — which is the whole reason this project exists.
+**Checked 2026-08-07.** Still **no C#/.NET SDK listed** — Java, JavaScript,
+Kotlin, PHP, TypeScript and Python only, and the *Community SDKs* section is
+empty. This would be the first entry in it.
 
-Worth having in place first: a published package, a README that stands on its
-own, and green CI. All three are the point of the checklist above.
+**The route is Discord, not a pull request.** An earlier version of this page
+said to open a PR against `tcgdex/documentation`; the site itself says *"Contact
+us on Discord to have your SDK added here."* A PR might work, but a message
+where they asked for one will not sit unread in a queue.
+
+Worth having in place before asking: a published package, a README that stands
+on its own, and green CI. All three are the point of the checklist above.
+
+This listing is the reason to publish at all. A package with no distribution is
+a repository with extra steps; a link on the API's own documentation is the only
+place someone looking for a .NET client would actually pass through.
 
 ---
 
