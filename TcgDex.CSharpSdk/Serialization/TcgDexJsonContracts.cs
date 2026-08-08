@@ -82,11 +82,13 @@ internal static class TcgDexJsonContracts
     /// elsewhere still surfaces.
     /// </para>
     /// <para>
-    /// If that alert reappears, it has almost certainly not come back on its
-    /// own: CodeQL keys an alert to its location, so any edit that moves these
-    /// lines closes the dismissed alert and opens a new numbered one for
-    /// identical code. Re-dismiss it rather than rewriting the loop. The same
-    /// note is on <c>TcgDexCacheOptions.IsCatalogPath</c>, for the same reason.
+    /// If that alert reappears under a new number, re-dismiss it rather than
+    /// rewriting the loop. CodeQL fingerprints an alert from the flagged code
+    /// itself, not from its line number: moving this method around keeps the
+    /// dismissal attached, but editing the <c>foreach</c> statement changes the
+    /// fingerprint and opens a fresh alert for identical behaviour. A
+    /// <c>var</c>-to-explicit-type sweep did exactly that here. The same note is
+    /// on <c>TcgDexCacheOptions.IsCatalogPath</c>, for the same reason.
     /// </para>
     /// </remarks>
     private static JsonSerializerOptions BuildWithoutPricing()
