@@ -1,7 +1,8 @@
 # Publishing to NuGet
 
-Written for a first-time publisher. **Nothing here has been done yet** — the
-package builds locally and has never been pushed.
+Written for a first-time publisher. The package builds locally and **has never
+been pushed**. The Trusted Publishing policy is registered and active, and
+`release.yml` is committed — what remains is pressing the button.
 
 > **Verified 2026-08-07 at `f026f07`.** Everything about *this repository* was
 > re-checked by running it, not by remembering it: the package was packed and
@@ -101,12 +102,12 @@ constrained by the repository and workflow file. So when a second package
 appears, the repo and workflow are what tell two policies apart, and the package
 name would not.
 
-**`release.yml` does not exist yet, and that is fine.** The repository currently
-has `ci.yml`, `codeql.yml`, `docs.yml` and `fuzz.yml`; the release workflow is
-[created further down](#automated-afterwards). A policy naming a workflow that
-is not there yet is harmless — it is a rule about what *would* be trusted, and
-simply never matches until the file exists. Create the policy now, add the
-workflow when you automate.
+**`release.yml` exists and is committed**, alongside `ci.yml`, `codeql.yml`,
+`docs.yml` and `fuzz.yml`. Nothing else needs creating before you publish.
+
+If you register a policy before its workflow exists, that is harmless too — a
+policy is a rule about what *would* be trusted, and simply never matches until
+the file is there.
 
 The one thing that must match exactly is the filename. A policy for `release.yml`
 does not trust `publish.yml`, and the failure is a rejected push at the moment
@@ -300,63 +301,22 @@ It triggers two ways on purpose: a tag push for routine releases, and
 `workflow_dispatch` so the **first** one can be a button you press while
 watching the log — which is what removes any reason to create an API key.
 
-```yaml
-name: Release
-on:
-  push:
-    tags: ["v*"]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to publish, without the leading v (e.g. 0.1.0)"
-        required: true
+The workflow lives at
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) — **it
+already exists and is committed.** It is deliberately not reproduced here: a
+copy in prose is a copy that drifts, and this document has already been wrong
+once by describing something the repository does not do.
 
-permissions:
-  contents: read
+Read the file itself; every non-obvious line carries its reason. The parts that
+matter:
 
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write   # lets this job request the OIDC token; without it, login fails
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
-
-      # Never publish something that is not green.
-      - run: dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj -c Release
-
-      # From the tag when tagged, from the input when dispatched. GITHUB_REF_NAME
-      # is the *branch* on a dispatch, so using it unconditionally would try to
-      # publish a version called "main".
-      - name: Pack
-        run: |
-          VERSION="${{ inputs.version || github.ref_name }}"
-          VERSION="${VERSION#v}"
-          echo "packing $VERSION"
-          dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj \
-            -c Release -o ./artifacts -p:Version="$VERSION"
-
-      # Exchange the OIDC token for a one-hour key. Last step before the push:
-      # request it early and it can expire before the push runs.
-      - name: NuGet login
-        uses: NuGet/login@v1
-        id: login
-        with:
-          user: ${{ secrets.NUGET_USER }}   # nuget.org profile name, NOT the email
-
-      - name: Push
-        run: >
-          dotnet nuget push "./artifacts/*.nupkg"
-          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
-          --source https://api.nuget.org/v3/index.json
-          --skip-duplicate
-```
+| | Why |
+|---|---|
+| `id-token: write` | Lets the job request the OIDC token. Missing it is the commonest reason trusted publishing fails first time, and the error is unhelpful. |
+| `Resolve version` runs **before** `Build` | The version has to reach the compile, not just the pack. `dotnet pack --no-build -p:Version=` alone stamps the package while the assembly inside keeps the csproj value — a DLL and a package that disagree. |
+| Semantic-version check | Fails loudly on a typo. NuGet accepts a surprising amount of nonsense as a version, and a published one cannot be withdrawn. |
+| `user: PinKushin` | The nuget.org **profile name**, not an email — the commonest `NuGet/login` failure. Written literally rather than as a secret because it is public: it is the package owner on every package page and in the policy itself. |
+| `--skip-duplicate` | Makes a re-run harmless, which is what lets a tag push follow a dispatch of the same version. |
 
 `NUGET_USER` is a repository secret holding your nuget.org **profile name** —
 not your email address, which is the commonest reason `NuGet/login` fails. It is

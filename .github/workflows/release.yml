@@ -1,0 +1,135 @@
+name: Release
+
+# Publishes to nuget.org with Trusted Publishing — no API key exists anywhere.
+# The job asks GitHub for a short-lived OIDC token, nuget.org checks it against
+# the policy registered for this repository and workflow file, and hands back a
+# key valid for one hour.
+#
+# The filename is load-bearing. The trusted publishing policy names
+# `release.yml` specifically; renaming this file silently stops publishing from
+# being trusted, and the failure surfaces as a rejected push at the moment you
+# are trying to ship.
+#
+# Two triggers on purpose:
+#   workflow_dispatch — the first release, and any time you want to watch it.
+#   tag push          — routine releases once it is boring.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, without the leading v (e.g. 0.1.0)"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  publish:
+    name: Publish to NuGet
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Lets this job request the OIDC token. Without it NuGet/login fails with
+      # an unhelpful error, and it is the commonest reason trusted publishing
+      # does not work first time.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      # Resolved before anything is compiled, because the version has to reach
+      # the *build* and not just the pack. Passing it only to `dotnet pack
+      # --no-build` would stamp the package 0.2.0 while the assembly inside it
+      # still said whatever <Version> holds — a package and a DLL that disagree,
+      # which is the kind of thing nobody notices until they are debugging a
+      # consumer's stack trace.
+      #
+      # From the tag when tagged, from the input when dispatched:
+      # GITHUB_REF_NAME is the *branch* on a dispatch, so using it
+      # unconditionally would try to publish a version called "main".
+      - name: Resolve version
+        run: |
+          VERSION="${{ inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+
+          # Fail loudly rather than shipping something unparseable. NuGet would
+          # accept a surprising amount of nonsense here.
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$VERSION' is not a semantic version (expected 1.2.3 or 1.2.3-beta.1)"
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "publishing $VERSION"
+
+      - name: Restore
+        run: dotnet restore
+
+      # -warnaserror here as well as in CI: a release is exactly the build that
+      # should not be the first one to skip the zero-warning rule.
+      - name: Build
+        run: >
+          dotnet build --configuration Release --no-restore -warnaserror
+          -p:Version="$VERSION"
+
+      # Never publish something that is not green. Runs every target framework,
+      # so netstandard2.0 is executed through net472 rather than assumed.
+      - name: Test
+        run: >
+          dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj
+          --configuration Release --no-build
+
+      # Deriving the version from the tag rather than from <Version> in the
+      # csproj means the thing you typed is the thing that ships, and the csproj
+      # value cannot drift into a lie between releases.
+      - name: Pack
+        run: >
+          dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj
+          --configuration Release --no-build
+          -o ./artifacts -p:Version="$VERSION"
+
+      - name: Show what will be published
+        run: ls -la ./artifacts
+
+      # Last step before the push. The key lives one hour, so requesting it any
+      # earlier risks it expiring mid-workflow.
+      #
+      # `user` is the nuget.org profile name, NOT an email address — the
+      # commonest reason this step fails. It is written literally rather than
+      # held in a secret because it is public: it appears as the package owner
+      # on every package page and in the trusted publishing policy itself.
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: PinKushin
+
+      # --skip-duplicate makes a re-run harmless when the version already
+      # exists, which is what lets the tag push follow a dispatch of the same
+      # version without failing.
+      - name: Push
+        run: >
+          dotnet nuget push "./artifacts/*.nupkg"
+          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+      - name: Upload the published package
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: published-package
+          path: ./artifacts/*
+          if-no-files-found: warn
