@@ -1,45 +1,48 @@
 # Roadmap
 
-State at `1530656`: the SDK covers the full TCGdex REST surface, builds clean on
+State at `3b91de6`, **published to NuGet as 0.1.0**. The SDK covers the full TCGdex REST surface, builds clean on
 `netstandard2.0`, `net8.0` and `net10.0`, and is verified under Native AOT.
 
 | | |
 |---|---|
-| Tests | **470 unit × 3 frameworks + 149 integration** |
+| Tests | **480 unit × 3 frameworks + 149 integration** |
 | Mutation score | **88.19%**, break threshold 85 |
 | Line coverage | **99.80%**, gated at 99.5 |
 | Branch coverage | **96.53%**, gated at 95 |
 | Warnings | zero — compiler, analyzers, DocFX, CI annotations |
 | Docs | published to GitHub Pages on every push to `main` |
-| Package | builds, ~182 KB, both target frameworks |
+| Package | **published, 0.1.0**, 462 KB, three target frameworks |
 
-Not published to NuGet, deliberately.
+Published 2026-08-08 via Trusted Publishing — no API key was ever created.
 
 ---
 
 ## Before 1.0
 
-### 1. Publish to NuGet — *the only remaining gate*
+### 1. Publish to NuGet — done
 
-Everything else on this list is done. Full first-timer walkthrough in
-[`publishing.md`](publishing.md), including the two irreversible facts worth
-reading before the first push: a published version can never be deleted, and the
-package ID is claimed permanently.
+**0.1.0 shipped 2026-08-08** via Trusted Publishing, from a `workflow_dispatch`
+run of [`release.yml`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/.github/workflows/release.yml).
+**No API key was ever created** — a laptop cannot mint a GitHub OIDC token, but a
+button press runs inside Actions, which can.
 
-Set up **Trusted Publishing** rather than a long-lived API key. nuget.org caps
-new keys at 30 days from 2026-08-17 and expires every pre-existing key on
-2026-11-01, so a key-based pipeline is a monthly chore; the OIDC exchange is
-configured once and never expires.
+Two facts that do not stop being true now it is done: a published version can be
+unlisted but never deleted, and `TcgDex.CSharpSdk` is claimed permanently.
 
-Ship `0.x` while the API shape can still move. `1.0.0` is a promise not to break
-it.
-
-### 2. Submit to tcgdex.dev/sdks
+### 2. Get listed on tcgdex.dev/sdks — *the only remaining item*
 
 TCGdex lists official SDKs for Java, JavaScript, Kotlin, PHP, TypeScript and
-Python. There is no C#/.NET one, which is the gap this fills. Submit via a pull
-request to [tcgdex/documentation](https://github.com/tcgdex/documentation) once
-published.
+Python. Checked 2026-08-07: **still no C#/.NET one**, and the *Community SDKs*
+section is empty, so this would be the first entry in it.
+
+**The route is Discord, not a pull request.** The site says "Contact us on
+Discord to have your SDK added here"; an earlier version of this page said to
+open a PR against `tcgdex/documentation`, which is not what they ask for.
+
+This is the step that makes publishing worth having done. A package with no
+distribution is a repository with extra steps; a link on the API's own
+documentation is the one place a person looking for a .NET client actually
+passes through.
 
 ---
 
