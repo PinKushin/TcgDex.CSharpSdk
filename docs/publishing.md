@@ -1,8 +1,9 @@
 # Publishing to NuGet
 
-Written for a first-time publisher. The package builds locally and **has never
-been pushed**. The Trusted Publishing policy is registered and active, and
-`release.yml` is committed — what remains is pressing the button.
+Written for a first-time publisher. **0.1.0 was published on 2026-08-08** by a
+`workflow_dispatch` run of `release.yml`, using Trusted Publishing — no API key
+was ever created. This page is kept as the record of how, and as the guide for
+the next release.
 
 > **Verified 2026-08-07 at `f026f07`.** Everything about *this repository* was
 > re-checked by running it, not by remembering it: the package was packed and

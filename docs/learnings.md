@@ -618,6 +618,62 @@ evict the entry just written. A clear-then-store sequence — the obvious thing 
 consumer does — would silently lose data.
 
 ---
+## A dependency update can pass every check and still be wrong to merge
+
+Dependabot proposed unifying `Directory.Packages.props` on `10.0.10`. It was
+**green**: built and tested on `netstandard2.0`, `net8.0` and `net10.0`, CodeQL
+clean, docs clean. Every gate this repository has said yes.
+
+It would still have been a mistake. The file deliberately splits versions by
+target — `net8.0` and `netstandard2.0` on the 8.0.x line, `net10.0` on 10.x —
+because **a library's dependency versions become a floor for every consumer**.
+Taking 10.x would force a `net8.0` application onto the 10.x
+`Microsoft.Extensions` graph and conflict with an ASP.NET Core 8 app pinned to
+8.0.x. NuGet resolves upwards on its own, so asking for the lowest version that
+satisfies each target costs nobody anything and constrains them least.
+
+**No test here can catch that, and no test could.** The harm lands on a consumer
+who does not exist yet, and a test suite can only represent code that exists.
+This is the clearest example in this document of a gate's boundary: green means
+"nothing we thought to check is broken", never "this is a good idea".
+
+It also disproved a comment in the same file. That comment claimed 8.0.x was
+"the newest line that still supports netstandard2.0" — the 10.0.10 build
+succeeded on `netstandard2.0`, so it was simply untrue. The right reason to stay
+is the floor, not compatibility, and a *wrong* reason for a *correct* decision is
+its own hazard: it survives until someone checks it, and then takes the decision
+down with it.
+
+Fixed with `ignore: version-update:semver-major` on the shipped packages. Patch
+and minor still flow, which is what matters for security fixes; moving a
+framework line stays a decision someone makes deliberately.
+
+---
+## `dotnet test` printed "Passed!" for a run that crashed
+
+Chasing a hang in a new test produced this:
+
+```
+The active test run was aborted. Reason: Test host process crashed
+
+Passed!  - Failed: 0, Passed: 4, Skipped: 0, Total: 4
+```
+
+Four tests had completed before the host died. The summary reports those four
+and says **Passed!**, with the abort on a separate line above it. A CI step
+grepping for `Failed!` — or a human reading the last line — sees green.
+
+The cause was a test double stalling inside `HttpContent.SerializeToStreamAsync`
+and being cancelled there, which takes the host down rather than throwing.
+Modelling the stall as a `Stream` whose `ReadAsync` observes the token is both
+safer and closer to a real socket.
+
+Two things to carry: **read the whole test output, not the summary line**, and
+when a test hangs, suspect the test before the code. The same shape appears
+twice more in this document — a stale artefact reporting success, and a green
+fuzz run that executed nothing.
+
+---
 ## A multiplexed fuzz harness needs a seed per mode, and your natural seeds won't give you one
 
 The fuzz target selects between seven modes on the first byte of the input —
