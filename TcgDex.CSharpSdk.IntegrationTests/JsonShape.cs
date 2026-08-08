@@ -90,8 +90,35 @@ internal static class JsonShape
         }
         else if (kind != "Null")
         {
-            shape[path] = $"{existing}|{kind}";
+            shape[path] = Union(existing, kind);
         }
+    }
+
+    /// <summary>
+    /// Combines two observed kinds for one path into a canonical union.
+    /// </summary>
+    /// <remarks>
+    /// Sorted, because the parts must not depend on the order the elements
+    /// happened to be walked in. <c>attacks[].damage</c> is genuinely
+    /// <c>Number</c> on one card and <c>String</c> on another, so appending in
+    /// encounter order made the same document describe as <c>Number|String</c>
+    /// or <c>String|Number</c> depending on which card came first — and
+    /// <see cref="Compare"/> reads that difference as a retype. That is a
+    /// spurious breaking failure in a job that runs unattended, where the only
+    /// available response is to go hunting for a change that never happened.
+    /// </remarks>
+    private static string Union(string existing, string kind)
+    {
+        SortedSet<string> kinds = new(StringComparer.Ordinal);
+
+        foreach (string part in existing.Split('|'))
+        {
+            kinds.Add(part);
+        }
+
+        kinds.Add(kind);
+
+        return string.Join("|", kinds);
     }
 
     private static string Describe(JsonValueKind kind)

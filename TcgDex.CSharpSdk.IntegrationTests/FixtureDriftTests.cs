@@ -58,14 +58,28 @@ public sealed class FixtureDriftTests : LiveApiFixture
 
         (IReadOnlyList<string>? breaking, IReadOnlyList<string>? additive) = JsonShape.Compare(recorded, live);
 
-        // Additive changes are reported but do not fail: the API gaining a field
-        // is worth knowing without breaking a build over it.
-        if (additive.Count > 0)
-        {
-            TestContext.Out.WriteLine(JsonShape.Report(fixture, source, additive));
-        }
-
+        // Breaking first, because a retyped field is the more urgent of the two
+        // and its message should not be buried under a list of new ones.
         breaking.ShouldBeEmpty(JsonShape.Report(fixture, source, breaking));
+
+        // Additive changes fail too. They used to be written to TestContext.Out
+        // and nothing more, which made them invisible in practice: this fixture
+        // only runs in the weekly scheduled job, so "reported" meant a line in
+        // the stdout of a run that reported green and nobody opened.
+        //
+        // A field the API starts serving is exactly the drift worth acting on —
+        // it is how `pricing`, `variants_detailed` and `updated` came to be
+        // served by TCGdex for a long time while the official JS SDK's types
+        // omitted all three. Silently logging that class of change is how an SDK
+        // falls behind the API it wraps.
+        //
+        // Failing costs nothing here. These tests are gated to
+        // `schedule || workflow_dispatch`, so no pull request is ever blocked by
+        // this; the red run *is* the notification. To respond: model the new
+        // field, then refresh the recording with scripts/Update-Fixtures.ps1 —
+        // in that order, because refreshing first makes this pass whether or not
+        // the model was updated.
+        additive.ShouldBeEmpty(JsonShape.Report(fixture, source, additive));
     }
 
     [Test]
