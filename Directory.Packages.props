@@ -94,6 +94,17 @@
     <PackageVersion Include="NUnit3TestAdapter" Version="6.2.0" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+
+    <!-- Property-based testing: generates thousands of inputs and shrinks a
+         failure to its smallest reproducing case. Complements the fuzzers,
+         which hunt for crashes on malformed input; these assert that a stated
+         property holds across valid input.
+
+         Apache-2.0, test-only, never shipped. Note it ships **only a net8.0
+         asset** — no netstandard2.0 — so it is referenced for net8.0 and
+         net10.0 and excluded from the net472 leg of the unit suite, the same
+         shape as PublicApiGenerator above. -->
+    <PackageVersion Include="CsCheck" Version="4.8.0" />
   </ItemGroup>
 
 </Project>

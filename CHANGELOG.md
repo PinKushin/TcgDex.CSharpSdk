@@ -17,6 +17,16 @@ something an application can observe — those live in the commit history.
 
 ### Added
 
+- **Property-based testing** with [CsCheck](https://github.com/AnthonyLloyd/CsCheck)
+  (Apache-2.0, test-only, never shipped) — seven properties over `BoundedLru` and
+  `JsonShape`. [`docs/measuring.md`](docs/measuring.md) documents them, and now
+  also carries an honest list of what is **not** measured and why — including the
+  GraphQL nested-fetch claim that justifies the whole GraphQL layer and has never
+  been timed.
+
+  Test tooling, so no behaviour change. Recorded here only because the page
+  describing it is one a consumer may read.
+
 - **Which assembly you get** ([`docs/getting-started.md`](docs/getting-started.md))
   — a resolution table for the three shipped targets. `netstandard2.0` is why
   the NuGet listing shows so many compatible frameworks; it is the universal

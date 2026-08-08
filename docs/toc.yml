@@ -33,7 +33,7 @@
   items:
     - name: Test coverage
       href: coverage.md
-    - name: Benchmarks and mutation testing
+    - name: Benchmarks, properties and mutation testing
       href: measuring.md
     - name: Compared with the other C# SDK
       href: comparison.md

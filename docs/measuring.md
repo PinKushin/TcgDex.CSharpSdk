@@ -1,20 +1,35 @@
-# Benchmarks, mutation testing and fuzzing
+# Benchmarks, properties, mutation testing and fuzzing
 
-Three things the rest of the test suite cannot tell you: **how fast the code
-is**, **whether the tests would notice if it were wrong**, and **what happens on
-input nobody thought of**. All three tools are free and MIT/Apache-2.0, and none
-ships in the package — BenchmarkDotNet and SharpFuzz live in their own
-non-packable projects, Stryker is a `dotnet tool`.
+Four things the rest of the test suite cannot tell you: **how fast the code is**,
+**whether a stated invariant holds for inputs nobody wrote down**, **whether the
+tests would notice if the code were wrong**, and **what happens on input nobody
+thought of**.
+
+All four tools are free and MIT/Apache-2.0, and none ships in the package —
+BenchmarkDotNet and SharpFuzz live in their own non-packable projects, Stryker is
+a `dotnet tool`, and CsCheck is a test-only reference.
+
+The four overlap less than they look. A benchmark says a thing is fast; a
+property says it is right for a thousand inputs; mutation testing says the tests
+would have noticed had it not been; a fuzzer says it does not fall over on input
+the SDK never produced. Each has caught a defect in this repository that the
+others did not.
 
 ---
 
 ## Benchmarks
 
 ```bash
+# everything
+dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*"
+
+# or one set at a time
 dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*Query*"
 dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*Serialization*"
 dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*LargePayload*"
+dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*Caching*"
 dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*Eviction*"
+dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*Comparison*"
 ```
 
 Release only — BenchmarkDotNet refuses a Debug build, and it is right to: a Debug
@@ -23,8 +38,18 @@ iterating; omit it for numbers worth quoting.
 
 ### What they measure, and why those things
 
-Both benchmark sets exist to check claims that were previously **arguments
-rather than evidence**.
+**Six sets, 29 benchmarks.** Each exists to check a claim that was previously an
+**argument rather than evidence** — several of them claims this repository had
+already written down and had wrong.
+
+| Set | Benchmarks | The claim it tests |
+|---|---|---|
+| `QueryBenchmarks` | 4 | The expression translator is cheap despite never calling `Expression.Compile()`. |
+| `SerializationBenchmarks` | 6 | Source generation beats reflection. **It does not**, on time — see below. |
+| `LargePayloadBenchmarks` | 5 | Conclusions drawn from an 18 KB card still hold at 2.3 MB. |
+| `CachingBenchmarks` | 5 | A cache hit is worth having, and a warm hit skips the parse. |
+| `EvictionBenchmarks` | 5 | Storing into a full cache costs about what storing into an empty one does. |
+| `ComparisonBenchmarks` | 5 | This SDK is competitive with the other C# TCGdex client. |
 
 `QueryBenchmarks` covers the expression-tree translator, which never calls
 `Expression.Compile()`. The AOT smoke test proves that choice is *safe*; this
@@ -35,7 +60,17 @@ order of magnitude — which would mean something started allocating or compilin
 
 `SerializationBenchmarks` compares the shipped source-generated path against
 reflection-based `System.Text.Json`, with the same naming policy, the same
-case-insensitivity and the same converters on both sides.
+case-insensitivity and the same converters on both sides. It also includes a
+Newtonsoft.Json leg, and legs with pricing and with attacks removed, which is
+where the cost of the `pricing` block was quantified.
+
+`CachingBenchmarks` and `EvictionBenchmarks` cover the two halves of the cache:
+what a hit saves, and what a store costs once the store is full. The second
+found a real defect — see [Where a cache store spends its time](#where-a-cache-store-spends-its-time).
+
+`ComparisonBenchmarks` runs both SDKs through the same harness. Its first version
+was wrong in this SDK's favour by disabling caching on one side only; the numbers
+here are from after that was fixed.
 
 ### The result corrected a claim
 
@@ -140,6 +175,104 @@ The store is flat across the sweep afterwards, where before it grew with a bound
 the caller chooses. This also corrects a claim made from `CachingBenchmarks`:
 the caching layer's overhead of ~0.8 µs was measured on a cache that had never
 filled, and a store into a full one was never anywhere near that.
+
+---
+
+### What is not measured, and why
+
+Listed so the gaps are deliberate rather than accidental. Anything here is a
+claim the project currently makes on reasoning alone.
+
+| Not measured | The unbacked claim | Worth doing? |
+|---|---|---|
+| **GraphQL nested fetch vs REST N+1** | "`set(id){cards{…}}` in one round trip beats REST's one call per card." | **Yes — this is the biggest gap.** It is stated as fact in [api-info.md](api-info.md) and [architecture.md](architecture.md) and justifies the entire GraphQL layer, and nothing has timed it. Needs a live-network benchmark, which is why it has not been written: BenchmarkDotNet against someone else's free API is a poor citizen. A recorded-response harness would measure the wrong thing, since the whole claim is about round trips. |
+| **`StreamAsync` per-page overhead** | Auto-pagination costs no more than the manual loop it replaces. | Low value. It is a `foreach` over the same requests; the cost is the requests. |
+| **Concurrent request coalescing** | Twelve concurrent readers collapse to one fetch. | Already proven by a unit test that counts requests. A benchmark would measure the test harness's thread scheduling more than the SDK. |
+| **`BoundedLru` under contention** | The cache is correct with concurrent writers. | Correctness here is checked by property tests rather than timed. A throughput number would be real, but nothing in the SDK's own use is contended enough to act on it. |
+| **Image URL construction** | — | String concatenation. Measuring it would be theatre. |
+
+The pattern worth keeping: **measure the claims that decide a design, not the
+code that happens to be easy to measure.** Every entry above that says "yes" is
+there because a design decision rests on it.
+
+---
+
+## Property-based testing
+
+```bash
+dotnet test TcgDex.CSharpSdk.Tests --filter "FullyQualifiedName~Properties"
+dotnet test TcgDex.CSharpSdk.IntegrationTests --filter "FullyQualifiedName~Properties"
+```
+
+[CsCheck](https://github.com/AnthonyLloyd/CsCheck) (Apache-2.0, test-only)
+generates inputs, and shrinks any failure to the smallest case that still
+reproduces it.
+
+### Why, when there are already fuzzers
+
+They answer different questions. The fuzzers ask *does anything crash on input
+the SDK did not produce*. Properties ask *does a stated invariant hold across
+valid input* — a bug that returns a wrong answer without throwing is invisible to
+a fuzzer and is exactly what a property catches.
+
+### It was added because of a bug that example tests missed for months
+
+`JsonShape` builds a union when one path holds two kinds across array elements —
+`attacks[].damage` is genuinely a number on one card and a string on another. It
+built that union by appending in encounter order, so the same document described
+as `Number|String` or `String|Number` depending on which element came first, and
+the comparison read the difference as a retype. A spurious breaking failure, in
+the unattended weekly job.
+
+Stated as a property it is one line — *the description of a document does not
+depend on the order of its array elements* — and generation finds it without
+anyone having thought of the case. Reintroducing the bug fails
+`Describe_DoesNotDependOnElementOrder` with a counter-example shrunk in **3
+shrinks out of 100 cases**, and a seed to replay it:
+
+```
+CsCheck.CsCheckException : Set seed: "7x8k2qc_O0e3" to reproduce (3 shrinks, 65 skipped, 100 total).
+```
+
+### What has properties
+
+| Type | Properties | What they pin |
+|---|---|---|
+| `BoundedLru` | 4 | The bound is never exceeded; the entry just written is still there; a replace is not growth; remove-then-write leaves the count consistent. |
+| `JsonShape` | 3 | Description is order-independent; comparison is reflexive; both directions notice the same drift. |
+
+`TheEntryJustWrittenIsStillThere` is the one worth reading. Eviction once ordered
+entries by a wall clock, whose resolution is coarse enough that a batch of writes
+shared a timestamp — so the sort could place the entry just inserted inside the
+evicted prefix, and a `Set` immediately followed by a `TryGet` missed. It
+surfaced only on the fast net472 leg, where writes landed inside one tick. The
+property holds it closed for every sequence rather than for the one that happened
+to expose it.
+
+### These were verified by breaking the code, not by watching them pass
+
+A property that has never been red proves nothing, and one of these proved
+exactly that. `ReplacingAnExistingKeyDoesNotEvict` passed with a replace
+deliberately counted as growth — because `Count` reads the dictionary rather than
+the tracked counter, so the drift is invisible until a *later* insert acts on it,
+and the sequence never inserted afterwards.
+
+That is the "wrong condition" failure: an input for which correct and broken
+predict the same observation. The fix was to the input — stay under the bound,
+rewrite heavily, then add one key — not to the assertion. With that, the same
+manipulation fails it.
+
+### Cost
+
+Deliberately small. Each property runs CsCheck's default 100 cases and the whole
+set adds well under a second, so it stays in the normal test run rather than
+becoming a nightly job. Fuzzing is where the long budgets belong.
+
+CsCheck ships a **net8.0 asset only**, so the properties are excluded from the
+`net472` leg of the unit suite — the same shape as `PublicApiGenerator`. They are
+statements about pure logic and hold identically on every target; the net472 leg
+exists to execute the netstandard2.0 assembly, which they do not exercise
+differently.
 
 ---
 
