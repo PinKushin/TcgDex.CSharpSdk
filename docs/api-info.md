@@ -482,6 +482,17 @@ Field selection (smaller payloads) and nested fetch in a single round trip:
 
 REST needs one call per card for the same data.
 
+> **What the SDK exposes is the flat search, not that nested query.**
+> `CardFilter` has no set field, so `SearchDetailedAsync` cannot fetch a set's
+> cards in one request. The nested form above is a property of the API that this
+> SDK does not currently surface — see *Possible later* in
+> [roadmap.md](roadmap.md).
+>
+> The win is real for what the SDK *does* offer: full detail for every card
+> matching a filter, in one request instead of one per card. Measured at
+> **7–8× faster and ~60% less allocated** — see
+> [measuring.md](measuring.md#one-request-against-n1).
+
 **Consequence for SDK design:** REST must remain the primary transport — GraphQL cannot serve 17
 of the 18 languages, any range filter, or any pricing data. GraphQL is an opt-in optimization for
 projection and nested fetch.

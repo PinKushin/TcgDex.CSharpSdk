@@ -178,6 +178,51 @@ filled, and a store into a full one was never anywhere near that.
 
 ---
 
+### One request against N+1
+
+The claim that justifies shipping a GraphQL layer at all: fetching full card
+detail in a single request beats REST's one call per card. Stated as fact in
+[api-info.md](api-info.md) and [architecture.md](architecture.md) for months
+before anyone timed it.
+
+```bash
+dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*RoundTrip*"
+```
+
+**Run by hand, once, and deliberately not in CI.** Every other benchmark here
+uses a stub transport; this one cannot, because the entire claim is about round
+trips and a recorded response would measure the wrong thing. It issues real
+requests to a free public API somebody else pays for — about 124 for the whole
+run, which is a defensible one-off and an indefensible weekly job.
+
+Measured 2026-08-08, caching off on both sides including the deserialized-response
+cache:
+
+| Query | REST: list + one per card | GraphQL: one request | Ratio | Allocated |
+|---|---|---|---|---|
+| `Furret` — 13 requests vs 1 | 560.63 ms | **81.15 ms** | 0.14 | 185 KB → 78 KB |
+| `Sentret` — 16 requests vs 1 | 575.00 ms | **67.95 ms** | 0.12 | 214 KB → 87 KB |
+
+So roughly **7–8× faster and 60% less allocated**, and the claim survives
+contact with a measurement. A second run gave 0.19 and 0.14 — same order, and a
+reminder that this measures TCGdex's servers and a home connection as much as
+the SDK.
+
+**One result does not fit the story, and is worth saying so.** The REST leg
+barely moved between 13 and 16 requests — 560 ms against 575 ms, under 3% for
+23% more requests. If per-request latency dominated, that should have been
+nearer 690 ms. Three iterations cannot resolve why: connection reuse, server-side
+variance and the size of the initial list response are all candidates. The
+headline ratio is not in doubt at these sizes; the *scaling* is not established,
+so nothing here should be extrapolated to a 200-card set without measuring it.
+
+**What is compared is what the SDK ships.** The GraphQL section of
+[api-info.md](api-info.md) illustrates the win with `set(id){cards{…}}` — real in
+the API, but **not exposed by this SDK**, because `CardFilter` has no set field.
+The flat detailed search is what a caller can actually reach, so that is what was
+timed. Benchmarking the nested form would have produced a number for a feature
+nobody can call.
+
 ### What is not measured, and why
 
 Listed so the gaps are deliberate rather than accidental. Anything here is a
@@ -185,7 +230,7 @@ claim the project currently makes on reasoning alone.
 
 | Not measured | The unbacked claim | Worth doing? |
 |---|---|---|
-| **GraphQL nested fetch vs REST N+1** | "`set(id){cards{…}}` in one round trip beats REST's one call per card." | **Yes — this is the biggest gap.** It is stated as fact in [api-info.md](api-info.md) and [architecture.md](architecture.md) and justifies the entire GraphQL layer, and nothing has timed it. Needs a live-network benchmark, which is why it has not been written: BenchmarkDotNet against someone else's free API is a poor citizen. A recorded-response harness would measure the wrong thing, since the whole claim is about round trips. |
+| ~~GraphQL vs REST N+1~~ | — | **Now measured.** See [One request against N+1](#one-request-against-n1). |
 | **`StreamAsync` per-page overhead** | Auto-pagination costs no more than the manual loop it replaces. | Low value. It is a `foreach` over the same requests; the cost is the requests. |
 | **Concurrent request coalescing** | Twelve concurrent readers collapse to one fetch. | Already proven by a unit test that counts requests. A benchmark would measure the test harness's thread scheduling more than the SDK. |
 | **`BoundedLru` under contention** | The cache is correct with concurrent writers. | Correctness here is checked by property tests rather than timed. A throughput number would be real, but nothing in the SDK's own use is contended enough to act on it. |
