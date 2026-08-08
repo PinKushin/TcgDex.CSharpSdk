@@ -72,7 +72,9 @@ internal static class TcgDexJsonContracts
 
     private static JsonSerializerOptions BuildWithoutPricing()
     {
-        IJsonTypeInfoResolver resolver = ((IJsonTypeInfoResolver)TcgDexJsonContext.Default)
+        // No cast to IJsonTypeInfoResolver: JsonSerializerContext implements it,
+        // so the extension method binds directly.
+        IJsonTypeInfoResolver resolver = TcgDexJsonContext.Default
             .WithAddedModifier(static typeInfo =>
             {
                 if (typeInfo.Type != typeof(Card))
