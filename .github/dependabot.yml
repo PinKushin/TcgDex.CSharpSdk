@@ -77,6 +77,31 @@ updates:
           - "SharpFuzz"
           - "Newtonsoft.Json"
           - "TCGdex"
+    # Major bumps on the shipped dependencies are ignored, and this is the one
+    # rule here that is not about noise.
+    #
+    # Dependabot cannot see that Directory.Packages.props deliberately splits
+    # these by target framework — net8.0 and netstandard2.0 on the 8.0.x line,
+    # net10.0 on 10.x. Its first attempt (PR #3) unified everything on 10.0.10,
+    # and **it was green**: built and tested on all three targets. The damage is
+    # invisible to CI because it lands on a consumer who does not exist yet — a
+    # library's dependency versions become a floor for everyone who takes it, so
+    # 10.x here forces a net8.0 app onto the 10.x Microsoft.Extensions graph and
+    # conflicts with an ASP.NET Core 8 app pinned to 8.0.x.
+    #
+    # Patch and minor updates still flow, which is what matters for security
+    # fixes. Moving a framework line stays a decision someone makes on purpose.
+    ignore:
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Bcl.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "System.Text.Json"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "System.Net.Http.Json"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "System.Diagnostics.DiagnosticSource"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "deps"
     labels: ["dependencies", "nuget"]

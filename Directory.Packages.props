@@ -28,8 +28,24 @@
 
   <!-- netstandard2.0 has no in-box System.Text.Json, no IAsyncEnumerable, and
        no ActivitySource, so what the modern targets get from the shared
-       framework arrives here as packages. 8.0.x throughout: it is the newest
-       line that still supports netstandard2.0. -->
+       framework arrives here as packages.
+
+       8.0.x throughout, and the reason is the dependency floor rather than
+       compatibility. An earlier version of this comment claimed 8.0.x was "the
+       newest line that still supports netstandard2.0" — a Dependabot pull
+       request bumping everything here to 10.0.10 built and tested green on all
+       three targets, which disproves it.
+
+       The real reason: a library's dependency versions become a floor for every
+       consumer. Taking 10.x here would force a net8.0 application onto the 10.x
+       Microsoft.Extensions graph and conflict with an ASP.NET Core 8 app that
+       pins 8.0.x. NuGet resolves upwards on its own, so a consumer already on
+       10.x still gets it — asking for the lowest version that satisfies each
+       target costs them nothing and constrains them least.
+
+       Major bumps on these are therefore ignored in .github/dependabot.yml.
+       **CI cannot catch this**: that pull request was green, because the harm
+       lands on a consumer who does not exist yet. -->
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
     <PackageVersion Include="System.Text.Json" Version="8.0.6" />
     <PackageVersion Include="System.Net.Http.Json" Version="8.0.1" />
