@@ -122,7 +122,11 @@ public sealed class QueryAndPagingTests : LiveApiFixture
             new CardQuery().Where(c => c.Hp > 300).Page(1, 10),
             Timeout);
 
-        cards.ShouldNotBeEmpty();
+        // A full page. An ignored filter and an honoured one both return
+        // results, so "not empty" cannot tell them apart — the page size shows
+        // the request was understood, and the HP check below shows it was
+        // applied.
+        cards.Count.ShouldBe(10, "far more than ten cards have over 300 HP");
 
         Card? card = await Client.Cards.GetAsync(cards[0].Id, Timeout);
         card.ShouldNotBeNull().Hp.ShouldNotBeNull().ShouldBeGreaterThan(300);

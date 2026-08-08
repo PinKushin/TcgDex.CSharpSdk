@@ -49,14 +49,18 @@ public sealed class LanguageTests : LiveApiFixture
 
         IReadOnlyList<CardBrief> page = await client.Cards.ListAsync(new CardQuery().Page(1, 1), Timeout);
 
-        page.ShouldNotBeEmpty($"language '{language}' is advertised as supported");
+        page.Count.ShouldBe(1, $"language '{language}' is advertised as supported, and one item was asked for");
 
         // Round-trip that language's own card id, proving detail lookups work
         // there too and not just the list endpoint.
         Card? card = await client.Cards.GetAsync(page[0].Id, Timeout);
 
         card.ShouldNotBeNull($"'{page[0].Id}' came from the {language} list, so it must resolve there");
-        card.Name.ShouldNotBeNullOrWhiteSpace();
+
+        // The same card, not merely a card. A language whose detail endpoint
+        // fell back to English would still return something named.
+        card.Id.ShouldBe(page[0].Id);
+        card.Name.ShouldBe(page[0].Name, "the list and detail endpoints must agree within a language");
     }
 
     [TestCaseSource(nameof(PopulatedLanguages))]
@@ -67,7 +71,20 @@ public sealed class LanguageTests : LiveApiFixture
 
         IReadOnlyList<string> categories = await client.Catalog.CategoriesAsync(Timeout);
 
-        categories.ShouldNotBeEmpty($"language '{language}' should expose categories");
+        // Counted rather than "not empty". The values themselves are translated
+        // — French returns Dresseur, Pokémon and Énergie — so they cannot be
+        // pinned across languages, but the count can be, and a language serving
+        // a truncated catalogue is the failure worth catching.
+        //
+        // pt-br is a genuine exception rather than a bug: the endpoint reports
+        // the categories that language's cards actually use, and Brazilian
+        // Portuguese has no Energy cards recorded, so it returns two. Verified
+        // across all fourteen populated languages; every other one returns three.
+        int expected = language == "pt-br" ? 2 : 3;
+
+        categories.Count.ShouldBe(
+            expected,
+            $"'{language}' must expose its full category set, whatever those are called there");
     }
 
     [TestCaseSource(nameof(EmptyLanguages))]

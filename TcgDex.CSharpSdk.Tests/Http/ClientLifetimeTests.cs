@@ -100,9 +100,12 @@ public sealed class ClientLifetimeTests
     {
         using TcgDexClient client = TcgDexClient.Create();
 
-        // All five, not a spot check of two. Create wires each resource by hand,
-        // so omitting one is a plausible edit — and a test that sampled Cards
-        // and Catalog would have stayed green with Sets left null.
+        // Deliberately the one test in this suite whose assertions are all
+        // "not null". There is nothing more specific to predict: the claim is
+        // that Create wires every resource, and a resource is either there or
+        // it is not. What makes it a real check is that it is exhaustive —
+        // Create wires each one by hand, so omitting one is a plausible edit,
+        // and sampling Cards and Catalog would have stayed green with Sets null.
         client.Cards.ShouldNotBeNull();
         client.Sets.ShouldNotBeNull();
         client.Series.ShouldNotBeNull();

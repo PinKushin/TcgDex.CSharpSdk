@@ -151,6 +151,20 @@ public sealed class CatalogTests : LiveApiFixture
             new CardQuery().Where(c => c.Rarity == rarity).Page(1, 5),
             Timeout);
 
-        cards.ShouldNotBeEmpty($"'{rarity}' is listed as a rarity so it must be filterable");
+        // Not merely "some results". An API that ignored an unrecognised filter
+        // parameter would return a full unfiltered page, and "not empty" is
+        // exactly what that failure looks like — so the page is counted, and
+        // then one card is fetched in full to confirm the filter was applied
+        // rather than dropped.
+        //
+        // CardBrief carries no rarity, which is why the second request is
+        // needed. It is deliberately one card and not five: proving the filter
+        // reached the server does not need repeating, and this suite runs
+        // against someone else's free API.
+        cards.Count.ShouldBe(5, $"'{rarity}' is listed as a rarity so a page of five must come back");
+
+        Card? first = await Client.Cards.GetAsync(cards[0].Id, Timeout);
+
+        first.ShouldNotBeNull().Rarity.ShouldBe(rarity, "the filter must be applied, not ignored");
     }
 }
