@@ -216,9 +216,36 @@ right way to get real usage before committing.
 
 ## Publishing
 
-### Manual, the first time
+**You almost certainly do not need an API key at all.** Read this before creating
+one.
 
-Do the first publish by hand so you see each step.
+Trusted Publishing exchanges a GitHub OIDC token for a one-hour key, and GitHub
+only issues those tokens *inside a workflow run*. Your laptop cannot mint one, so
+there is genuinely nothing to exchange from a terminal — that part of the
+constraint is real.
+
+What does not follow is that the first release has to happen from a terminal.
+**Add `workflow_dispatch` to the release workflow and press the button.** That
+runs in Actions, so OIDC works, and you get the same "watch it happen, one step
+at a time" that a manual push offers, with a live log — and no long-lived
+credential is ever created, stored, or forgotten about.
+
+So the honest ordering is:
+
+| | Key needed | When it makes sense |
+|---|---|---|
+| **`workflow_dispatch`** | **none** | **Default. Manual control, no credential.** |
+| Tag push | none | Once releases are routine |
+| `dotnet nuget push` from a terminal | yes | Only if Trusted Publishing is not yet enabled on your account |
+
+A failed publish costs nothing and claims nothing — the package ID is only taken
+on a *successful* push — so there is no risk in trying the keyless route first
+and falling back if the policy is not active yet.
+
+### Manual from a terminal — only if Trusted Publishing is unavailable
+
+The rollout is gradual, so if **Trusted Publishing** is not in your nuget.org
+account menu yet, this is the fallback.
 
 ```bash
 dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj -c Release -o ./artifacts
@@ -228,9 +255,9 @@ Inspect the result before pushing — a `.nupkg` is a zip, so open it and confir
 the DLLs, README and licence are all present and there is nothing that should
 not ship.
 
-A manual push needs a real API key: Trusted Publishing issues its token to a CI
-job, so there is nothing to exchange from your laptop. Treat that key as
-disposable — create it, push, then delete it on nuget.org the same day.
+This path needs a real API key, for the reason above: there is no OIDC token to
+exchange outside a workflow run. Treat the key as disposable — create it, push,
+then delete it on nuget.org immediately afterwards.
 
 **Pass the key by environment variable, not on the command line.** A key in
 `--api-key` lands in your shell history, and on Windows in
@@ -264,17 +291,25 @@ If you would rather never handle a key at all, skip the manual push and let the
 tag-triggered workflow below do the first release too. You lose the chance to
 watch the push happen; you gain having no long-lived credential ever exist.
 
-### Automated, afterwards
+### The release workflow — this is the one to use
 
-Once the manual run has proven the package, publish on tag push. Add
-`.github/workflows/release.yml` — and note the filename must match the **Workflow
-File** in the Trusted Publishing policy exactly:
+Add `.github/workflows/release.yml`. The filename must match the **Workflow
+File** in the Trusted Publishing policy exactly.
+
+It triggers two ways on purpose: a tag push for routine releases, and
+`workflow_dispatch` so the **first** one can be a button you press while
+watching the log — which is what removes any reason to create an API key.
 
 ```yaml
 name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, without the leading v (e.g. 0.1.0)"
+        required: true
 
 permissions:
   contents: read
@@ -286,8 +321,8 @@ jobs:
       contents: read
       id-token: write   # lets this job request the OIDC token; without it, login fails
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
             8.0.x
@@ -296,10 +331,14 @@ jobs:
       # Never publish something that is not green.
       - run: dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj -c Release
 
-      # Version comes from the tag, so the tag and the package can never disagree.
+      # From the tag when tagged, from the input when dispatched. GITHUB_REF_NAME
+      # is the *branch* on a dispatch, so using it unconditionally would try to
+      # publish a version called "main".
       - name: Pack
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "packing $VERSION"
           dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj \
             -c Release -o ./artifacts -p:Version="$VERSION"
 
@@ -326,16 +365,30 @@ not sensitive; it is a secret only so the workflow file stays copy-pasteable.
 On an API key instead, drop the `NuGet login` step and the `id-token` permission,
 and use `--api-key ${{ secrets.NUGET_API_KEY }}`.
 
-Release with:
+**First release — no key, no tag, nothing to undo if it fails:**
+
+GitHub → **Actions** → **Release** → **Run workflow** → enter `0.1.0` → run.
+Watch the log. If the policy is not active or the login step fails, nothing has
+been published and nothing has been claimed; fix it and press it again.
+
+**Afterwards, tag as usual:**
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-`--skip-duplicate` stops a re-run from failing on an already-published version.
-Deriving the version from the tag removes the commonest release mistake:
-tagging `v0.2.0` while the csproj still says `0.1.0`.
+Tag *after* the dispatch succeeded, so the repository records what actually
+shipped. `--skip-duplicate` means the tag push is harmless even though that
+version already exists.
+
+`--skip-duplicate` stops a re-run from failing on an already-published version,
+which is what makes both the dispatch and the later tag push safe to repeat.
+
+Deriving the version from the tag or the input, rather than from the csproj,
+removes the commonest release mistake: tagging `v0.2.0` while
+`<Version>` still says `0.1.0`. The csproj value then only matters for local
+`dotnet pack`, and the thing you typed is the thing that ships.
 
 ---
 
