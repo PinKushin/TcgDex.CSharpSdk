@@ -51,6 +51,29 @@ public sealed class TranslatorDefensiveTests
     private static NotSupportedException Rejects(Expression<Func<Probe, bool>> predicate)
         => Should.Throw<NotSupportedException>(() => ExpressionTranslator.Translate(predicate));
 
+    /// <summary>
+    /// Asserts that the rejection message names the construct that caused it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Every test below used to end at <c>Message.ShouldNotBeNullOrWhiteSpace()</c>
+    /// — nine tests making the same claim, none of them checking the thing the
+    /// message exists for. A message reading only "unsupported predicate" would
+    /// have passed all nine, and a developer holding it would still not know
+    /// which clause of their query was at fault.
+    /// </para>
+    /// <para>
+    /// The offending expression is what makes the message actionable, so that is
+    /// what each test predicts. The shared "Supported forms are: …" catalogue is
+    /// asserted once, in <see cref="TheMessage_ListsTheSupportedForms"/>, rather
+    /// than repeated here nine times.
+    /// </para>
+    /// </remarks>
+    private static void Names(NotSupportedException exception, string construct)
+        => exception.Message.ShouldContain(
+            construct,
+            customMessage: "the message has to identify which part of the predicate was rejected");
+
     // ----- an OR operand that is neither a comparison nor a method call -----
 
     [Test]
@@ -59,7 +82,7 @@ public sealed class TranslatorDefensiveTests
         // `|| true` would match everything, quietly discarding the other side.
         NotSupportedException exception = Rejects(p => p.Name == "a" || true);
 
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+        Names(exception, "'True'");
     }
 
     [Test]
@@ -68,7 +91,7 @@ public sealed class TranslatorDefensiveTests
         // The API has no "field is true" filter, so this cannot be translated.
         NotSupportedException exception = Rejects(p => p.Name == "a" || p.Flag);
 
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+        Names(exception, "'p.Flag'");
     }
 
     // ----- a binary operator with no filter equivalent -----
@@ -81,12 +104,12 @@ public sealed class TranslatorDefensiveTests
         // silently means something else.
         NotSupportedException exception = Rejects(p => p.Flag & true);
 
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+        Names(exception, "(p.Flag And True)");
     }
 
     [Test]
     public void AnExclusiveOrOnAMember_IsRejected()
-        => Rejects(p => p.Flag ^ true).Message.ShouldNotBeNullOrWhiteSpace();
+        => Names(Rejects(p => p.Flag ^ true), "(p.Flag ^ True)");
 
     // ----- an unmapped instance method -----
 
@@ -95,7 +118,7 @@ public sealed class TranslatorDefensiveTests
     {
         // The receiver is the lambda parameter rather than a property, so there
         // is no field to filter on.
-        Rejects(p => p.Matches("a")).Message.ShouldNotBeNullOrWhiteSpace();
+        Names(Rejects(p => p.Matches("a")), "p.Matches(\"a\")");
     }
 
     [Test]
@@ -107,7 +130,9 @@ public sealed class TranslatorDefensiveTests
         // means something entirely different.
         NotSupportedException exception = Rejects(p => p.Child!.Matches("a"));
 
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+        // Naming the receiver as well as the method is what distinguishes this
+        // from the case above, where the method was called on the parameter.
+        Names(exception, "p.Child.Matches(\"a\")");
     }
 
     [Test]
@@ -128,8 +153,9 @@ public sealed class TranslatorDefensiveTests
                 method: null),
             parameter);
 
-        Should.Throw<NotSupportedException>(() => ExpressionTranslator.Translate(predicate))
-            .Message.ShouldNotBeNullOrWhiteSpace();
+        Names(
+            Should.Throw<NotSupportedException>(() => ExpressionTranslator.Translate(predicate)),
+            "(p.Optional > null)");
     }
 
     // ----- a value that cannot be read from the tree -----
@@ -141,7 +167,7 @@ public sealed class TranslatorDefensiveTests
         // which the translator deliberately never does.
         NotSupportedException exception = Rejects(p => p.Name == MakeName());
 
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+        Names(exception, "MakeName()");
     }
 
     [Test]
@@ -149,7 +175,29 @@ public sealed class TranslatorDefensiveTests
     {
         string[] names = new[] { "a", "b" };
 
-        Rejects(p => p.Name == names[0]).Message.ShouldNotBeNullOrWhiteSpace();
+        // The indexer only, not the whole rendered expression: a captured local
+        // is reached through a compiler-generated closure, so the full text
+        // carries a display-class name that would change if this test method
+        // were renamed.
+        Names(Rejects(p => p.Name == names[0]), "names[0]");
+    }
+
+    // ----- the part of the message that is the same every time -----
+
+    [Test]
+    public void TheMessage_ListsTheSupportedForms()
+    {
+        // Asserted once rather than in all nine rejection tests. The catalogue
+        // is what turns "no" into "here is what to write instead", so it needs a
+        // test — but repeating it above would be nine copies of one claim, and
+        // every one of them would have to be edited to add an operator.
+        string message = Rejects(p => p.Flag ^ true).Message;
+
+        message.ShouldContain("equality and inequality");
+        message.ShouldContain("< <= > >=");
+        message.ShouldContain("Contains/StartsWith/EndsWith");
+        message.ShouldContain("&& between fields");
+        message.ShouldContain("|| within a single field");
     }
 
     // ----- the supported shapes still work on another model -----

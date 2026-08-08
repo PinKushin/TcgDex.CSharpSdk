@@ -36,7 +36,11 @@ public sealed class ClientLifetimeTests
 
         // Still usable, which proves it was left alone.
         Card? card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
-        card.ShouldNotBeNull();
+
+        // Named, not merely non-null: a disposed HttpClient throws
+        // ObjectDisposedException, so a card that deserialized correctly is what
+        // shows the transport was left intact.
+        card.ShouldNotBeNull().Name.ShouldBe("Furret");
     }
 
     [Test]
@@ -57,7 +61,11 @@ public sealed class ClientLifetimeTests
         client.Dispose();
 
         Card? card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
-        card.ShouldNotBeNull();
+
+        // Named, not merely non-null: a disposed HttpClient throws
+        // ObjectDisposedException, so a card that deserialized correctly is what
+        // shows the transport was left intact.
+        card.ShouldNotBeNull().Name.ShouldBe("Furret");
     }
 
     [Test]
@@ -92,7 +100,16 @@ public sealed class ClientLifetimeTests
     {
         using TcgDexClient client = TcgDexClient.Create();
 
+        // Deliberately the one test in this suite whose assertions are all
+        // "not null". There is nothing more specific to predict: the claim is
+        // that Create wires every resource, and a resource is either there or
+        // it is not. What makes it a real check is that it is exhaustive —
+        // Create wires each one by hand, so omitting one is a plausible edit,
+        // and sampling Cards and Catalog would have stayed green with Sets null.
         client.Cards.ShouldNotBeNull();
+        client.Sets.ShouldNotBeNull();
+        client.Series.ShouldNotBeNull();
+        client.Random.ShouldNotBeNull();
         client.Catalog.ShouldNotBeNull();
     }
 
@@ -114,11 +131,15 @@ public sealed class ClientLifetimeTests
         // The language reaching the URL is covered where it can be observed:
         // ClientTests drives an injected handler and asserts the request path,
         // and the integration suite checks it against the live API.
-        foreach (string? language in new[] { TcgDexLanguages.French, TcgDexLanguages.Japanese })
+        // Every supported language, not two of them — the validation this
+        // guards against rejecting is a lookup against the whole set, so a
+        // sample of two would miss a code dropped from the list.
+        foreach (string language in TcgDexLanguages.All)
         {
-            using TcgDexClient client = TcgDexClient.Create(new TcgDexOptions { Language = language });
-
-            client.Cards.ShouldNotBeNull();
+            // Constructing without throwing is the entire claim, so it is
+            // asserted directly rather than through a not-null on a property
+            // that could not be null if construction succeeded.
+            Should.NotThrow(() => TcgDexClient.Create(new TcgDexOptions { Language = language }).Dispose());
         }
     }
 

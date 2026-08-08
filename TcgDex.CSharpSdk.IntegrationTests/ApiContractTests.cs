@@ -64,8 +64,14 @@ public sealed class ApiContractTests : LiveApiFixture
 
         card.ShouldNotBeNull();
 
+        // The test is named for normalising to *text*, and asserted only that
+        // BaseDamage was non-null — which says nothing about the text and
+        // nothing about the value. Printed card data does not change, so both
+        // are safe to predict exactly: xy1-1's Poison Powder does 60.
         Attack damaged = card.Attacks.First(a => a.Damage is not null);
-        damaged.BaseDamage.ShouldNotBeNull();
+
+        damaged.Damage.ShouldBe("60", "a JSON number must surface as its text form");
+        damaged.BaseDamage.ShouldBe(60);
     }
 
     [Test]
@@ -98,8 +104,13 @@ public sealed class ApiContractTests : LiveApiFixture
     {
         Serie? serie = await Client.Series.GetAsync("swsh", Timeout);
 
-        serie.ShouldNotBeNull();
-        serie.Sets.ShouldNotBeEmpty();
+        serie.ShouldNotBeNull().Id.ShouldBe("swsh");
+
+        // A named set rather than "not empty". Sword & Shield is a closed
+        // series, so its members no longer change — and a nested collection
+        // that bound as one empty object would satisfy "not empty" while
+        // carrying nothing, which is the failure this test exists to catch.
+        serie.Sets.Select(s => s.Id).ShouldContain("swsh3");
     }
 
     [Test]
@@ -264,8 +275,16 @@ public sealed class ApiContractTests : LiveApiFixture
     {
         Card card = await Client.Random.CardAsync(Timeout);
 
-        card.Id.ShouldNotBeNullOrWhiteSpace();
-        card.Name.ShouldNotBeNullOrWhiteSpace();
+        // The value is genuinely unpredictable, so the prediction is about the
+        // card rather than its contents: whatever came back must be a real card
+        // that can be fetched again by its own id, and the round trip must
+        // agree. That is an exact equality on deterministic logic, where
+        // "id is not blank" would have accepted a malformed or truncated id.
+        Card? refetched = await Client.Cards.GetAsync(card.Id, Timeout);
+
+        refetched.ShouldNotBeNull($"the random endpoint returned '{card.Id}', which does not resolve");
+        refetched.Id.ShouldBe(card.Id);
+        refetched.Name.ShouldBe(card.Name);
     }
 
     [Test]
