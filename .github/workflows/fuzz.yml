@@ -80,7 +80,7 @@ jobs:
       # is not a failure: the seeds below still make the run useful, it just
       # starts further back.
       - name: Restore the corpus
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: corpus
           key: fuzz-corpus-${{ github.run_id }}
