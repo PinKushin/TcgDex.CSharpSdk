@@ -17,6 +17,14 @@ something an application can observe — those live in the commit history.
 
 ### Added
 
+- **"When the API is having a moment"** ([`docs/getting-started.md`](docs/getting-started.md))
+  — what a `502 Bad Gateway` from TCGdex looks like through the SDK, prompted by
+  a real outage: it arrives as `TcgDexApiException` with the status code, a
+  gateway body is HTML rather than problem-details JSON so `ex.Problem` is null,
+  and failures are never cached. Points at
+  `.AddStandardResilienceHandler()` for callers who want retries, and says why
+  the SDK still ships none of its own.
+
 - **Property-based testing** with [CsCheck](https://github.com/AnthonyLloyd/CsCheck)
   (Apache-2.0, test-only, never shipped) — seven properties over `BoundedLru` and
   `JsonShape`. [`docs/measuring.md`](docs/measuring.md) documents them, and now

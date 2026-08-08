@@ -194,6 +194,40 @@ The API returns **404 for an unsupported language too**, so a status code alone
 cannot tell that apart from a missing card. The SDK discriminates on the error
 body and exposes `ex.IsLanguageError`.
 
+## When the API is having a moment
+
+TCGdex is free and community-run, and it does occasionally fall over — a crashed
+container shows up as **`502 Bad Gateway`**. Worth knowing what that looks like
+from here:
+
+- It arrives as `TcgDexApiException` with `StatusCode = BadGateway`, like any
+  other server error. It is never mistaken for a missing card.
+- **A gateway error is HTML, not the API's usual problem-details JSON.** The SDK
+  handles that — an unparseable body becomes the same exception type rather than
+  a `JsonException` — but if you parse `ex.Problem` yourself, expect it to be
+  null here.
+- **Failures are never cached.** Two consecutive 502s both reach you; a bad
+  response cannot pin itself in front of a good one.
+
+**The SDK ships no retry policy, deliberately.** Retries nobody asked for are how
+a client ends up hammering a free API during exactly the outage it is trying to
+ride out. `AddTcgDex` returns `IHttpClientBuilder` so you can add your own, with
+a budget you chose:
+
+```csharp
+builder.Services
+    .AddTcgDex()
+    .AddStandardResilienceHandler();   // Microsoft.Extensions.Http.Resilience
+```
+
+That gives retries with exponential backoff and jitter, plus a circuit breaker
+that stops sending once a host is clearly down. If you add something hand-rolled
+instead, keep the backoff and the ceiling — a tight retry loop against a
+recovering service is what turns one outage into a longer one.
+
+Without a container, wrap the handler yourself when constructing the
+`HttpClient`; nothing in the SDK needs to know.
+
 ## Images
 
 `Image`, `Logo` and `Symbol` are base URLs **without a file extension**, and the
