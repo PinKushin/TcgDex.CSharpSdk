@@ -5,7 +5,9 @@ namespace TcgDex.Models;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The live API returns an RFC 7807-shaped problem document. Note that a
+/// The live API returns an RFC 9457-shaped problem document — the current
+/// specification, which obsoletes RFC 7807; the wire format is unchanged.
+/// Note that a
 /// <c>404</c> does not necessarily mean the resource is missing — an
 /// unsupported language also returns <c>404</c>, with
 /// <see cref="Type"/> ending in <c>language-invalid</c>. Discriminate on
