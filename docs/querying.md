@@ -3,13 +3,13 @@
 Predicates are written in C# and translated to the API's filter syntax:
 
 ```csharp
-var query = new CardQuery()
+CardQuery query = new CardQuery()
     .Where(c => c.Name.Contains("Pikachu"))
     .Where(c => c.Hp > 100)
     .OrderByDescending(c => c.Name)
     .Page(1, 50);
 
-var cards = await tcgdex.Cards.ListAsync(query, cancellationToken);
+IReadOnlyList<CardBrief> cards = await tcgdex.Cards.ListAsync(query, cancellationToken);
 ```
 
 which produces:
@@ -90,7 +90,7 @@ shorter than you asked for:
 `StreamAsync` does that loop for you, fetching pages lazily as you consume them:
 
 ```csharp
-await foreach (var card in tcgdex.Cards.StreamAsync(
+await foreach (CardBrief card in tcgdex.Cards.StreamAsync(
     new CardQuery().Where(c => c.Category == "Pokemon"),
     pageSize: 100,
     cancellationToken))
@@ -112,13 +112,13 @@ By hand, the same loop is:
 ```csharp
 const int PageSize = 100;
 
-for (var page = 1; ; page++)
+for (int page = 1; ; page++)
 {
-    var batch = await tcgdex.Cards.ListAsync(
+    IReadOnlyList<CardBrief> batch = await tcgdex.Cards.ListAsync(
         new CardQuery().Where(c => c.Category == "Pokemon").Page(page, PageSize),
         cancellationToken);
 
-    foreach (var card in batch)
+    foreach (CardBrief card in batch)
     {
         // ...
     }
@@ -139,7 +139,7 @@ When you need the detail for many cards, `SearchDetailedAsync` gets it in a
 single request over GraphQL:
 
 ```csharp
-var cards = await tcgdex.Cards.SearchDetailedAsync(
+IReadOnlyList<Card> cards = await tcgdex.Cards.SearchDetailedAsync(
     new CardFilter { Name = "Furret" },
     cancellationToken: ct);
 
@@ -187,7 +187,7 @@ break Native AOT. Expression trees are walked structurally instead, and captured
 variables are read from their closure — so this works:
 
 ```csharp
-var minimumHp = 250;
+int minimumHp = 250;
 
 new CardQuery().Where(c => c.Hp > minimumHp);   // hp=gt:250
 ```

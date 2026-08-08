@@ -41,22 +41,22 @@ public sealed class FixtureDriftTests : LiveApiFixture
     [TestCaseSource(nameof(FixtureCases))]
     public async Task RecordedFixture_StillMatchesTheLiveApi(string fixture, string source)
     {
-        if (Excluded.TryGetValue(fixture, out var reason))
+        if (Excluded.TryGetValue(fixture, out string? reason))
         {
             Assert.Ignore($"'{fixture}' is excluded: {reason}");
         }
 
-        var recordedJson = await File.ReadAllTextAsync(FixturePath(fixture), Timeout);
+        string recordedJson = await File.ReadAllTextAsync(FixturePath(fixture), Timeout);
 
-        using var httpClient = new HttpClient();
-        using var response = await httpClient.GetAsync(new Uri(ApiRoot, source), Timeout);
+        using HttpClient httpClient = new();
+        using HttpResponseMessage response = await httpClient.GetAsync(new Uri(ApiRoot, source), Timeout);
 
-        var liveJson = await response.Content.ReadAsStringAsync(Timeout);
+        string liveJson = await response.Content.ReadAsStringAsync(Timeout);
 
-        var recorded = JsonShape.Describe(recordedJson);
-        var live = JsonShape.Describe(liveJson);
+        IReadOnlyDictionary<string, string> recorded = JsonShape.Describe(recordedJson);
+        IReadOnlyDictionary<string, string> live = JsonShape.Describe(liveJson);
 
-        var (breaking, additive) = JsonShape.Compare(recorded, live);
+        (IReadOnlyList<string>? breaking, IReadOnlyList<string>? additive) = JsonShape.Compare(recorded, live);
 
         // Additive changes are reported but do not fail: the API gaining a field
         // is worth knowing without breaking a build over it.
@@ -73,13 +73,13 @@ public sealed class FixtureDriftTests : LiveApiFixture
     {
         // A fixture with no manifest entry is never drift-checked, which is the
         // failure mode this whole file exists to prevent.
-        var onDisk = Directory
+        List<string?> onDisk = Directory
             .EnumerateFiles(FixtureDirectory, "*.json")
             .Select(Path.GetFileName)
             .Where(name => name is not null && name != "manifest.json")
             .ToList();
 
-        var listed = LoadManifest().Keys;
+        Dictionary<string, string>.KeyCollection listed = LoadManifest().Keys;
 
         onDisk.ShouldAllBe(name => listed.Contains(name!));
     }
@@ -87,7 +87,7 @@ public sealed class FixtureDriftTests : LiveApiFixture
     [Test]
     public void EveryManifestEntryHasAFixture()
     {
-        foreach (var fixture in LoadManifest().Keys)
+        foreach (string fixture in LoadManifest().Keys)
         {
             File.Exists(FixturePath(fixture))
                 .ShouldBeTrue($"'{fixture}' is in the manifest but not on disk");
@@ -102,7 +102,7 @@ public sealed class FixtureDriftTests : LiveApiFixture
     {
         get
         {
-            var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            DirectoryInfo? directory = new(TestContext.CurrentContext.TestDirectory);
 
             while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, "TcgDex.CSharpSdk.Tests")))
             {
@@ -123,14 +123,14 @@ public sealed class FixtureDriftTests : LiveApiFixture
 
     private static Dictionary<string, string> LoadManifest()
     {
-        var json = File.ReadAllText(Path.Combine(FixtureDirectory, "manifest.json"));
+        string json = File.ReadAllText(Path.Combine(FixtureDirectory, "manifest.json"));
 
-        using var document = JsonDocument.Parse(json);
+        using JsonDocument document = JsonDocument.Parse(json);
 
-        var fixtures = document.RootElement.GetProperty("fixtures");
-        var manifest = new Dictionary<string, string>(StringComparer.Ordinal);
+        JsonElement fixtures = document.RootElement.GetProperty("fixtures");
+        Dictionary<string, string> manifest = new(StringComparer.Ordinal);
 
-        foreach (var entry in fixtures.EnumerateObject())
+        foreach (JsonProperty entry in fixtures.EnumerateObject())
         {
             manifest[entry.Name] = entry.Value.GetString()!;
         }

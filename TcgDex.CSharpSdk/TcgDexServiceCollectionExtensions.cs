@@ -33,7 +33,7 @@ public static class TcgDexServiceCollectionExtensions
     {
         Guard.NotNull(services);
 
-        var options = new TcgDexOptions();
+        TcgDexOptions options = new();
         configure?.Invoke(options);
 
         // Fail here, at registration, rather than on the first request — a
@@ -97,7 +97,7 @@ public static class TcgDexServiceCollectionExtensions
     {
         Guard.NotNull(services);
 
-        var cacheOptions = new TcgDexCacheOptions();
+        TcgDexCacheOptions cacheOptions = new();
         configureCache?.Invoke(cacheOptions);
 
         services.TryAddSingleton(cacheOptions);

@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using TcgDex;
+using TcgDex.Models;
 using TcgDex.Tests.Http;
 
 /// <summary>
@@ -45,7 +46,7 @@ public sealed class TypedCacheTests
         {
             Requests++;
 
-            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            HttpResponseMessage response = new(HttpStatusCode.OK)
             {
                 Content = new StringContent(Body, System.Text.Encoding.UTF8, "application/json"),
             };
@@ -67,11 +68,11 @@ public sealed class TypedCacheTests
     [Test]
     public async Task SameETag_ReturnsTheSameInstance()
     {
-        var handler = new TaggedHandler(Card());
-        using var client = Client(handler);
+        TaggedHandler handler = new(Card());
+        using TcgDexClient client = Client(handler);
 
-        var first = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
-        var second = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? first = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? second = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
         ReferenceEquals(first, second).ShouldBeTrue("the body is unchanged, so the parse is skipped");
         handler.Requests.ShouldBe(2, "the typed cache skips the parse, not the request");
@@ -82,15 +83,15 @@ public sealed class TypedCacheTests
     {
         // The test the whole design exists to pass. A resource that changed must
         // not be answered from an entry built before it changed.
-        var handler = new TaggedHandler(Card());
-        using var client = Client(handler);
+        TaggedHandler handler = new(Card());
+        using TcgDexClient client = Client(handler);
 
-        var first = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? first = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
         handler.Body = Card().Replace("\"Furret\"", "\"Sentret\"");
         handler.ETag = "W/\"v2\"";
 
-        var second = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? second = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
         ReferenceEquals(first, second).ShouldBeFalse();
         first.ShouldNotBeNull().Name.ShouldBe("Furret");
@@ -102,11 +103,11 @@ public sealed class TypedCacheTests
     {
         // No ETag means no way to know the body is the same one, so there is
         // nothing to validate an entry against and the cache must stay out of it.
-        var handler = new TaggedHandler(Card()) { ETag = null };
-        using var client = Client(handler);
+        TaggedHandler handler = new(Card()) { ETag = null };
+        using TcgDexClient client = Client(handler);
 
-        var first = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
-        var second = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? first = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? second = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
         ReferenceEquals(first, second).ShouldBeFalse();
     }
@@ -114,11 +115,11 @@ public sealed class TypedCacheTests
     [Test]
     public async Task WhenDisabled_EveryFetchReparses()
     {
-        var handler = new TaggedHandler(Card());
-        using var client = Client(handler, maxTypedEntries: 0);
+        TaggedHandler handler = new(Card());
+        using TcgDexClient client = Client(handler, maxTypedEntries: 0);
 
-        var first = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
-        var second = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? first = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? second = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
         ReferenceEquals(first, second).ShouldBeFalse();
     }
@@ -128,14 +129,14 @@ public sealed class TypedCacheTests
     {
         // Same ETag on two resources is not a collision the SDK gets to assume
         // away: ETags are only unique within a URL.
-        var handler = new TaggedHandler(Card());
-        using var client = Client(handler);
+        TaggedHandler handler = new(Card());
+        using TcgDexClient client = Client(handler);
 
-        var furret = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? furret = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
         handler.Body = Card().Replace("\"Furret\"", "\"Sentret\"");
 
-        var other = await client.Cards.GetAsync("swsh3-137", CancellationToken.None);
+        Card? other = await client.Cards.GetAsync("swsh3-137", CancellationToken.None);
 
         furret.ShouldNotBeNull().Name.ShouldBe("Furret");
         other.ShouldNotBeNull().Name.ShouldBe("Sentret", "a different URL is a different entry");
@@ -148,15 +149,15 @@ public sealed class TypedCacheTests
         // this today — each endpoint has one model — but a key that ignored the
         // type would hand a Card back to a caller asking for a Serie, and that
         // would surface as an InvalidCastException a long way from here.
-        var handler = new TaggedHandler(Fixture.ReadText("serie-full.json"));
-        using var client = Client(handler);
+        TaggedHandler handler = new(Fixture.ReadText("serie-full.json"));
+        using TcgDexClient client = Client(handler);
 
-        var asSerie = await client.Series.GetAsync("swsh", CancellationToken.None);
+        Serie? asSerie = await client.Series.GetAsync("swsh", CancellationToken.None);
 
         handler.Body = Card();
         handler.ETag = "W/\"v2\"";
 
-        var asCard = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? asCard = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
         asSerie.ShouldNotBeNull().Id.ShouldBe("swsh");
         asCard.ShouldNotBeNull().Name.ShouldBe("Furret");
@@ -172,11 +173,11 @@ public sealed class TypedCacheTests
         // from the typed cache it would never reach the handler, and the queue
         // would be left with one unused — so the assertion that both were
         // consumed is what proves nothing was cached.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.NotFound, Fixture.ReadText("error-not-found.json"))
             .RespondWith(HttpStatusCode.NotFound, Fixture.ReadText("error-not-found.json"));
 
-        using var client = Client(handler);
+        using TcgDexClient client = Client(handler);
 
         (await client.Cards.GetAsync("nope-1", CancellationToken.None)).ShouldBeNull();
         (await client.Cards.GetAsync("nope-1", CancellationToken.None)).ShouldBeNull();
@@ -190,17 +191,17 @@ public sealed class TypedCacheTests
         // Retaining deserialized objects is the point and also the risk: they
         // are several times the size of the bytes they came from. A bound that
         // did not hold would be a memory leak rather than a cache.
-        var handler = new TaggedHandler(Card());
-        using var client = Client(handler, maxTypedEntries: 4);
+        TaggedHandler handler = new(Card());
+        using TcgDexClient client = Client(handler, maxTypedEntries: 4);
 
-        for (var i = 0; i < 50; i++)
+        for (int i = 0; i < 50; i++)
         {
             await client.Cards.GetAsync($"swsh3-{i}", CancellationToken.None);
         }
 
         // The oldest is long gone, so this reparses rather than being served.
-        var first = await client.Cards.GetAsync("swsh3-0", CancellationToken.None);
-        var again = await client.Cards.GetAsync("swsh3-0", CancellationToken.None);
+        Card? first = await client.Cards.GetAsync("swsh3-0", CancellationToken.None);
+        Card? again = await client.Cards.GetAsync("swsh3-0", CancellationToken.None);
 
         first.ShouldNotBeNull();
         ReferenceEquals(first, again).ShouldBeTrue("just fetched, so it is the newest entry");
@@ -218,7 +219,7 @@ public sealed class TypedCacheTests
         // single commonest real gap in this project: someone reading a log gets
         // the exception type from the stack trace anyway, and the only thing
         // telling them *which knob* and *what value* is the text.
-        var error = Should.Throw<ArgumentException>(
+        ArgumentException error = Should.Throw<ArgumentException>(
             () => new TcgDexOptions { MaxDeserializedCacheEntries = -1 }.Validate());
 
         error.Message.ShouldContain(nameof(TcgDexOptions.MaxDeserializedCacheEntries));

@@ -22,10 +22,10 @@ builder.Services.AddTcgDex();
 Without a container, pass one in:
 
 ```csharp
-using var client = TcgDexClient.Create(loggerFactory: myLoggerFactory);
+using TcgDexClient client = TcgDexClient.Create(loggerFactory: myLoggerFactory);
 
 // or
-var client = new TcgDexClient(httpClient, options, myLoggerFactory);
+TcgDexClient client = new(httpClient, options, myLoggerFactory);
 ```
 
 Everything is logged under the single category **`TcgDex`**, so one rule

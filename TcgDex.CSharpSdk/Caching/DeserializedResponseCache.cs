@@ -66,7 +66,7 @@ internal sealed class DeserializedResponseCache
             return false;
         }
 
-        if (!_entries.TryGet(new Key(uri, typeof(T)), out var entry)
+        if (!_entries.TryGet(new Key(uri, typeof(T)), out (object Value, string ETag) entry)
             || !string.Equals(entry.ETag, etag, StringComparison.Ordinal))
         {
             return false;

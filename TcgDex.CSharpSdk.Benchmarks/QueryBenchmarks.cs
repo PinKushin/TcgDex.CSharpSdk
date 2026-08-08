@@ -38,7 +38,7 @@ public class QueryBenchmarks
     [Benchmark]
     public string CapturedVariable()
     {
-        var minimum = MinimumHp;
+        int minimum = MinimumHp;
 
         return new CardQuery().Where(c => c.Hp > minimum).ToQueryString();
     }

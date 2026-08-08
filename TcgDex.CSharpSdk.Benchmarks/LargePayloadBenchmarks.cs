@@ -188,18 +188,18 @@ public class LargePayloadBenchmarks : IDisposable
     /// </remarks>
     private static string SynthesizeCardList(int targetBytes)
     {
-        var builder = new StringBuilder(targetBytes + 1024);
+        StringBuilder builder = new(targetBytes + 1024);
         builder.Append('[');
 
-        for (var index = 0; builder.Length < targetBytes; index++)
+        for (int index = 0; builder.Length < targetBytes; index++)
         {
             if (index > 0)
             {
                 builder.Append(',');
             }
 
-            var (serie, set, name) = Templates[index % Templates.Length];
-            var localId = index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            (string? serie, string? set, string? name) = Templates[index % Templates.Length];
+            string localId = index.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
             builder.Append("{\"id\":\"").Append(set).Append('-').Append(localId)
                    .Append("\",\"localId\":\"").Append(localId)

@@ -6,6 +6,8 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using TcgDex.Caching;
+using TcgDex.Models;
+using TCGDex.Models;
 
 /// <summary>
 /// The three paths a request can take through the caching handler.
@@ -58,7 +60,7 @@ public class CachingBenchmarks : IDisposable
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotModified));
             }
 
-            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            HttpResponseMessage response = new(HttpStatusCode.OK)
             {
                 Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
             };
@@ -134,14 +136,14 @@ public class CachingBenchmarks : IDisposable
 
     private HttpClient Build(TimeSpan timeToLive)
     {
-        var options = new TcgDexCacheOptions
+        TcgDexCacheOptions options = new()
         {
             DefaultTimeToLive = timeToLive,
             PricingTimeToLive = timeToLive,
             CatalogTimeToLive = timeToLive,
         };
 
-        var handler = new TcgDexCachingHandler(new MemoryTcgDexResponseCache(), options)
+        TcgDexCachingHandler handler = new(new MemoryTcgDexResponseCache(), options)
         {
             InnerHandler = new StubHandler(_body),
         };
@@ -167,21 +169,21 @@ public class CachingBenchmarks : IDisposable
     [Benchmark(Baseline = true)]
     public async Task<int> NoCachingLayer()
     {
-        using var response = await _uncached.GetAsync(Url).ConfigureAwait(false);
+        using HttpResponseMessage response = await _uncached.GetAsync(Url).ConfigureAwait(false);
         return (await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false)).Length;
     }
 
     [Benchmark]
     public async Task<int> CacheHit()
     {
-        using var response = await _freshHit.GetAsync(Url).ConfigureAwait(false);
+        using HttpResponseMessage response = await _freshHit.GetAsync(Url).ConfigureAwait(false);
         return (await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false)).Length;
     }
 
     [Benchmark]
     public async Task<int> Revalidation()
     {
-        using var response = await _revalidating.GetAsync(Url).ConfigureAwait(false);
+        using HttpResponseMessage response = await _revalidating.GetAsync(Url).ConfigureAwait(false);
         return (await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false)).Length;
     }
 
@@ -199,7 +201,7 @@ public class CachingBenchmarks : IDisposable
     [Benchmark]
     public async Task<string?> WarmHitToCard_Mine()
     {
-        var card = await _mineEndToEnd.Cards.GetAsync(CardId, CancellationToken.None)
+        Card? card = await _mineEndToEnd.Cards.GetAsync(CardId, CancellationToken.None)
             .ConfigureAwait(false);
 
         return card?.Name;
@@ -234,7 +236,7 @@ public class CachingBenchmarks : IDisposable
     [Benchmark]
     public async Task<string?> WarmHitToCard_Theirs()
     {
-        var card = await _theirs.FetchCardAsync(CardId, cancellationToken: CancellationToken.None)
+        CardModel? card = await _theirs.FetchCardAsync(CardId, cancellationToken: CancellationToken.None)
             .ConfigureAwait(false);
 
         return card?.Name;

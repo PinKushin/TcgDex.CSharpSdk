@@ -11,7 +11,7 @@ public sealed class SetSerieContractTests
     [Test]
     public void Deserialize_Set_MapsMetadataAndCards()
     {
-        var set = Fixture.Load<Set>("set-full.json");
+        Set set = Fixture.Load<Set>("set-full.json");
 
         set.Id.ShouldBe("swsh3");
         set.Name.ShouldBe("Darkness Ablaze");
@@ -25,9 +25,9 @@ public sealed class SetSerieContractTests
     [Test]
     public void Deserialize_Set_MapsFullCardCountBreakdown()
     {
-        var set = Fixture.Load<Set>("set-full.json");
+        Set set = Fixture.Load<Set>("set-full.json");
 
-        var count = set.CardCount.ShouldNotBeNull();
+        CardCount count = set.CardCount.ShouldNotBeNull();
         count.Official.ShouldBe(189);
         count.Total.ShouldBe(201);
         count.Normal.ShouldBe(138);
@@ -39,7 +39,7 @@ public sealed class SetSerieContractTests
     [Test]
     public void Deserialize_Set_IncludesItsCardsAsBriefs()
     {
-        var set = Fixture.Load<Set>("set-full.json");
+        Set set = Fixture.Load<Set>("set-full.json");
 
         set.Cards.ShouldNotBeEmpty();
         set.Cards.Count.ShouldBe(set.CardCount!.Total);
@@ -49,7 +49,7 @@ public sealed class SetSerieContractTests
     [Test]
     public void Deserialize_Serie_MapsSetsAndBoundaryMarkers()
     {
-        var serie = Fixture.Load<Serie>("serie-full.json");
+        Serie serie = Fixture.Load<Serie>("serie-full.json");
 
         serie.Id.ShouldBe("swsh");
         serie.Name.ShouldBe("Sword & Shield");
@@ -63,7 +63,7 @@ public sealed class SetSerieContractTests
     public void Deserialize_CardList_ReturnsBareArrayOfBriefs()
     {
         // List endpoints return a bare array, with no envelope and no total count.
-        var cards = Fixture.Load<IReadOnlyList<CardBrief>>("list-cards-brief.json");
+        IReadOnlyList<CardBrief> cards = Fixture.Load<IReadOnlyList<CardBrief>>("list-cards-brief.json");
 
         cards.ShouldNotBeEmpty();
         cards.ShouldAllBe(c => c.Name == "Furret");
@@ -73,7 +73,7 @@ public sealed class SetSerieContractTests
     [Test]
     public void Deserialize_StringEnumeration_ReturnsScalars()
     {
-        var categories = Fixture.Load<IReadOnlyList<string>>("list-categories.json");
+        IReadOnlyList<string> categories = Fixture.Load<IReadOnlyList<string>>("list-categories.json");
 
         categories.ShouldBe(["Energy", "Pokemon", "Trainer"], ignoreOrder: true);
     }
@@ -83,7 +83,7 @@ public sealed class SetSerieContractTests
     {
         // /retreats, /hp and /dex-ids return numbers where the sibling
         // endpoints return strings.
-        var retreats = Fixture.Load<IReadOnlyList<int>>("list-retreats-int.json");
+        IReadOnlyList<int> retreats = Fixture.Load<IReadOnlyList<int>>("list-retreats-int.json");
 
         retreats.ShouldBe([1, 2, 3, 4, 5]);
     }
@@ -91,7 +91,7 @@ public sealed class SetSerieContractTests
     [Test]
     public void Deserialize_NotFoundProblem_MapsProblemDocument()
     {
-        var problem = Fixture.Load<TcgDexProblem>("error-not-found.json");
+        TcgDexProblem problem = Fixture.Load<TcgDexProblem>("error-not-found.json");
 
         problem.Status.ShouldBe(404);
         problem.Type.ShouldBe("https://tcgdex.dev/errors/not-found");
@@ -105,7 +105,7 @@ public sealed class SetSerieContractTests
     {
         // Both come back as 404, so the status code alone cannot tell them
         // apart — the type URI is the discriminator.
-        var problem = Fixture.Load<TcgDexProblem>("error-bad-language.json");
+        TcgDexProblem problem = Fixture.Load<TcgDexProblem>("error-bad-language.json");
 
         problem.Status.ShouldBe(404);
         problem.IsLanguageError.ShouldBeTrue();

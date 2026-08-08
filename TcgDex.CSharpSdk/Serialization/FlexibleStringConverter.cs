@@ -35,7 +35,7 @@ internal sealed class FlexibleStringConverter : JsonConverter<string?>
         };
 
     private static string ReadNumber(ref Utf8JsonReader reader)
-        => reader.TryGetInt64(out var whole)
+        => reader.TryGetInt64(out long whole)
             ? whole.ToString(System.Globalization.CultureInfo.InvariantCulture)
             : reader.GetDecimal().ToString(System.Globalization.CultureInfo.InvariantCulture);
 

@@ -63,9 +63,9 @@ internal static class BoundedContent
         {
 #if NETSTANDARD2_0
             cancellationToken.ThrowIfCancellationRequested();
-            var unbounded = await content.ReadAsByteArrayAsync().ConfigureAwait(false);
+            byte[] unbounded = await content.ReadAsByteArrayAsync().ConfigureAwait(false);
 #else
-            var unbounded = await content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+            byte[] unbounded = await content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
 #endif
             return new ArraySegment<byte>(unbounded);
         }
@@ -81,9 +81,9 @@ internal static class BoundedContent
 
 #if NETSTANDARD2_0
         cancellationToken.ThrowIfCancellationRequested();
-        using var stream = await content.ReadAsStreamAsync().ConfigureAwait(false);
+        using Stream stream = await content.ReadAsStreamAsync().ConfigureAwait(false);
 #else
-        using var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using Stream stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #endif
 
         // Pre-sized from Content-Length when the sender declares one, which is
@@ -96,7 +96,7 @@ internal static class BoundedContent
         // against the limit above, and the byte counting below remains the only
         // thing that enforces it. This uses the value as a *hint* for capacity,
         // where being wrong costs a resize rather than a bypassed guard.
-        var capacity = content.Headers.ContentLength is { } hint && hint > 0 && hint <= maxBytes
+        int capacity = content.Headers.ContentLength is { } hint && hint > 0 && hint <= maxBytes
             ? (int)Math.Min(hint, int.MaxValue)
             : 0;
 
@@ -104,11 +104,11 @@ internal static class BoundedContent
         // far the largest single cost in this method — larger than the payload
         // it was reading — and it is pure scratch space that never outlives the
         // call. Renting is what a per-request buffer should always have been.
-        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(ChunkSize);
+        byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(ChunkSize);
 
         try
         {
-            using var buffered = capacity > 0 ? new MemoryStream(capacity) : new MemoryStream();
+            using MemoryStream buffered = capacity > 0 ? new MemoryStream(capacity) : new MemoryStream();
 
             while (true)
             {
@@ -116,11 +116,11 @@ internal static class BoundedContent
                 // Stream.ReadAsync(Memory<byte>, ...) is .NET Core 2.1+. CA1835
                 // prefers it and is right where it exists, so the targets split
                 // rather than the whole SDK dropping to the array overload.
-                var read = await stream
+                int read = await stream
                     .ReadAsync(buffer, 0, buffer.Length, cancellationToken)
                     .ConfigureAwait(false);
 #else
-                var read = await stream
+                int read = await stream
                     .ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)
                     .ConfigureAwait(false);
 #endif
@@ -147,7 +147,7 @@ internal static class BoundedContent
             // MemoryStream built with the parameterless constructor always
             // exposes its buffer, but the fallback keeps this honest if that
             // ever changes.
-            return buffered.TryGetBuffer(out var segment)
+            return buffered.TryGetBuffer(out ArraySegment<byte> segment)
                 ? segment
                 : new ArraySegment<byte>(buffered.ToArray());
         }
@@ -162,7 +162,7 @@ internal static class BoundedContent
 
     private static TcgDexApiException TooLarge(Uri uri, long maxBytes, long? declared)
     {
-        var size = declared is { } length
+        string size = declared is { } length
             ? $"declared {length} bytes"
             : $"exceeded {maxBytes} bytes";
 

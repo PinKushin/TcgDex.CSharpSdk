@@ -15,7 +15,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task ExactMatch_ReturnsOnlyExactMatches()
     {
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name == "Furret"),
             Timeout);
 
@@ -26,7 +26,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task LooseMatch_ReturnsSubstringMatches()
     {
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name.Contains("furret")).Page(1, 30),
             Timeout);
 
@@ -37,7 +37,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task NotEqual_ExcludesTheValue()
     {
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name != "Furret").Page(1, 30),
             Timeout);
 
@@ -48,7 +48,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task StartsWith_AnchorsToTheStart()
     {
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name.StartsWith("Fu")).Page(1, 30),
             Timeout);
 
@@ -63,9 +63,9 @@ public sealed class QueryAndPagingTests : LiveApiFixture
         // reach the network. The unit tests prove the string is now `name=*`;
         // only this proves the API agrees that it means "match anything"
         // rather than rejecting it.
-        var search = "*";
+        string search = "*";
 
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name.Contains(search)).Page(1, 30),
             Timeout);
 
@@ -78,7 +78,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task EndsWith_AnchorsToTheEnd()
     {
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name.EndsWith("chu")).Page(1, 30),
             Timeout);
 
@@ -89,11 +89,11 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task OrWithinOneField_ReturnsBothAlternatives()
     {
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name == "Furret" || c.Name == "Sentret").Page(1, 60),
             Timeout);
 
-        var names = cards.Select(c => c.Name).Distinct().ToList();
+        List<string> names = cards.Select(c => c.Name).Distinct().ToList();
         names.ShouldBe(["Furret", "Sentret"], ignoreOrder: true);
     }
 
@@ -101,7 +101,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     public async Task AndAcrossFields_NarrowsResults()
     {
         // Briefs carry no category, so this is verified by fetching one back.
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery()
                 .Where(c => c.Category == CardCategories.Trainer)
                 .Where(c => c.TrainerType == "Tool")
@@ -110,7 +110,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
 
         cards.ShouldNotBeEmpty();
 
-        var card = await Client.Cards.GetAsync(cards[0].Id, Timeout);
+        Card? card = await Client.Cards.GetAsync(cards[0].Id, Timeout);
         card.ShouldNotBeNull().Category.ShouldBe(CardCategories.Trainer);
         card.TrainerType.ShouldBe("Tool");
     }
@@ -118,24 +118,24 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task NumericComparison_IsHonoured()
     {
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Hp > 300).Page(1, 10),
             Timeout);
 
         cards.ShouldNotBeEmpty();
 
-        var card = await Client.Cards.GetAsync(cards[0].Id, Timeout);
+        Card? card = await Client.Cards.GetAsync(cards[0].Id, Timeout);
         card.ShouldNotBeNull().Hp.ShouldNotBeNull().ShouldBeGreaterThan(300);
     }
 
     [Test]
     public async Task Sorting_ChangesResultOrder()
     {
-        var ascending = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> ascending = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name == "Furret").OrderBy(c => c.Id).Page(1, 20),
             Timeout);
 
-        var descending = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> descending = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name == "Furret").OrderByDescending(c => c.Id).Page(1, 20),
             Timeout);
 
@@ -148,7 +148,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task PageSizeOfOne_ReturnsExactlyOne()
     {
-        var cards = await Client.Cards.ListAsync(new CardQuery().Page(1, 1), Timeout);
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(new CardQuery().Page(1, 1), Timeout);
 
         cards.Count.ShouldBe(1);
     }
@@ -156,8 +156,8 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task SuccessivePages_DoNotOverlap()
     {
-        var first = await Client.Cards.ListAsync(new CardQuery().Page(1, 5), Timeout);
-        var second = await Client.Cards.ListAsync(new CardQuery().Page(2, 5), Timeout);
+        IReadOnlyList<CardBrief> first = await Client.Cards.ListAsync(new CardQuery().Page(1, 5), Timeout);
+        IReadOnlyList<CardBrief> second = await Client.Cards.ListAsync(new CardQuery().Page(2, 5), Timeout);
 
         first.Count.ShouldBe(5);
         second.Count.ShouldBe(5);
@@ -169,7 +169,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     {
         // The API exposes no total count, so a short or empty page is the only
         // signal that results are exhausted.
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name == "Furret").Page(500, 100),
             Timeout);
 
@@ -179,9 +179,9 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task ShortPage_SignalsTheEndOfResults()
     {
-        var query = new CardQuery().Where(c => c.Name == "Furret").Page(1, 100);
+        CardQuery query = new CardQuery().Where(c => c.Name == "Furret").Page(1, 100);
 
-        var cards = await Client.Cards.ListAsync(query, Timeout);
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(query, Timeout);
 
         // Far fewer than 100 Furrets exist, so this page is the last one.
         cards.Count.ShouldBeLessThan(100);
@@ -193,7 +193,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task MissingSet_ReturnsNull()
     {
-        var set = await Client.Sets.GetAsync("no-such-set-999", Timeout);
+        Set? set = await Client.Sets.GetAsync("no-such-set-999", Timeout);
 
         set.ShouldBeNull();
     }
@@ -201,7 +201,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task MissingSerie_ReturnsNull()
     {
-        var serie = await Client.Series.GetAsync("no-such-serie-999", Timeout);
+        Serie? serie = await Client.Series.GetAsync("no-such-serie-999", Timeout);
 
         serie.ShouldBeNull();
     }
@@ -209,7 +209,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task FilterMatchingNothing_ReturnsEmptyNotNull()
     {
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name == "ThisPokemonDoesNotExist"),
             Timeout);
 
@@ -220,7 +220,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public void CancelledRequest_ThrowsOperationCanceled()
     {
-        using var cts = new CancellationTokenSource();
+        using CancellationTokenSource cts = new();
         cts.Cancel();
 
         Should.ThrowAsync<OperationCanceledException>(

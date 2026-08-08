@@ -58,7 +58,7 @@ internal sealed record QueryFilter(string Field, QueryOperator Operator, IReadOn
     /// <returns>The encoded parameter.</returns>
     internal string Render()
     {
-        var prefix = Operator switch
+        string prefix = Operator switch
         {
             QueryOperator.Equal => "eq:",
             QueryOperator.NotEqual => "neq:",
@@ -79,7 +79,7 @@ internal sealed record QueryFilter(string Field, QueryOperator Operator, IReadOn
 
         // Values are escaped, but the operator prefix, the `|` that separates
         // OR alternatives, and any `*` wildcard are structural and stay literal.
-        var values = string.Join("|", Values.Select(EscapeValue));
+        string values = string.Join("|", Values.Select(EscapeValue));
 
         return $"{Field}={prefix}{values}";
     }
@@ -90,15 +90,15 @@ internal sealed record QueryFilter(string Field, QueryOperator Operator, IReadOn
         // and the range indexers below are all post-netstandard2.0, and a
         // direct character comparison is both portable and exactly what those
         // overloads do.
-        var leadingWildcard = value.Length > 0 && value[0] == '*';
+        bool leadingWildcard = value.Length > 0 && value[0] == '*';
 
         // `> 1`, so a lone "*" counts as one wildcard rather than as both a
         // leading and a trailing one. Counting it twice left nothing to strip
         // and threw ArgumentOutOfRangeException out of the substring below —
         // for a query the API answers with 200 and every card.
-        var trailingWildcard = value.Length > 1 && value[value.Length - 1] == '*';
+        bool trailingWildcard = value.Length > 1 && value[value.Length - 1] == '*';
 
-        var core = value;
+        string core = value;
         if (leadingWildcard)
         {
             core = core.Substring(1);
@@ -109,7 +109,7 @@ internal sealed record QueryFilter(string Field, QueryOperator Operator, IReadOn
             core = core.Substring(0, core.Length - 1);
         }
 
-        var escaped = Uri.EscapeDataString(core);
+        string escaped = Uri.EscapeDataString(core);
 
         return (leadingWildcard ? "*" : string.Empty)
              + escaped

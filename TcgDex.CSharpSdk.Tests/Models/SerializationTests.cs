@@ -21,23 +21,23 @@ public sealed class SerializationTests
     private static string Serialize<T>(T value)
         where T : notnull
     {
-        var typeInfo = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
+        JsonTypeInfo<T> typeInfo = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
         return JsonSerializer.Serialize(value, typeInfo);
     }
 
     private static T Deserialize<T>(string json)
         where T : notnull
     {
-        var typeInfo = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
+        JsonTypeInfo<T> typeInfo = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
         return JsonSerializer.Deserialize(json, typeInfo)!;
     }
 
     [Test]
     public void Card_RoundTrips()
     {
-        var original = Fixture.Load<Card>("card-pokemon-full.json");
+        Card original = Fixture.Load<Card>("card-pokemon-full.json");
 
-        var restored = Deserialize<Card>(Serialize(original));
+        Card restored = Deserialize<Card>(Serialize(original));
 
         restored.Id.ShouldBe(original.Id);
         restored.Name.ShouldBe(original.Name);
@@ -52,7 +52,7 @@ public sealed class SerializationTests
     {
         // FlexibleStringConverter.Write: damage is read from either a number or
         // a string, and always written back as a string.
-        var original = new Attack { Name = "Blasting Wind", Damage = "50+", Cost = ["Grass"] };
+        Attack original = new() { Name = "Blasting Wind", Damage = "50+", Cost = ["Grass"] };
 
         // Asserted by round trip rather than by raw text: System.Text.Json's
         // default encoder escapes `+` as +, so the serialized form does not
@@ -63,7 +63,7 @@ public sealed class SerializationTests
     [Test]
     public void Attack_WithNullDamage_WritesNull()
     {
-        var json = Serialize(new Attack { Name = "Feelin' Fine" });
+        string json = Serialize(new Attack { Name = "Feelin' Fine" });
 
         Deserialize<Attack>(json).Damage.ShouldBeNull();
     }
@@ -73,7 +73,7 @@ public sealed class SerializationTests
     {
         // Proves the normalisation survives a round trip: a numeric input
         // becomes text and stays text.
-        var attack = Deserialize<Attack>("""{"name":"Tail Smash","damage":130}""");
+        Attack attack = Deserialize<Attack>("""{"name":"Tail Smash","damage":130}""");
 
         attack.Damage.ShouldBe("130");
 
@@ -101,10 +101,10 @@ public sealed class SerializationTests
     {
         // TcgPlayerPricingConverter.Write: printing names are data, so they must
         // survive being written back out.
-        var original = Fixture.Load<Card>("card-pokemon-full.json");
-        var pricing = original.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+        Card original = Fixture.Load<Card>("card-pokemon-full.json");
+        TcgPlayerPricing pricing = original.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
 
-        var restored = Deserialize<Card>(Serialize(original))
+        TcgPlayerPricing restored = Deserialize<Card>(Serialize(original))
             .Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
 
         restored.Unit.ShouldBe(pricing.Unit);
@@ -115,9 +115,9 @@ public sealed class SerializationTests
     [Test]
     public void TcgPlayerPricing_WithNoPrintings_RoundTrips()
     {
-        var original = new TcgPlayerPricing { Unit = "USD" };
+        TcgPlayerPricing original = new() { Unit = "USD" };
 
-        var restored = Deserialize<TcgPlayerPricing>(Serialize(original));
+        TcgPlayerPricing restored = Deserialize<TcgPlayerPricing>(Serialize(original));
 
         restored.Unit.ShouldBe("USD");
         restored.Printings.ShouldBeEmpty();
@@ -128,7 +128,7 @@ public sealed class SerializationTests
     {
         // The source reports a printing with no data as null rather than
         // omitting the key.
-        var pricing = Deserialize<TcgPlayerPricing>(
+        TcgPlayerPricing pricing = Deserialize<TcgPlayerPricing>(
             """{"unit":"USD","normal":null,"holofoil":{"marketPrice":1.5}}""");
 
         pricing.Printings.Keys.ShouldNotContain("normal");
@@ -142,7 +142,7 @@ public sealed class SerializationTests
     [Test]
     public void TcgPlayerPricing_WhenNull_DeserializesToNull()
     {
-        var pricing = Deserialize<Pricing>("""{"tcgplayer":null,"cardmarket":null}""");
+        Pricing pricing = Deserialize<Pricing>("""{"tcgplayer":null,"cardmarket":null}""");
 
         pricing.Tcgplayer.ShouldBeNull();
         pricing.Cardmarket.ShouldBeNull();
@@ -151,9 +151,9 @@ public sealed class SerializationTests
     [Test]
     public void Set_RoundTrips()
     {
-        var original = Fixture.Load<Set>("set-full.json");
+        Set original = Fixture.Load<Set>("set-full.json");
 
-        var restored = Deserialize<Set>(Serialize(original));
+        Set restored = Deserialize<Set>(Serialize(original));
 
         restored.Id.ShouldBe(original.Id);
         restored.Cards.Count.ShouldBe(original.Cards.Count);
@@ -163,9 +163,9 @@ public sealed class SerializationTests
     [Test]
     public void Serie_RoundTrips()
     {
-        var original = Fixture.Load<Serie>("serie-full.json");
+        Serie original = Fixture.Load<Serie>("serie-full.json");
 
-        var restored = Deserialize<Serie>(Serialize(original));
+        Serie restored = Deserialize<Serie>(Serialize(original));
 
         restored.Id.ShouldBe(original.Id);
         restored.Sets.Count.ShouldBe(original.Sets.Count);
@@ -177,7 +177,7 @@ public sealed class SerializationTests
         // damage is polymorphic across string, number and null, so the failure
         // message has to name the token actually received — otherwise a caller
         // hitting an unexpected shape learns only that parsing failed.
-        var exception = Should.Throw<JsonException>(() =>
+        JsonException exception = Should.Throw<JsonException>(() =>
             Deserialize<Attack>("""{"name":"Tackle","damage":["not","a","scalar"]}"""));
 
         exception.Message.ShouldContain("StartArray");
@@ -188,7 +188,7 @@ public sealed class SerializationTests
     {
         // Naming the token found is what separates "the server sent an array
         // where pricing should be" from an unexplained parse failure.
-        var exception = Should.Throw<JsonException>(() =>
+        JsonException exception = Should.Throw<JsonException>(() =>
             Deserialize<TcgPlayerPricing>("""["not","an","object"]"""));
 
         exception.Message.ShouldContain("StartArray");
@@ -200,9 +200,9 @@ public sealed class SerializationTests
     {
         // `updated` is written only when present, and that branch had no test:
         // a round trip that omits it passes whether the branch exists or not.
-        var updated = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero);
+        DateTimeOffset updated = new(2026, 8, 1, 0, 0, 0, TimeSpan.Zero);
 
-        var json = Serialize(new TcgPlayerPricing { Unit = "USD", Updated = updated });
+        string json = Serialize(new TcgPlayerPricing { Unit = "USD", Updated = updated });
 
         json.ShouldContain("updated");
 

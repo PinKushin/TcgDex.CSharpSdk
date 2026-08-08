@@ -57,7 +57,7 @@ public sealed class TranslatorDefensiveTests
     public void OrWithAConstantOperand_IsRejected()
     {
         // `|| true` would match everything, quietly discarding the other side.
-        var exception = Rejects(p => p.Name == "a" || true);
+        NotSupportedException exception = Rejects(p => p.Name == "a" || true);
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();
     }
@@ -66,7 +66,7 @@ public sealed class TranslatorDefensiveTests
     public void OrWithABareBooleanMember_IsRejected()
     {
         // The API has no "field is true" filter, so this cannot be translated.
-        var exception = Rejects(p => p.Name == "a" || p.Flag);
+        NotSupportedException exception = Rejects(p => p.Name == "a" || p.Flag);
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();
     }
@@ -79,7 +79,7 @@ public sealed class TranslatorDefensiveTests
         // `&` is a BinaryExpression like `==` is, but there is no operator for
         // it. Reading the node type without checking would emit a filter that
         // silently means something else.
-        var exception = Rejects(p => p.Flag & true);
+        NotSupportedException exception = Rejects(p => p.Flag & true);
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();
     }
@@ -105,7 +105,7 @@ public sealed class TranslatorDefensiveTests
         // exactly like Contains to the shape check, and only the name
         // distinguishes it. Mapping it by shape alone would emit a filter that
         // means something entirely different.
-        var exception = Rejects(p => p.Child!.Matches("a"));
+        NotSupportedException exception = Rejects(p => p.Child!.Matches("a"));
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();
     }
@@ -118,9 +118,9 @@ public sealed class TranslatorDefensiveTests
         // an expression arriving from anywhere other than C# source could carry
         // it. Only `==` and `!=` against null are presence checks; translating a
         // relational one as `null:` would mean something different entirely.
-        var parameter = Expression.Parameter(typeof(Probe), "p");
+        ParameterExpression parameter = Expression.Parameter(typeof(Probe), "p");
 
-        var predicate = Expression.Lambda<Func<Probe, bool>>(
+        Expression<Func<Probe, bool>> predicate = Expression.Lambda<Func<Probe, bool>>(
             Expression.GreaterThan(
                 Expression.Property(parameter, nameof(Probe.Optional)),
                 Expression.Constant(null, typeof(int?)),
@@ -139,7 +139,7 @@ public sealed class TranslatorDefensiveTests
     {
         // Evaluating this would mean invoking caller code during translation,
         // which the translator deliberately never does.
-        var exception = Rejects(p => p.Name == MakeName());
+        NotSupportedException exception = Rejects(p => p.Name == MakeName());
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();
     }
@@ -147,7 +147,7 @@ public sealed class TranslatorDefensiveTests
     [Test]
     public void AnArrayIndexAsTheComparedValue_IsRejected()
     {
-        var names = new[] { "a", "b" };
+        string[] names = new[] { "a", "b" };
 
         Rejects(p => p.Name == names[0]).Message.ShouldNotBeNullOrWhiteSpace();
     }
@@ -175,7 +175,7 @@ public sealed class TranslatorDefensiveTests
     public void AValueThatIsNeitherTextNorFormattable_UsesToString()
     {
         // Falls through every typed branch to the final ToString.
-        var value = new Probe { Name = "x" };
+        Probe value = new() { Name = "x" };
 
         ExpressionTranslator.Format(value).ShouldBe(value.ToString());
     }

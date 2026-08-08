@@ -59,7 +59,7 @@ public class SerializationBenchmarks
     [Benchmark(Baseline = true)]
     public Card? SourceGenerated()
     {
-        var typeInfo = (JsonTypeInfo<Card>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(Card));
+        JsonTypeInfo<Card> typeInfo = (JsonTypeInfo<Card>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(Card));
 
         return JsonSerializer.Deserialize(_cardJson, typeInfo);
     }
@@ -87,13 +87,13 @@ public class SerializationBenchmarks
     /// </summary>
     private static string StripProperty(string json, string name)
     {
-        using var document = JsonDocument.Parse(json);
-        using var buffer = new MemoryStream();
-        using var writer = new Utf8JsonWriter(buffer);
+        using JsonDocument document = JsonDocument.Parse(json);
+        using MemoryStream buffer = new();
+        using Utf8JsonWriter writer = new(buffer);
 
         writer.WriteStartObject();
 
-        foreach (var property in document.RootElement.EnumerateObject())
+        foreach (JsonProperty property in document.RootElement.EnumerateObject())
         {
             if (!string.Equals(property.Name, name, StringComparison.Ordinal))
             {

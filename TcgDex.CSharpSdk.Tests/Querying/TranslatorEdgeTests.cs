@@ -47,7 +47,7 @@ public sealed class TranslatorEdgeTests
     {
         // An empty filter value would match everything, which is never what the
         // caller meant.
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Name.Contains("")));
 
         exception.Message.ShouldContain("name");
@@ -68,7 +68,7 @@ public sealed class TranslatorEdgeTests
     [Test]
     public void NonFormattableValue_FallsBackToToString()
     {
-        var value = new Uri("https://example.test/x");
+        Uri value = new("https://example.test/x");
 
         ExpressionTranslator.Format(value).ShouldBe("https://example.test/x");
     }
@@ -102,7 +102,7 @@ public sealed class TranslatorEdgeTests
     {
         // `Where(c => true)` has no field to filter on, so it cannot be
         // translated into anything meaningful.
-        var exception = Should.Throw<NotSupportedException>(() => Query().Where(c => true));
+        NotSupportedException exception = Should.Throw<NotSupportedException>(() => Query().Where(c => true));
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();
     }
@@ -153,14 +153,14 @@ public sealed class TranslatorEdgeTests
     private static T Deserialize<T>(string json)
         where T : notnull
     {
-        var info = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
+        JsonTypeInfo<T> info = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
         return JsonSerializer.Deserialize(json, info)!;
     }
 
     private static string Serialize<T>(T value)
         where T : notnull
     {
-        var info = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
+        JsonTypeInfo<T> info = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
         return JsonSerializer.Serialize(value, info);
     }
 
@@ -171,7 +171,7 @@ public sealed class TranslatorEdgeTests
     [Test]
     public void AttackDamage_WhenNull_IsWrittenAsJsonNull()
     {
-        var json = Serialize(new Attack { Name = "x", Damage = null });
+        string json = Serialize(new Attack { Name = "x", Damage = null });
 
         // Round-trips as null rather than being dropped or written as "".
         Deserialize<Attack>(json).Damage.ShouldBeNull();

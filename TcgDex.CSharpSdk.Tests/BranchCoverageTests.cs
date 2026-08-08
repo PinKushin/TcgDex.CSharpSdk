@@ -53,12 +53,12 @@ public sealed class BranchCoverageTests
         int? page = null,
         int? itemsPerPage = null)
     {
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, """{"data":{"cards":[]}}""");
-        var client = new TcgDexClient(new HttpClient(handler), new TcgDexOptions());
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, """{"data":{"cards":[]}}""");
+        TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
 
         await client.Cards.SearchDetailedAsync(filter, page, itemsPerPage, CancellationToken.None);
 
-        using var document = JsonDocument.Parse(handler.SingleRequestBody);
+        using JsonDocument document = JsonDocument.Parse(handler.SingleRequestBody);
         return document.RootElement.GetProperty("query").GetString()!;
     }
 
@@ -67,7 +67,7 @@ public sealed class BranchCoverageTests
     {
         // With no filter the pagination argument is first, so emitting a
         // separator would produce `cards(,pagination:{…})` — a syntax error.
-        var query = await GraphQlQueryAsync(new CardFilter(), page: 2, itemsPerPage: 10);
+        string query = await GraphQlQueryAsync(new CardFilter(), page: 2, itemsPerPage: 10);
 
         query.ShouldContain("cards(pagination:{page:2,itemsPerPage:10})");
     }
@@ -75,7 +75,7 @@ public sealed class BranchCoverageTests
     [Test]
     public async Task PageWithoutItemsPerPage_EmitsOnlyThePage()
     {
-        var query = await GraphQlQueryAsync(new CardFilter(), page: 3);
+        string query = await GraphQlQueryAsync(new CardFilter(), page: 3);
 
         query.ShouldContain("pagination:{page:3}");
         query.ShouldNotContain("itemsPerPage");
@@ -86,7 +86,7 @@ public sealed class BranchCoverageTests
     {
         // The comma between page and itemsPerPage is conditional on page being
         // present; emitting it unconditionally breaks this case.
-        var query = await GraphQlQueryAsync(new CardFilter(), itemsPerPage: 25);
+        string query = await GraphQlQueryAsync(new CardFilter(), itemsPerPage: 25);
 
         query.ShouldContain("pagination:{itemsPerPage:25}");
 
@@ -98,7 +98,7 @@ public sealed class BranchCoverageTests
     [Test]
     public async Task NeitherFilterNorPagination_OmitsTheArgumentListEntirely()
     {
-        var query = await GraphQlQueryAsync(new CardFilter());
+        string query = await GraphQlQueryAsync(new CardFilter());
 
         query.ShouldContain("{ cards {");
     }
@@ -108,21 +108,21 @@ public sealed class BranchCoverageTests
     private static T Deserialize<T>(string json)
         where T : notnull
     {
-        var info = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
+        JsonTypeInfo<T> info = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
         return JsonSerializer.Deserialize(json, info)!;
     }
 
     private static string Serialize<T>(T value)
         where T : notnull
     {
-        var info = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
+        JsonTypeInfo<T> info = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
         return JsonSerializer.Serialize(value, info);
     }
 
     [Test]
     public void PricingWithNullUnit_ReadsAsNullRatherThanThrowing()
     {
-        var pricing = Deserialize<TcgPlayerPricing>("""{"unit":null,"normal":{"marketPrice":1}}""");
+        TcgPlayerPricing pricing = Deserialize<TcgPlayerPricing>("""{"unit":null,"normal":{"marketPrice":1}}""");
 
         pricing.Unit.ShouldBeNull();
         pricing["normal"].ShouldNotBeNull().MarketPrice.ShouldBe(1m);
@@ -131,7 +131,7 @@ public sealed class BranchCoverageTests
     [Test]
     public void PricingWithNullUpdated_ReadsAsNull()
     {
-        var pricing = Deserialize<TcgPlayerPricing>("""{"unit":"USD","updated":null}""");
+        TcgPlayerPricing pricing = Deserialize<TcgPlayerPricing>("""{"unit":"USD","updated":null}""");
 
         pricing.Updated.ShouldBeNull();
         pricing.Unit.ShouldBe("USD");
@@ -140,7 +140,7 @@ public sealed class BranchCoverageTests
     [Test]
     public void PricingWithBothTimestampAndUnit_ReadsBoth()
     {
-        var pricing = Deserialize<TcgPlayerPricing>(
+        TcgPlayerPricing pricing = Deserialize<TcgPlayerPricing>(
             """{"unit":"USD","updated":"2026-08-05T08:03:54.324Z"}""");
 
         pricing.Unit.ShouldBe("USD");
@@ -152,7 +152,7 @@ public sealed class BranchCoverageTests
     {
         // The write path branches on Unit being present; the absent case is the
         // one a hand-built instance hits.
-        var json = Serialize(new TcgPlayerPricing { Unit = null });
+        string json = Serialize(new TcgPlayerPricing { Unit = null });
 
         Deserialize<TcgPlayerPricing>(json).Unit.ShouldBeNull();
     }
@@ -164,20 +164,20 @@ public sealed class BranchCoverageTests
     {
         // Both are optional on the stored entry, and rebuilding must not assume
         // either is present.
-        var inner = new CountingHandler();
+        CountingHandler inner = new();
         inner.Respond(HttpStatusCode.OK, """{"id":"x"}""", etag: null);
 
-        var handler = new TcgDexCachingHandler(new MemoryTcgDexResponseCache())
+        TcgDexCachingHandler handler = new(new MemoryTcgDexResponseCache())
         {
             InnerHandler = inner,
         };
 
-        using var client = new HttpClient(handler);
+        using HttpClient client = new(handler);
         const string Url = "https://api.tcgdex.net/v2/en/cards/x";
 
         await client.GetAsync(Url, CancellationToken.None);
 
-        using var replayed = await client.GetAsync(Url, CancellationToken.None);
+        using HttpResponseMessage replayed = await client.GetAsync(Url, CancellationToken.None);
         (await replayed.Content.ReadAsStringAsync(CancellationToken.None)).ShouldBe("""{"id":"x"}""");
         replayed.Headers.ETag.ShouldBeNull();
     }
@@ -185,20 +185,20 @@ public sealed class BranchCoverageTests
     [Test]
     public async Task ACachedResponseWithAnETag_ReplaysIt()
     {
-        var inner = new CountingHandler();
+        CountingHandler inner = new();
         inner.Respond(HttpStatusCode.OK, """{"id":"x"}""", "W/\"abc\"");
 
-        var handler = new TcgDexCachingHandler(new MemoryTcgDexResponseCache())
+        TcgDexCachingHandler handler = new(new MemoryTcgDexResponseCache())
         {
             InnerHandler = inner,
         };
 
-        using var client = new HttpClient(handler);
+        using HttpClient client = new(handler);
         const string Url = "https://api.tcgdex.net/v2/en/cards/x";
 
         await client.GetAsync(Url, CancellationToken.None);
 
-        using var replayed = await client.GetAsync(Url, CancellationToken.None);
+        using HttpResponseMessage replayed = await client.GetAsync(Url, CancellationToken.None);
         replayed.Headers.ETag.ShouldNotBeNull();
         replayed.Content.Headers.ContentType!.MediaType.ShouldBe("application/json");
     }
@@ -243,12 +243,12 @@ public sealed class BranchCoverageTests
     {
         // `problem?.Describe() ?? ReasonPhrase ?? default` — the middle rung is
         // reached only when the body cannot be parsed at all.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.ServiceUnavailable, "not json at all");
 
-        var client = new TcgDexClient(new HttpClient(handler), new TcgDexOptions());
+        TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
 
         exception.Problem.ShouldBeNull();
@@ -258,12 +258,12 @@ public sealed class BranchCoverageTests
     [Test]
     public void AFailureWithAParseableBody_UsesTheProblemDescription()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.BadGateway, """{"title":"upstream exploded"}""");
 
-        var client = new TcgDexClient(new HttpClient(handler), new TcgDexOptions());
+        TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
 
         exception.Message.ShouldContain("upstream exploded");
@@ -309,8 +309,8 @@ public sealed class BranchCoverageTests
     {
         // `Deserialize(...) ?? throw` — the null half, which a literal "null"
         // body produces.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "null");
-        var client = new TcgDexClient(new HttpClient(handler), new TcgDexOptions());
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "null");
+        TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
 
         Should.ThrowAsync<TcgDexApiException>(async () =>
             await client.Cards.SearchDetailedAsync(
@@ -325,7 +325,7 @@ public sealed class BranchCoverageTests
     {
         // The eviction scan guards against finding no candidate, which happens
         // if entries expire between the overflow check and the scan.
-        var cache = new MemoryTcgDexResponseCache(maxEntries: 1);
+        MemoryTcgDexResponseCache cache = new(maxEntries: 1);
 
         await cache.SetAsync("a", new CachedResponse
         {

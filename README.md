@@ -39,7 +39,7 @@ public sealed class CardLookup(ITcgDexClient tcgdex)
 {
     public async Task<string?> DescribeAsync(string id, CancellationToken ct)
     {
-        var card = await tcgdex.Cards.GetAsync(id, ct);
+        Card? card = await tcgdex.Cards.GetAsync(id, ct);
 
         return card is null ? null : $"{card.Name} ({card.Category}) — {card.Rarity}";
     }
@@ -49,10 +49,10 @@ public sealed class CardLookup(ITcgDexClient tcgdex)
 Without a container:
 
 ```csharp
-using var http = new HttpClient();
-var tcgdex = new TcgDexClient(http, new TcgDexOptions());
+using HttpClient http = new();
+TcgDexClient tcgdex = new(http, new TcgDexOptions());
 
-var card = await tcgdex.Cards.GetAsync("swsh3-136", cancellationToken);
+Card? card = await tcgdex.Cards.GetAsync("swsh3-136", cancellationToken);
 Console.WriteLine(card?.Name);   // Furret
 ```
 
@@ -61,13 +61,13 @@ Console.WriteLine(card?.Name);   // Furret
 Predicates are written in C# and translated to the API's filter syntax:
 
 ```csharp
-var query = new CardQuery()
+CardQuery query = new CardQuery()
     .Where(c => c.Name.Contains("Pikachu"))
     .Where(c => c.Hp > 100)
     .OrderByDescending(c => c.Name)
     .Page(1, 50);
 
-var cards = await tcgdex.Cards.ListAsync(query, cancellationToken);
+IReadOnlyList<CardBrief> cards = await tcgdex.Cards.ListAsync(query, cancellationToken);
 ```
 
 which becomes:
@@ -110,7 +110,7 @@ call per card. When you need the detail, `SearchDetailedAsync` fetches it in a
 single request over GraphQL:
 
 ```csharp
-var cards = await tcgdex.Cards.SearchDetailedAsync(
+IReadOnlyList<Card> cards = await tcgdex.Cards.SearchDetailedAsync(
     new CardFilter { Name = "Furret" },
     cancellationToken: ct);
 
@@ -186,7 +186,7 @@ One rule, applied everywhere:
 ```csharp
 try
 {
-    var card = await tcgdex.Cards.GetAsync(id, ct);
+    Card? card = await tcgdex.Cards.GetAsync(id, ct);
     if (card is null) { /* no such card */ }
 }
 catch (TcgDexApiException ex)

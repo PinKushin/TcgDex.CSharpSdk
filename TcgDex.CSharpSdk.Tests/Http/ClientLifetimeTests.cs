@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using TcgDex;
+using TcgDex.Models;
 using TcgDex.Tests.Diagnostics;
 
 /// <summary>
@@ -25,16 +26,16 @@ public sealed class ClientLifetimeTests
     {
         // The caller may be sharing that HttpClient with the rest of their
         // application; disposing it here would break them.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
 
-        using var httpClient = new HttpClient(handler);
-        var client = new TcgDexClient(httpClient, new TcgDexOptions());
+        using HttpClient httpClient = new(handler);
+        TcgDexClient client = new(httpClient, new TcgDexOptions());
 
         client.Dispose();
 
         // Still usable, which proves it was left alone.
-        var card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
         card.ShouldNotBeNull();
     }
 
@@ -46,16 +47,16 @@ public sealed class ClientLifetimeTests
         // exercised that delegation. Flipping it to true would have made the
         // SDK dispose an HttpClient its caller may be sharing with the rest of
         // their application.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
 
-        using var httpClient = new HttpClient(handler);
-        var log = new RecordingLogger(LogLevel.Trace);
-        var client = new TcgDexClient(httpClient, new TcgDexOptions(), log.Factory);
+        using HttpClient httpClient = new(handler);
+        RecordingLogger log = new(LogLevel.Trace);
+        TcgDexClient client = new(httpClient, new TcgDexOptions(), log.Factory);
 
         client.Dispose();
 
-        var card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
         card.ShouldNotBeNull();
     }
 
@@ -65,10 +66,10 @@ public sealed class ClientLifetimeTests
         // The category is what a consumer writes a filter rule against, so
         // blanking it silently breaks their logging configuration while every
         // message still appears. Nothing asserted it.
-        var log = new RecordingLogger(LogLevel.Trace);
+        RecordingLogger log = new(LogLevel.Trace);
 
-        using var httpClient = new HttpClient(new RecordingHandler());
-        using var client = new TcgDexClient(httpClient, new TcgDexOptions(), log.Factory);
+        using HttpClient httpClient = new(new RecordingHandler());
+        using TcgDexClient client = new(httpClient, new TcgDexOptions(), log.Factory);
 
         log.Categories.ShouldContain("TcgDex");
     }
@@ -76,8 +77,8 @@ public sealed class ClientLifetimeTests
     [Test]
     public void DisposingIsIdempotent()
     {
-        using var httpClient = new HttpClient(new RecordingHandler());
-        var client = new TcgDexClient(httpClient, new TcgDexOptions());
+        using HttpClient httpClient = new(new RecordingHandler());
+        TcgDexClient client = new(httpClient, new TcgDexOptions());
 
         Should.NotThrow(() =>
         {
@@ -89,7 +90,7 @@ public sealed class ClientLifetimeTests
     [Test]
     public void Create_ProducesAUsableClient()
     {
-        using var client = TcgDexClient.Create();
+        using TcgDexClient client = TcgDexClient.Create();
 
         client.Cards.ShouldNotBeNull();
         client.Catalog.ShouldNotBeNull();
@@ -113,9 +114,9 @@ public sealed class ClientLifetimeTests
         // The language reaching the URL is covered where it can be observed:
         // ClientTests drives an injected handler and asserts the request path,
         // and the integration suite checks it against the live API.
-        foreach (var language in new[] { TcgDexLanguages.French, TcgDexLanguages.Japanese })
+        foreach (string? language in new[] { TcgDexLanguages.French, TcgDexLanguages.Japanese })
         {
-            using var client = TcgDexClient.Create(new TcgDexOptions { Language = language });
+            using TcgDexClient client = TcgDexClient.Create(new TcgDexOptions { Language = language });
 
             client.Cards.ShouldNotBeNull();
         }
@@ -129,9 +130,9 @@ public sealed class ClientLifetimeTests
         // configureCache call entirely went unnoticed. What matters is that the
         // caller's settings reach the cache, and the delegate running is the
         // observable part of that from outside.
-        var configured = false;
+        bool configured = false;
 
-        using var client = TcgDexClient.Create(configureCache: cache =>
+        using TcgDexClient client = TcgDexClient.Create(configureCache: cache =>
         {
             configured = true;
             cache.DefaultTimeToLive = TimeSpan.FromMinutes(1);
@@ -154,24 +155,24 @@ public sealed class ClientLifetimeTests
         // neither it nor the handler. Asserting on private state is a poor
         // default; here the alternative is not asserting a documented
         // guarantee, which is worse.
-        using var client = TcgDexClient.Create();
+        using TcgDexClient client = TcgDexClient.Create();
 
         // Two names, because the field is BCL private state: modern .NET calls
         // it _handler, .NET Framework calls it handler. Looking up both is the
         // cost of asserting this at all — if a future runtime renames it again,
         // this fails loudly rather than silently stopping checking.
-        var handlerField = (typeof(HttpMessageInvoker)
+        FieldInfo handlerField = (typeof(HttpMessageInvoker)
                 .GetField("_handler", BindingFlags.NonPublic | BindingFlags.Instance)
             ?? typeof(HttpMessageInvoker)
                 .GetField("handler", BindingFlags.NonPublic | BindingFlags.Instance))
             .ShouldNotBeNull();
 
-        var httpClientField = typeof(TcgDexClient)
+        FieldInfo httpClientField = typeof(TcgDexClient)
             .GetField("_ownedHttpClient", BindingFlags.NonPublic | BindingFlags.Instance)
             .ShouldNotBeNull();
 
-        var httpClient = httpClientField.GetValue(client).ShouldNotBeNull();
-        var handler = handlerField.GetValue(httpClient).ShouldNotBeNull();
+        object httpClient = httpClientField.GetValue(client).ShouldNotBeNull();
+        object handler = handlerField.GetValue(httpClient).ShouldNotBeNull();
 
 #if NETFRAMEWORK
         // .NET Framework resolves the netstandard2.0 asset, where
@@ -179,12 +180,12 @@ public sealed class ClientLifetimeTests
         // there through ServicePoint.ConnectionLeaseTimeout instead, and Brotli
         // is unavailable — so this asserts the other half of the SDK's #if
         // rather than skipping the framework.
-        var frameworkHandler = handler.ShouldBeOfType<HttpClientHandler>();
+        HttpClientHandler frameworkHandler = handler.ShouldBeOfType<HttpClientHandler>();
 
         frameworkHandler.AutomaticDecompression
             .ShouldBe(DecompressionMethods.GZip | DecompressionMethods.Deflate);
 #else
-        var modernHandler = handler.ShouldBeOfType<SocketsHttpHandler>();
+        SocketsHttpHandler modernHandler = handler.ShouldBeOfType<SocketsHttpHandler>();
 
         modernHandler.PooledConnectionLifetime.ShouldBe(TimeSpan.FromMinutes(2));
         modernHandler.AutomaticDecompression.ShouldBe(DecompressionMethods.All);
@@ -202,7 +203,7 @@ public sealed class ClientLifetimeTests
         // never ran and the test passed whatever the client did with its
         // HttpClient. Mutation testing found it by flipping ownsHttpClient to
         // false with nothing noticing.
-        var client = TcgDexClient.Create();
+        TcgDexClient client = TcgDexClient.Create();
         client.Dispose();
 
         Should.ThrowAsync<ObjectDisposedException>(

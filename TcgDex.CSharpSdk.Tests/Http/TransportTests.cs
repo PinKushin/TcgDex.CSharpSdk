@@ -16,7 +16,7 @@ public sealed class TransportTests
 {
     private static TcgDexTransport CreateTransport(RecordingHandler handler, string language = "en")
     {
-        var options = new TcgDexOptions { Language = language };
+        TcgDexOptions options = new() { Language = language };
         return new TcgDexTransport(new HttpClient(handler), options);
     }
 
@@ -25,7 +25,7 @@ public sealed class TransportTests
     [Test]
     public async Task GetAsync_BuildsUrlFromBaseAddressAndLanguage()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
 
         await CreateTransport(handler).GetAsync<Card>("cards/swsh3-136", CancellationToken.None);
@@ -36,7 +36,7 @@ public sealed class TransportTests
     [Test]
     public async Task GetAsync_UsesConfiguredLanguageSegment()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
 
         await CreateTransport(handler, "fr").GetAsync<Card>("cards/swsh3-136", CancellationToken.None);
@@ -47,7 +47,7 @@ public sealed class TransportTests
     [Test]
     public async Task GetAsync_IssuesGetRequest()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
 
         await CreateTransport(handler).GetAsync<Card>("cards/swsh3-136", CancellationToken.None);
@@ -60,7 +60,7 @@ public sealed class TransportTests
     {
         // Filters are top-level query parameters. Anything that rewrites or
         // wraps them — in a `?q=` parameter, say — breaks the API contract.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
 
         await CreateTransport(handler)
             .GetAsync<IReadOnlyList<CardBrief>>("cards?name=eq:Furret&hp=gt:100", CancellationToken.None);
@@ -72,15 +72,15 @@ public sealed class TransportTests
     [Test]
     public async Task GetAsync_RespectsCustomBaseAddress()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
 
-        var options = new TcgDexOptions
+        TcgDexOptions options = new()
         {
             BaseAddress = new Uri("https://mirror.example.test/v2/"),
             Language = "en",
         };
-        var transport = new TcgDexTransport(new HttpClient(handler), options);
+        TcgDexTransport transport = new(new HttpClient(handler), options);
 
         await transport.GetAsync<Card>("cards/swsh3-136", CancellationToken.None);
 
@@ -92,10 +92,10 @@ public sealed class TransportTests
     [Test]
     public async Task GetAsync_DeserializesThroughTheSdkContext()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
 
-        var card = await CreateTransport(handler).GetAsync<Card>("cards/swsh3-136", CancellationToken.None);
+        Card? card = await CreateTransport(handler).GetAsync<Card>("cards/swsh3-136", CancellationToken.None);
 
         card.ShouldNotBeNull();
         card.Name.ShouldBe("Furret");
@@ -106,10 +106,10 @@ public sealed class TransportTests
     [Test]
     public async Task GetAsync_WhenResourceNotFound_ReturnsNull()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.NotFound, "error-not-found.json");
 
-        var card = await CreateTransport(handler).GetAsync<Card>("cards/nope", CancellationToken.None);
+        Card? card = await CreateTransport(handler).GetAsync<Card>("cards/nope", CancellationToken.None);
 
         card.ShouldBeNull("a missing resource is an expected outcome, not an error");
     }
@@ -119,12 +119,12 @@ public sealed class TransportTests
     {
         // A bad language is also a 404, but it is a caller mistake rather than a
         // missing card — returning null would silently hide a typo'd language.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.NotFound, "error-bad-language.json");
 
-        var transport = CreateTransport(handler, "en");
+        TcgDexTransport transport = CreateTransport(handler, "en");
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(
             async () => await transport.GetAsync<Card>("cards/swsh3-136", CancellationToken.None)).Result;
 
         exception.IsLanguageError.ShouldBeTrue();
@@ -135,12 +135,12 @@ public sealed class TransportTests
     [Test]
     public void GetAsync_WhenServerError_Throws()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.InternalServerError, "{}");
 
-        var transport = CreateTransport(handler);
+        TcgDexTransport transport = CreateTransport(handler);
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(
             async () => await transport.GetAsync<Card>("cards/swsh3-136", CancellationToken.None)).Result;
 
         exception.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
@@ -151,13 +151,13 @@ public sealed class TransportTests
     {
         // A proxy or outage can return HTML. Callers should not have to catch
         // JsonException separately from the SDK's own exception type.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(_ => new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("<html>gateway error</html>"),
             });
 
-        var transport = CreateTransport(handler);
+        TcgDexTransport transport = CreateTransport(handler);
 
         Should.ThrowAsync<TcgDexApiException>(
             async () => await transport.GetAsync<Card>("cards/swsh3-136", CancellationToken.None))
@@ -169,10 +169,10 @@ public sealed class TransportTests
     [Test]
     public void GetAsync_WhenCancelled_ThrowsOperationCanceled()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
 
-        using var cts = new CancellationTokenSource();
+        using CancellationTokenSource cts = new();
         cts.Cancel();
 
         Should.ThrowAsync<OperationCanceledException>(
@@ -184,9 +184,9 @@ public sealed class TransportTests
     [Test]
     public void Options_WithUnsupportedLanguage_AreRejected()
     {
-        var options = new TcgDexOptions { Language = "zz" };
+        TcgDexOptions options = new() { Language = "zz" };
 
-        var exception = Should.Throw<ArgumentException>(options.Validate);
+        ArgumentException exception = Should.Throw<ArgumentException>(options.Validate);
 
         // The message should name the valid set rather than just saying "invalid".
         exception.Message.ShouldContain("zz");
@@ -199,9 +199,9 @@ public sealed class TransportTests
         // Negative is neither a limit nor the documented "no limit", so it is a
         // caller mistake worth naming at construction rather than silently
         // behaving like one of the two.
-        var options = new TcgDexOptions { MaxResponseBytes = -1 };
+        TcgDexOptions options = new() { MaxResponseBytes = -1 };
 
-        var exception = Should.Throw<ArgumentException>(options.Validate);
+        ArgumentException exception = Should.Throw<ArgumentException>(options.Validate);
 
         exception.Message.ShouldContain("-1");
         exception.Message.ShouldContain("zero");
@@ -231,7 +231,7 @@ public sealed class TransportTests
     [Test]
     public void Options_WithSupportedLanguage_AreAccepted()
     {
-        foreach (var language in TcgDexLanguages.All)
+        foreach (string language in TcgDexLanguages.All)
         {
             Should.NotThrow(new TcgDexOptions { Language = language }.Validate);
         }
@@ -240,7 +240,7 @@ public sealed class TransportTests
     [Test]
     public void Options_DefaultToEnglishAgainstTheOfficialHost()
     {
-        var options = new TcgDexOptions();
+        TcgDexOptions options = new();
 
         options.Language.ShouldBe("en");
         options.BaseAddress.ShouldBe(new Uri("https://api.tcgdex.net/v2/"));

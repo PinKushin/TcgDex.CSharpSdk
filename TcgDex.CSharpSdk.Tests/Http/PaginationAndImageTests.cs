@@ -19,7 +19,7 @@ public sealed class PaginationAndImageTests
 
     private static string Page(int count, int startAt = 0)
     {
-        var cards = Enumerable.Range(startAt, count)
+        IEnumerable<string> cards = Enumerable.Range(startAt, count)
             .Select(i => $$"""{"id":"c-{{i}}","localId":"{{i}}","name":"Card {{i}}"}""");
 
         return $"[{string.Join(",", cards)}]";
@@ -30,14 +30,14 @@ public sealed class PaginationAndImageTests
     [Test]
     public async Task StreamAsync_FollowsPagesUntilAShortOneArrives()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.OK, Page(3, 0))
             .RespondWith(HttpStatusCode.OK, Page(3, 3))
             .RespondWith(HttpStatusCode.OK, Page(1, 6));
 
-        var cards = new List<CardBrief>();
+        List<CardBrief> cards = new();
 
-        await foreach (var card in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 3, CancellationToken.None))
+        await foreach (CardBrief card in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 3, CancellationToken.None))
         {
             cards.Add(card);
         }
@@ -51,11 +51,11 @@ public sealed class PaginationAndImageTests
     [Test]
     public async Task StreamAsync_RequestsSequentialPages()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.OK, Page(2, 0))
             .RespondWith(HttpStatusCode.OK, Page(0));
 
-        await foreach (var _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 2, CancellationToken.None))
+        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 2, CancellationToken.None))
         {
         }
 
@@ -69,13 +69,13 @@ public sealed class PaginationAndImageTests
     {
         // Unavoidable: with no total count, a full page is indistinguishable
         // from "there is more" until the next request comes back empty.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.OK, Page(2, 0))
             .RespondWith(HttpStatusCode.OK, "[]");
 
-        var count = 0;
+        int count = 0;
 
-        await foreach (var _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 2, CancellationToken.None))
+        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 2, CancellationToken.None))
         {
             count++;
         }
@@ -87,11 +87,11 @@ public sealed class PaginationAndImageTests
     [Test]
     public async Task StreamAsync_WithNoResults_YieldsNothing()
     {
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
 
-        var count = 0;
+        int count = 0;
 
-        await foreach (var _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 10, CancellationToken.None))
+        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 10, CancellationToken.None))
         {
             count++;
         }
@@ -105,11 +105,11 @@ public sealed class PaginationAndImageTests
     {
         // Laziness is the point: taking two results from a large set must not
         // download the whole thing.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Page(50, 0));
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Page(50, 0));
 
-        var taken = new List<CardBrief>();
+        List<CardBrief> taken = new();
 
-        await foreach (var card in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 50, CancellationToken.None))
+        await foreach (CardBrief card in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 50, CancellationToken.None))
         {
             taken.Add(card);
 
@@ -126,15 +126,15 @@ public sealed class PaginationAndImageTests
     [Test]
     public async Task StreamAsync_AppliesTheQueryFilters()
     {
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
 
-        var query = new CardQuery().Where(c => c.Name == "Furret").OrderBy(c => c.Name);
+        CardQuery query = new CardQuery().Where(c => c.Name == "Furret").OrderBy(c => c.Name);
 
-        await foreach (var _ in CreateClient(handler).Cards.StreamAsync(query, 10, CancellationToken.None))
+        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(query, 10, CancellationToken.None))
         {
         }
 
-        var uri = handler.Requests[0].RequestUri!.ToString();
+        string uri = handler.Requests[0].RequestUri!.ToString();
         uri.ShouldContain("name=eq:Furret");
         uri.ShouldContain("sort:field=name");
     }
@@ -144,15 +144,15 @@ public sealed class PaginationAndImageTests
     {
         // The stream owns paging; a page left on the query would silently skip
         // results or repeat them.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
 
-        var query = new CardQuery().Page(7, 3);
+        CardQuery query = new CardQuery().Page(7, 3);
 
-        await foreach (var _ in CreateClient(handler).Cards.StreamAsync(query, 25, CancellationToken.None))
+        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(query, 25, CancellationToken.None))
         {
         }
 
-        var uri = handler.Requests[0].RequestUri!.ToString();
+        string uri = handler.Requests[0].RequestUri!.ToString();
         uri.ShouldContain("pagination:page=1");
         uri.ShouldContain("itemsPerPage=25");
     }
@@ -160,11 +160,11 @@ public sealed class PaginationAndImageTests
     [Test]
     public void StreamAsync_WithNullQuery_Throws()
     {
-        var handler = new RecordingHandler();
+        RecordingHandler handler = new();
 
         Should.ThrowAsync<ArgumentNullException>(async () =>
         {
-            await foreach (var _ in CreateClient(handler).Cards.StreamAsync(null!, 10, CancellationToken.None))
+            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(null!, 10, CancellationToken.None))
             {
             }
         });
@@ -174,11 +174,11 @@ public sealed class PaginationAndImageTests
     [TestCase(-1)]
     public void StreamAsync_WithInvalidPageSize_Throws(int pageSize)
     {
-        var handler = new RecordingHandler();
+        RecordingHandler handler = new();
 
         Should.ThrowAsync<ArgumentOutOfRangeException>(async () =>
         {
-            await foreach (var _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), pageSize, CancellationToken.None))
+            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), pageSize, CancellationToken.None))
             {
             }
         });
@@ -187,14 +187,14 @@ public sealed class PaginationAndImageTests
     [Test]
     public void StreamAsync_WhenCancelled_StopsEnumerating()
     {
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Page(5, 0));
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Page(5, 0));
 
-        using var cts = new CancellationTokenSource();
+        using CancellationTokenSource cts = new();
         cts.Cancel();
 
         Should.ThrowAsync<OperationCanceledException>(async () =>
         {
-            await foreach (var _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 5, cts.Token))
+            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 5, cts.Token))
             {
             }
         });
@@ -228,7 +228,7 @@ public sealed class PaginationAndImageTests
     public void GetImageUrl_OnACardWithoutArtwork_ReturnsNull()
     {
         // `exu-!` is a real card with no image.
-        var card = Fixture.Load<Card>("card-missing-image.json");
+        Card card = Fixture.Load<Card>("card-missing-image.json");
 
         card.GetImageUrl().ShouldBeNull();
     }
@@ -236,7 +236,7 @@ public sealed class PaginationAndImageTests
     [Test]
     public void GetImageUrl_OnACardWithArtwork_BuildsTheUrl()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
         card.GetImageUrl(ImageQuality.Low, ImageFormat.Webp).ShouldEndWith("/low.webp");
     }
@@ -244,7 +244,7 @@ public sealed class PaginationAndImageTests
     [Test]
     public void GetLogoAndSymbolUrls_AreBuiltFromTheSet()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
         // Logos and symbols take no quality segment — `{base}.{format}`.
         // Applying the card pattern to them returns 404.
@@ -255,8 +255,8 @@ public sealed class PaginationAndImageTests
     [Test]
     public void GetImageUrl_OnABrief_BuildsTheUrl()
     {
-        var briefs = Fixture.Load<IReadOnlyList<CardBrief>>("list-cards-brief.json");
-        var withImage = briefs.First(b => b.Image is not null);
+        IReadOnlyList<CardBrief> briefs = Fixture.Load<IReadOnlyList<CardBrief>>("list-cards-brief.json");
+        CardBrief withImage = briefs.First(b => b.Image is not null);
 
         withImage.GetImageUrl().ShouldEndWith("/high.png");
     }
@@ -277,7 +277,7 @@ public sealed class PaginationAndImageTests
     {
         // Both Set and SetBrief carry logos, and a caller holding either should
         // not have to know which overload they are on.
-        var set = Fixture.Load<Set>("set-full.json");
+        Set set = Fixture.Load<Set>("set-full.json");
 
         set.GetLogoUrl().ShouldEndWith("/logo.png");
         set.GetSymbolUrl(ImageFormat.Webp).ShouldEndWith("/symbol.webp");

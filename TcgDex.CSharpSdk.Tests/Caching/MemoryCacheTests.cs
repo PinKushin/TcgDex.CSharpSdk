@@ -24,10 +24,10 @@ public sealed class MemoryCacheTests
     [Test]
     public async Task StoredEntry_IsRetrievable()
     {
-        var cache = new MemoryTcgDexResponseCache();
+        MemoryTcgDexResponseCache cache = new();
 
         await cache.SetAsync("a", Response("""{"v":1}"""), TimeSpan.FromMinutes(5));
-        var entry = await cache.GetAsync("a");
+        CachedResponse? entry = await cache.GetAsync("a");
 
         entry.ShouldNotBeNull();
         System.Text.Encoding.UTF8.GetString(entry.Body).ShouldBe("""{"v":1}""");
@@ -41,7 +41,7 @@ public sealed class MemoryCacheTests
     [Test]
     public async Task RemovedEntry_IsGone()
     {
-        var cache = new MemoryTcgDexResponseCache();
+        MemoryTcgDexResponseCache cache = new();
 
         await cache.SetAsync("a", Response(), TimeSpan.FromMinutes(5));
         await cache.RemoveAsync("a");
@@ -57,7 +57,7 @@ public sealed class MemoryCacheTests
     [Test]
     public async Task Clear_EmptiesTheCache()
     {
-        var cache = new MemoryTcgDexResponseCache();
+        MemoryTcgDexResponseCache cache = new();
 
         await cache.SetAsync("a", Response(), TimeSpan.FromMinutes(5));
         await cache.SetAsync("b", Response(), TimeSpan.FromMinutes(5));
@@ -72,8 +72,8 @@ public sealed class MemoryCacheTests
     {
         // Entries outlive their freshness window so the ETag stays usable, but
         // not forever — an entry kept indefinitely would pin memory.
-        var time = new FakeTimeProvider();
-        var cache = new MemoryTcgDexResponseCache(timeProvider: time);
+        FakeTimeProvider time = new();
+        MemoryTcgDexResponseCache cache = new(timeProvider: time);
 
         await cache.SetAsync("a", Response(), TimeSpan.FromMinutes(1));
 
@@ -86,8 +86,8 @@ public sealed class MemoryCacheTests
     [Test]
     public async Task WithinItsLifetime_AStaleEntryIsStillReturnedForRevalidation()
     {
-        var time = new FakeTimeProvider();
-        var cache = new MemoryTcgDexResponseCache(timeProvider: time);
+        FakeTimeProvider time = new();
+        MemoryTcgDexResponseCache cache = new(timeProvider: time);
 
         await cache.SetAsync("a", Response(), TimeSpan.FromMinutes(5));
 
@@ -102,8 +102,8 @@ public sealed class MemoryCacheTests
     {
         // A zero window means "revalidate every time", not "do not store" — the
         // entry must survive long enough to carry its ETag.
-        var time = new FakeTimeProvider();
-        var cache = new MemoryTcgDexResponseCache(timeProvider: time);
+        FakeTimeProvider time = new();
+        MemoryTcgDexResponseCache cache = new(timeProvider: time);
 
         await cache.SetAsync("a", Response(), TimeSpan.Zero);
 
@@ -113,8 +113,8 @@ public sealed class MemoryCacheTests
     [Test]
     public async Task WhenFull_TheLeastRecentlyUsedEntryIsEvicted()
     {
-        var time = new FakeTimeProvider();
-        var cache = new MemoryTcgDexResponseCache(maxEntries: 3, timeProvider: time);
+        FakeTimeProvider time = new();
+        MemoryTcgDexResponseCache cache = new(maxEntries: 3, timeProvider: time);
 
         await cache.SetAsync("a", Response(), TimeSpan.FromHours(1));
         time.Advance(TimeSpan.FromSeconds(1));
@@ -149,10 +149,10 @@ public sealed class MemoryCacheTests
         // default bound of 512 and 49 µs at 4096. Evicting a batch amortises
         // that scan over many stores, at the cost of the cache settling just
         // below its bound rather than exactly at it.
-        var time = new FakeTimeProvider();
-        var cache = new MemoryTcgDexResponseCache(maxEntries: 16, timeProvider: time);
+        FakeTimeProvider time = new();
+        MemoryTcgDexResponseCache cache = new(maxEntries: 16, timeProvider: time);
 
-        for (var i = 0; i < 16; i++)
+        for (int i = 0; i < 16; i++)
         {
             await cache.SetAsync($"key-{i}", Response(), TimeSpan.FromHours(1));
             time.Advance(TimeSpan.FromSeconds(1));
@@ -174,8 +174,8 @@ public sealed class MemoryCacheTests
         // A batch of MaxEntries/8 rounds to zero below eight, and evicting
         // nothing would let the cache grow without limit — the floor of one is
         // what stops that, and nothing else tests a bound that small.
-        var time = new FakeTimeProvider();
-        var cache = new MemoryTcgDexResponseCache(maxEntries: 2, timeProvider: time);
+        FakeTimeProvider time = new();
+        MemoryTcgDexResponseCache cache = new(maxEntries: 2, timeProvider: time);
 
         await cache.SetAsync("a", Response(), TimeSpan.FromHours(1));
         time.Advance(TimeSpan.FromSeconds(1));
@@ -195,7 +195,7 @@ public sealed class MemoryCacheTests
         // trips the bound, and eviction removes the only entry there is —
         // the one just written. Mutation testing found this: deleting the reset
         // left every existing test passing.
-        var cache = new MemoryTcgDexResponseCache(maxEntries: 3);
+        MemoryTcgDexResponseCache cache = new(maxEntries: 3);
 
         await cache.SetAsync("a", Response(), TimeSpan.FromHours(1));
         await cache.SetAsync("b", Response(), TimeSpan.FromHours(1));
@@ -216,13 +216,13 @@ public sealed class MemoryCacheTests
         // it is exactly what breaks if the bound is checked against a counter
         // that is incremented per store rather than per insert — a cache would
         // then evict its own live entries while sitting well under its limit.
-        var cache = new MemoryTcgDexResponseCache(maxEntries: 3);
+        MemoryTcgDexResponseCache cache = new(maxEntries: 3);
 
         await cache.SetAsync("a", Response(), TimeSpan.FromHours(1));
         await cache.SetAsync("b", Response(), TimeSpan.FromHours(1));
         await cache.SetAsync("c", Response(), TimeSpan.FromHours(1));
 
-        for (var i = 0; i < 20; i++)
+        for (int i = 0; i < 20; i++)
         {
             await cache.SetAsync("a", Response(), TimeSpan.FromHours(1));
         }
@@ -239,7 +239,7 @@ public sealed class MemoryCacheTests
         // The other half of the same contract: a removal has to be accounted
         // for, or the cache believes it is full when it is not and evicts on a
         // store that had room.
-        var cache = new MemoryTcgDexResponseCache(maxEntries: 3);
+        MemoryTcgDexResponseCache cache = new(maxEntries: 3);
 
         await cache.SetAsync("a", Response(), TimeSpan.FromHours(1));
         await cache.SetAsync("b", Response(), TimeSpan.FromHours(1));
@@ -259,9 +259,9 @@ public sealed class MemoryCacheTests
         // The bound is the whole point of the class: a batch that miscounted,
         // or a scan that removed nothing because every entry shared a
         // timestamp, would leak memory rather than fail visibly.
-        var cache = new MemoryTcgDexResponseCache(maxEntries: 32);
+        MemoryTcgDexResponseCache cache = new(maxEntries: 32);
 
-        for (var i = 0; i < 500; i++)
+        for (int i = 0; i < 500; i++)
         {
             await cache.SetAsync($"key-{i}", Response(), TimeSpan.FromHours(1));
             cache.Count.ShouldBeLessThanOrEqualTo(32);
@@ -282,7 +282,7 @@ public sealed class MemoryCacheTests
     [Test]
     public async Task ConcurrentWrites_DoNotCorruptTheCache()
     {
-        var cache = new MemoryTcgDexResponseCache(maxEntries: 50);
+        MemoryTcgDexResponseCache cache = new(maxEntries: 50);
 
         await Task.WhenAll(Enumerable.Range(0, 200).Select(i =>
             cache.SetAsync($"key-{i}", Response(), TimeSpan.FromHours(1)).AsTask()));
@@ -294,8 +294,8 @@ public sealed class MemoryCacheTests
     [Test]
     public void IsFresh_ComparesAgainstTheStoreTime()
     {
-        var stored = UnixEpoch;
-        var response = Response() with { StoredAt = stored };
+        DateTimeOffset stored = UnixEpoch;
+        CachedResponse response = Response() with { StoredAt = stored };
 
         response.IsFresh(stored.AddSeconds(30), TimeSpan.FromMinutes(1)).ShouldBeTrue();
         response.IsFresh(stored.AddMinutes(2), TimeSpan.FromMinutes(1)).ShouldBeFalse();
@@ -306,10 +306,10 @@ public sealed class MemoryCacheTests
     [Test]
     public void AddTcgDexWithCaching_RegistersAWorkingClient()
     {
-        var services = new ServiceCollection();
+        ServiceCollection services = new();
         services.AddTcgDexWithCaching();
 
-        using var provider = services.BuildServiceProvider();
+        using ServiceProvider provider = services.BuildServiceProvider();
 
         provider.GetRequiredService<ITcgDexClient>().ShouldNotBeNull();
         provider.GetRequiredService<ITcgDexResponseCache>().ShouldBeOfType<MemoryTcgDexResponseCache>();
@@ -319,12 +319,12 @@ public sealed class MemoryCacheTests
     [Test]
     public void AddTcgDexWithCaching_AppliesBothOptionSets()
     {
-        var services = new ServiceCollection();
+        ServiceCollection services = new();
         services.AddTcgDexWithCaching(
             configure: o => o.Language = TcgDexLanguages.German,
             configureCache: c => c.DefaultTimeToLive = TimeSpan.FromMinutes(42));
 
-        using var provider = services.BuildServiceProvider();
+        using ServiceProvider provider = services.BuildServiceProvider();
 
         provider.GetRequiredService<TcgDexOptions>().Language.ShouldBe("de");
         provider.GetRequiredService<TcgDexCacheOptions>()
@@ -334,11 +334,11 @@ public sealed class MemoryCacheTests
     [Test]
     public void AddTcgDexWithCaching_LetsCallersSupplyTheirOwnStore()
     {
-        var services = new ServiceCollection();
+        ServiceCollection services = new();
         services.AddSingleton<ITcgDexResponseCache, CountingCache>();
         services.AddTcgDexWithCaching();
 
-        using var provider = services.BuildServiceProvider();
+        using ServiceProvider provider = services.BuildServiceProvider();
 
         provider.GetRequiredService<ITcgDexResponseCache>().ShouldBeOfType<CountingCache>();
     }
@@ -346,7 +346,7 @@ public sealed class MemoryCacheTests
     [Test]
     public void AddTcgDexWithCaching_ValidatesLanguageAtRegistration()
     {
-        var services = new ServiceCollection();
+        ServiceCollection services = new();
 
         Should.Throw<ArgumentException>(() => services.AddTcgDexWithCaching(o => o.Language = "zz"));
     }
@@ -358,7 +358,7 @@ public sealed class MemoryCacheTests
     private sealed class CountingCache : ITcgDexResponseCache
     {
         public ValueTask<CachedResponse?> GetAsync(string key, CancellationToken cancellationToken = default)
-            => new ValueTask<CachedResponse?>((CachedResponse?)null);
+            => new((CachedResponse?)null);
 
         public ValueTask SetAsync(
             string key,
@@ -388,7 +388,7 @@ public sealed class MemoryCacheTests
         // extension point, so these guards are contract rather than internal
         // defensiveness — a caller really can reach them. Nothing tested any of
         // the three methods with a bad key.
-        var cache = new MemoryTcgDexResponseCache();
+        MemoryTcgDexResponseCache cache = new();
 
         Should.Throw<ArgumentException>(() => cache.GetAsync(key!).AsTask().Wait());
     }
@@ -398,7 +398,7 @@ public sealed class MemoryCacheTests
     [TestCase("   ")]
     public void SetAsync_WithABlankKey_Throws(string? key)
     {
-        var cache = new MemoryTcgDexResponseCache();
+        MemoryTcgDexResponseCache cache = new();
 
         Should.Throw<ArgumentException>(() =>
             cache.SetAsync(key!, SampleResponse(UnixEpoch), TimeSpan.FromMinutes(1))
@@ -408,7 +408,7 @@ public sealed class MemoryCacheTests
     [Test]
     public void SetAsync_WithANullResponse_Throws()
     {
-        var cache = new MemoryTcgDexResponseCache();
+        MemoryTcgDexResponseCache cache = new();
 
         Should.Throw<ArgumentNullException>(() =>
             cache.SetAsync("k", null!, TimeSpan.FromMinutes(1)).AsTask().Wait());
@@ -419,7 +419,7 @@ public sealed class MemoryCacheTests
     [TestCase("   ")]
     public void RemoveAsync_WithABlankKey_Throws(string? key)
     {
-        var cache = new MemoryTcgDexResponseCache();
+        MemoryTcgDexResponseCache cache = new();
 
         Should.Throw<ArgumentException>(() => cache.RemoveAsync(key!).AsTask().Wait());
     }
@@ -430,8 +430,8 @@ public sealed class MemoryCacheTests
         // Each entry point checks the token before doing any work. An
         // implementation that ignored it would look identical in every other
         // test, because none of them cancel.
-        var cache = new MemoryTcgDexResponseCache();
-        using var cancelled = new CancellationTokenSource();
+        MemoryTcgDexResponseCache cache = new();
+        using CancellationTokenSource cancelled = new();
         cancelled.Cancel();
 
         Should.Throw<OperationCanceledException>(
@@ -452,10 +452,10 @@ public sealed class MemoryCacheTests
         // has exactly elapsed is gone, not still valid — and with distinct
         // timestamps every other test passes either way, so only landing
         // precisely on the expiry distinguishes them.
-        var time = new FakeTimeProvider();
-        var cache = new MemoryTcgDexResponseCache(timeProvider: time);
+        FakeTimeProvider time = new();
+        MemoryTcgDexResponseCache cache = new(timeProvider: time);
 
-        var ttl = TimeSpan.FromMinutes(5);
+        TimeSpan ttl = TimeSpan.FromMinutes(5);
         await cache.SetAsync("k", SampleResponse(time.GetUtcNow()), ttl);
 
         // The entry is retained past freshness for revalidation, so advancing

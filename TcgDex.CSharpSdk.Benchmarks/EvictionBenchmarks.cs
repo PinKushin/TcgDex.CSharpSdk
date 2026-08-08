@@ -3,6 +3,7 @@ namespace TcgDex.Benchmarks;
 using System;
 using System.Globalization;
 using System.Threading;
+using System.Threading.Tasks;
 using TcgDex.Caching;
 
 /// <summary>
@@ -72,7 +73,7 @@ public class EvictionBenchmarks
         // Filled to the bound so the very first measured store already
         // overflows. Without this the early invocations would measure an insert
         // with no eviction and flatter the result.
-        for (var i = 0; i < MaxEntries; i++)
+        for (int i = 0; i < MaxEntries; i++)
         {
             Store(_cache, Key(i));
         }
@@ -94,7 +95,7 @@ public class EvictionBenchmarks
         // measures insertion rather than policy.
         _pool = new string[MaxEntries];
 
-        for (var i = 0; i < MaxEntries; i++)
+        for (int i = 0; i < MaxEntries; i++)
         {
             _pool[i] = Key(i);
         }
@@ -102,7 +103,7 @@ public class EvictionBenchmarks
         _mineFixed = new MemoryTcgDexResponseCache(MaxEntries);
         _theirsFixed = new TCGDex.MemoryTCGDexCache();
 
-        foreach (var key in _pool)
+        foreach (string key in _pool)
         {
             Store(_mineFixed, key);
             _theirsFixed.Set(key, _response, 300);
@@ -130,7 +131,7 @@ public class EvictionBenchmarks
 
     private string NextPooledKey()
     {
-        var key = _pool[_cursor];
+        string key = _pool[_cursor];
         _cursor = _cursor + 1 == _pool.Length ? 0 : _cursor + 1;
 
         return key;
@@ -167,7 +168,7 @@ public class EvictionBenchmarks
     /// </remarks>
     private void Store(MemoryTcgDexResponseCache cache, string key)
     {
-        var pending = cache.SetAsync(key, _response, TimeSpan.FromMinutes(5), CancellationToken.None);
+        ValueTask pending = cache.SetAsync(key, _response, TimeSpan.FromMinutes(5), CancellationToken.None);
 
         if (pending.IsCompleted)
         {

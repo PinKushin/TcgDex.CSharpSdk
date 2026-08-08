@@ -18,7 +18,7 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_PokemonCard_MapsCoreFields()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
         card.Id.ShouldBe("swsh3-136");
         card.Name.ShouldBe("Furret");
@@ -38,7 +38,7 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_PokemonCard_MapsNestedSet()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
         card.Set.Id.ShouldBe("swsh3");
         card.Set.Name.ShouldBe("Darkness Ablaze");
@@ -50,11 +50,11 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_PokemonCard_MapsAttacksWithEnergyCost()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
         card.Attacks.ShouldNotBeEmpty();
 
-        var attack = card.Attacks.SingleOrDefault(a => a.Name == "Feelin' Fine")
+        Attack attack = card.Attacks.SingleOrDefault(a => a.Name == "Feelin' Fine")
             .ShouldNotBeNull("expected the recorded card to have a 'Feelin' Fine' attack");
 
         attack.Effect.ShouldBe("Draw 3 cards.");
@@ -65,9 +65,9 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_PokemonCard_MapsWeaknessValueAsText()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
-        var weakness = card.Weaknesses.ShouldHaveSingleItem();
+        WeaknessOrResistance weakness = card.Weaknesses.ShouldHaveSingleItem();
         weakness.Type.ShouldBe("Fighting");
 
         // "×2" is a multiplier, not a number — modelling this as int would throw.
@@ -77,7 +77,7 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_PokemonCard_MapsLegality()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
         card.Legal.ShouldNotBeNull();
         card.Legal.Standard.ShouldBeFalse();
@@ -89,9 +89,9 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_AttackDamage_WhenJsonNumber_ReadsAsText()
     {
-        var card = Fixture.Load<Card>("card-damage-int.json");
+        Card card = Fixture.Load<Card>("card-damage-int.json");
 
-        var damages = card.Attacks.Select(a => a.Damage).Where(d => d is not null).ToList();
+        List<string?> damages = card.Attacks.Select(a => a.Damage).Where(d => d is not null).ToList();
         damages.ShouldNotBeEmpty("xy1-1 is recorded because it sends damage as a JSON number");
         damages.ShouldContain("60");
     }
@@ -99,9 +99,9 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_AttackDamage_WhenJsonString_KeepsModifier()
     {
-        var card = Fixture.Load<Card>("card-damage-string.json");
+        Card card = Fixture.Load<Card>("card-damage-string.json");
 
-        var damages = card.Attacks.Select(a => a.Damage).ToList();
+        List<string?> damages = card.Attacks.Select(a => a.Damage).ToList();
         damages.ShouldContain("50+", "the '+' modifier must survive deserialization");
     }
 
@@ -113,7 +113,7 @@ public sealed class CardContractTests
     [TestCase(null, null)]
     public void BaseDamage_ExtractsLeadingNumber(string? damage, int? expected)
     {
-        var attack = new Attack { Name = "test", Damage = damage };
+        Attack attack = new() { Name = "test", Damage = damage };
 
         attack.BaseDamage.ShouldBe(expected);
     }
@@ -123,7 +123,7 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_TrainerCard_MapsTrainerTypeAndEffect()
     {
-        var card = Fixture.Load<Card>("card-trainer.json");
+        Card card = Fixture.Load<Card>("card-trainer.json");
 
         card.Category.ShouldBe(CardCategories.Trainer);
         card.TrainerType.ShouldBe("Tool");
@@ -139,7 +139,7 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_EnergyCard_MapsEnergyType()
     {
-        var card = Fixture.Load<Card>("card-energy.json");
+        Card card = Fixture.Load<Card>("card-energy.json");
 
         card.Category.ShouldBe(CardCategories.Energy);
         card.EnergyType.ShouldBe("Normal");
@@ -152,9 +152,9 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_CardWithAbilities_MapsEraSpecificType()
     {
-        var card = Fixture.Load<Card>("card-with-resistances.json");
+        Card card = Fixture.Load<Card>("card-with-resistances.json");
 
-        var ability = card.Abilities.ShouldHaveSingleItem();
+        Ability ability = card.Abilities.ShouldHaveSingleItem();
         ability.Name.ShouldBe("Damage Bind");
         ability.Type.ShouldBe("Poke-BODY", "ability type is an era label, not a fixed enum");
     }
@@ -162,9 +162,9 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_CardWithResistances_MapsSignedTextValue()
     {
-        var card = Fixture.Load<Card>("card-with-resistances.json");
+        Card card = Fixture.Load<Card>("card-with-resistances.json");
 
-        var resistance = card.Resistances.ShouldHaveSingleItem();
+        WeaknessOrResistance resistance = card.Resistances.ShouldHaveSingleItem();
         resistance.Type.ShouldBe("Metal");
         resistance.Value.ShouldBe("-20", "resistance values are signed text, not numbers");
     }
@@ -172,10 +172,10 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_CardWithBoosters_MapsObjectArray()
     {
-        var card = Fixture.Load<Card>("card-with-boosters.json");
+        Card card = Fixture.Load<Card>("card-with-boosters.json");
 
         // `boosters` is an object array. Typing it as a string throws here.
-        var booster = card.Boosters.ShouldHaveSingleItem();
+        Booster booster = card.Boosters.ShouldHaveSingleItem();
         booster.Id.ShouldBe("boo_A4-ho-oh");
         booster.Name.ShouldBe("Ho-Oh");
     }
@@ -183,7 +183,7 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_CardWithoutImage_LeavesImageNull()
     {
-        var card = Fixture.Load<Card>("card-missing-image.json");
+        Card card = Fixture.Load<Card>("card-missing-image.json");
 
         card.Id.ShouldBe("exu-!");
         card.LocalId.ShouldBe("!", "local ids are not always numeric");
@@ -198,7 +198,7 @@ public sealed class CardContractTests
         // omitted array arrives as null. Each collection therefore guards in its
         // init accessor. Without that, consuming a Trainer card and iterating
         // Attacks throws NullReferenceException.
-        var trainer = Fixture.Load<Card>("card-trainer.json");
+        Card trainer = Fixture.Load<Card>("card-trainer.json");
 
         trainer.Attacks.ShouldNotBeNull();
         trainer.Abilities.ShouldNotBeNull();
@@ -213,7 +213,7 @@ public sealed class CardContractTests
     public void Construct_WithExplicitNullCollection_CoercesToEmpty()
     {
         // The same guard protects callers building a Card by hand.
-        var card = new Card
+        Card card = new()
         {
             Id = "x-1",
             Name = "Test",
@@ -231,7 +231,7 @@ public sealed class CardContractTests
     [Test]
     public void Deserialize_CardWithSuffix_PreservesCase()
     {
-        var card = Fixture.Load<Card>("card-damage-int.json");
+        Card card = Fixture.Load<Card>("card-damage-int.json");
 
         // "EX" and "ex" denote different eras, so casing must survive.
         card.Suffix.ShouldBe("EX");

@@ -1,5 +1,6 @@
 namespace TcgDex.AotSmokeTest;
 
+using System.Net.Http;
 using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
@@ -56,7 +57,7 @@ internal static class Program
 
     private static int Main()
     {
-        var failures = new List<string>();
+        List<string> failures = new();
 
         Check(failures, "source-generated deserialization", SourceGeneratedDeserialization);
         Check(failures, "polymorphic damage converter", PolymorphicDamageConverter);
@@ -104,14 +105,14 @@ internal static class Program
 
     private static Card DeserializeCard()
     {
-        var typeInfo = (JsonTypeInfo<Card>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(Card));
+        JsonTypeInfo<Card> typeInfo = (JsonTypeInfo<Card>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(Card));
         return JsonSerializer.Deserialize(CardJson, typeInfo)
             ?? throw new InvalidOperationException("card deserialized to null");
     }
 
     private static string? SourceGeneratedDeserialization()
     {
-        var card = DeserializeCard();
+        Card card = DeserializeCard();
 
         if (card.Name != "Furret")
         {
@@ -146,8 +147,8 @@ internal static class Program
         // Driven through the public client rather than the internal contract
         // factory, so this covers the path a consumer actually takes — and, as a
         // side effect, exercises the deserialization cache under AOT too.
-        var kept = Fetch(new TcgDexOptions());
-        var skipped = Fetch(new TcgDexOptions { DeserializePricing = false });
+        Card? kept = Fetch(new TcgDexOptions());
+        Card? skipped = Fetch(new TcgDexOptions { DeserializePricing = false });
 
         if (kept?.Pricing is null)
         {
@@ -173,8 +174,8 @@ internal static class Program
     /// <summary>Fetches the embedded card through a client with a stub transport.</summary>
     private static Card? Fetch(TcgDexOptions options)
     {
-        using var http = new System.Net.Http.HttpClient(new StubHandler(CardJson));
-        using var client = new TcgDexClient(http, options);
+        using HttpClient http = new(new StubHandler(CardJson));
+        using TcgDexClient client = new(http, options);
 
         return client.Cards.GetAsync("swsh3-136", CancellationToken.None)
             .GetAwaiter()
@@ -188,7 +189,7 @@ internal static class Program
             System.Net.Http.HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
-            var response = new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            HttpResponseMessage response = new(System.Net.HttpStatusCode.OK)
             {
                 Content = new System.Net.Http.StringContent(
                     body,
@@ -204,8 +205,8 @@ internal static class Program
 
     private static string? PolymorphicDamageConverter()
     {
-        var card = DeserializeCard();
-        var attack = card.Attacks.Count > 1 ? card.Attacks[1] : null;
+        Card card = DeserializeCard();
+        Attack? attack = card.Attacks.Count > 1 ? card.Attacks[1] : null;
 
         if (attack?.Damage != "130")
         {
@@ -217,7 +218,7 @@ internal static class Program
 
     private static string? CollectionGuards()
     {
-        var card = DeserializeCard();
+        Card card = DeserializeCard();
 
         // `abilities` is absent from the JSON above. Source-generated
         // deserialization discards property initializers, so this is null
@@ -229,7 +230,7 @@ internal static class Program
 
     private static string? ExpressionTreeTranslation()
     {
-        var actual = new CardQuery()
+        string actual = new CardQuery()
             .Where(c => c.Name == "Furret")
             .Where(c => c.Hp > 100)
             .OrderByDescending(c => c.Name)
@@ -248,9 +249,9 @@ internal static class Program
         // The captured local lands in a compiler-generated closure. Resolving it
         // by compiling the expression would fail under AOT; the SDK reads the
         // closure field reflectively instead.
-        var minimumHp = 250;
+        int minimumHp = 250;
 
-        var actual = new CardQuery().Where(c => c.Hp > minimumHp).ToQueryString();
+        string actual = new CardQuery().Where(c => c.Hp > minimumHp).ToQueryString();
 
         return actual == "hp=gt:250" ? null : $"got '{actual}'";
     }

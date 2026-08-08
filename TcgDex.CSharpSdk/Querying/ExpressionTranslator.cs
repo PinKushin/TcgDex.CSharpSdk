@@ -26,7 +26,7 @@ internal static class ExpressionTranslator
     {
         Guard.NotNull(predicate);
 
-        var filters = new List<QueryFilter>();
+        List<QueryFilter> filters = new();
         Visit(predicate.Body, predicate.Parameters[0], filters);
         return filters;
     }
@@ -43,7 +43,7 @@ internal static class ExpressionTranslator
     {
         Guard.NotNull(selector);
 
-        if (!TryGetMember(selector.Body, selector.Parameters[0], out var member))
+        if (!TryGetMember(selector.Body, selector.Parameters[0], out MemberExpression? member))
         {
             throw new NotSupportedException(
                 $"Sorting requires a direct property of the model, but got '{selector.Body}'.");
@@ -100,8 +100,8 @@ internal static class ExpressionTranslator
     /// </remarks>
     private static QueryFilter TranslateOr(BinaryExpression node, ParameterExpression parameter)
     {
-        var left = TranslateSingle(node.Left, parameter);
-        var right = TranslateSingle(node.Right, parameter);
+        QueryFilter left = TranslateSingle(node.Left, parameter);
+        QueryFilter right = TranslateSingle(node.Right, parameter);
 
         if (!string.Equals(left.Field, right.Field, StringComparison.Ordinal))
         {
@@ -123,8 +123,8 @@ internal static class ExpressionTranslator
 
     private static QueryFilter TranslateComparison(BinaryExpression node, ParameterExpression parameter)
     {
-        var (member, value, flipped) = OrientOperands(node, parameter);
-        var field = FieldName(member);
+        (MemberExpression? member, object? value, bool flipped) = OrientOperands(node, parameter);
+        string field = FieldName(member);
 
         // A comparison against null is the API's presence check, not an
         // equality test.
@@ -138,7 +138,7 @@ internal static class ExpressionTranslator
             };
         }
 
-        var comparison = node.NodeType switch
+        QueryOperator comparison = node.NodeType switch
         {
             ExpressionType.Equal => QueryOperator.Equal,
             ExpressionType.NotEqual => QueryOperator.NotEqual,
@@ -161,12 +161,12 @@ internal static class ExpressionTranslator
         BinaryExpression node,
         ParameterExpression parameter)
     {
-        if (TryGetMember(node.Left, parameter, out var leftMember))
+        if (TryGetMember(node.Left, parameter, out MemberExpression? leftMember))
         {
             return (leftMember, Evaluate(node.Right), false);
         }
 
-        if (TryGetMember(node.Right, parameter, out var rightMember))
+        if (TryGetMember(node.Right, parameter, out MemberExpression? rightMember))
         {
             return (rightMember, Evaluate(node.Left), true);
         }
@@ -177,14 +177,14 @@ internal static class ExpressionTranslator
     private static QueryFilter TranslateMethodCall(MethodCallExpression node, ParameterExpression parameter)
     {
         if (node.Object is null
-            || !TryGetMember(node.Object, parameter, out var member)
+            || !TryGetMember(node.Object, parameter, out MemberExpression? member)
             || node.Arguments.Count != 1)
         {
             throw Unsupported(node);
         }
 
-        var field = FieldName(member);
-        var argument = Evaluate(node.Arguments[0])?.ToString();
+        string field = FieldName(member);
+        string? argument = Evaluate(node.Arguments[0])?.ToString();
 
         if (string.IsNullOrEmpty(argument))
         {
@@ -192,7 +192,7 @@ internal static class ExpressionTranslator
                 $"'{node.Method.Name}' needs a non-empty value to build a filter for '{field}'.");
         }
 
-        var value = Uri.UnescapeDataString(argument);
+        string value = Uri.UnescapeDataString(argument);
 
         return node.Method.Name switch
         {
@@ -224,7 +224,7 @@ internal static class ExpressionTranslator
         ParameterExpression parameter,
         out MemberExpression member)
     {
-        var current = expression;
+        Expression current = expression;
 
         while (current is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
         {
@@ -246,7 +246,7 @@ internal static class ExpressionTranslator
 
     private static string FieldName(MemberExpression member)
     {
-        var name = member.Member.Name;
+        string name = member.Member.Name;
 
         return string.Concat(char.ToLowerInvariant(name[0]), name.AsSpan(1).ToString());
     }
@@ -262,7 +262,7 @@ internal static class ExpressionTranslator
     /// </remarks>
     private static object? Evaluate(Expression expression)
     {
-        var current = expression;
+        Expression current = expression;
 
         while (current is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
         {

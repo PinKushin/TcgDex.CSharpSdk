@@ -42,8 +42,20 @@ dotnet_diagnostic.CA1062.severity = warning   # validate public arguments
 dotnet_diagnostic.CA1863.severity = none      # CompositeFormat: noise for this codebase
 
 # --- language style ---------------------------------------------------------
-csharp_style_var_for_built_in_types = false:suggestion
-csharp_style_var_when_type_is_apparent = true:suggestion
+# Explicit types, always. The type belongs at the front of the line where the
+# eye lands, not after the equals sign — `Dictionary<string, Card> byId = new();`
+# reads as what it is before you reach the right-hand side.
+#
+# Target-typed `new()` is the point: it keeps the type declared once, on the
+# left, rather than repeated. Enforced at warning, which this repo builds with
+# -warnaserror, so `var` cannot come back by accident.
+#
+# There are no anonymous types in this solution, so there is no case where `var`
+# is unavoidable and no exception to carve out.
+csharp_style_var_for_built_in_types = false:warning
+csharp_style_var_when_type_is_apparent = false:warning
+csharp_style_var_elsewhere = false:warning
+csharp_style_implicit_object_creation_when_type_is_apparent = true:suggestion
 csharp_prefer_braces = true:warning
 csharp_style_prefer_pattern_matching = true:suggestion
 csharp_style_expression_bodied_methods = when_on_single_line:suggestion

@@ -38,9 +38,9 @@ public sealed class PricingOptOutTests
     [Test]
     public async Task ByDefault_PricingIsPopulated()
     {
-        using var client = CreateClient(deserializePricing: true);
+        using TcgDexClient client = CreateClient(deserializePricing: true);
 
-        var card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
         card.ShouldNotBeNull().Pricing.ShouldNotBeNull()
             .Cardmarket.ShouldNotBeNull().Avg.ShouldBe(0.11m);
@@ -49,9 +49,9 @@ public sealed class PricingOptOutTests
     [Test]
     public async Task WhenTurnedOff_PricingIsNull()
     {
-        using var client = CreateClient(deserializePricing: false);
+        using TcgDexClient client = CreateClient(deserializePricing: false);
 
-        var card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
         card.ShouldNotBeNull().Pricing.ShouldBeNull(
             "the property is dropped from the contract, so the block is skipped");
@@ -60,9 +60,9 @@ public sealed class PricingOptOutTests
     [Test]
     public async Task WhenTurnedOff_EveryOtherFieldStillDeserializes()
     {
-        using var client = CreateClient(deserializePricing: false);
+        using TcgDexClient client = CreateClient(deserializePricing: false);
 
-        var card = (await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).ShouldNotBeNull();
+        Card card = (await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).ShouldNotBeNull();
 
         card.Name.ShouldBe("Furret");
         card.Id.ShouldBe("swsh3-136");
@@ -82,10 +82,10 @@ public sealed class PricingOptOutTests
         // caller's attempt to serialize a Card into a crash, and round-tripping
         // a model through System.Text.Json is an ordinary thing to do. Writing
         // null is honest: with pricing off there is none to emit.
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
-        var contract = TcgDexJsonContracts.For(new TcgDexOptions { DeserializePricing = false });
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
+        JsonSerializerOptions contract = TcgDexJsonContracts.For(new TcgDexOptions { DeserializePricing = false });
 
-        var json = Should.NotThrow(() => JsonSerializer.Serialize(card, contract));
+        string json = Should.NotThrow(() => JsonSerializer.Serialize(card, contract));
 
         json.ShouldContain("\"pricing\":null");
         json.ShouldContain("Furret", Case.Sensitive, "the rest of the card must still be written");
@@ -102,11 +102,11 @@ public sealed class PricingOptOutTests
         // The reason this is a contract modifier rather than a static flag. Two
         // clients configured differently are an ordinary DI arrangement, and a
         // global switch would make whichever was constructed last win.
-        using var on = CreateClient(deserializePricing: true);
-        using var off = CreateClient(deserializePricing: false);
+        using TcgDexClient on = CreateClient(deserializePricing: true);
+        using TcgDexClient off = CreateClient(deserializePricing: false);
 
-        var withPricing = await on.Cards.GetAsync("swsh3-136", CancellationToken.None);
-        var withoutPricing = await off.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? withPricing = await on.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        Card? withoutPricing = await off.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
         withPricing.ShouldNotBeNull().Pricing.ShouldNotBeNull();
         withoutPricing.ShouldNotBeNull().Pricing.ShouldBeNull();

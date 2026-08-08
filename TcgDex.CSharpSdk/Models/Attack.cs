@@ -53,7 +53,7 @@ public sealed record Attack
             // string.IsNullOrEmpty with [NotNullWhen(false)], so an explicit
             // null test is what keeps the loop below provably safe on every
             // target.
-            var damage = Damage;
+            string? damage = Damage;
             if (damage is null || damage.Length == 0)
             {
                 return null;
@@ -63,7 +63,7 @@ public sealed record Attack
             // latter accepts every Unicode decimal digit, which int.Parse would
             // then reject. char.IsAsciiDigit itself is .NET 7+, and this also
             // builds for netstandard2.0.
-            var length = 0;
+            int length = 0;
             while (length < damage.Length && damage[length] is >= '0' and <= '9')
             {
                 length++;

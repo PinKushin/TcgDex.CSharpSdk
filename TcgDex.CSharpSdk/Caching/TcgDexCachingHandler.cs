@@ -92,9 +92,9 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
-        var key = request.RequestUri.AbsoluteUri;
-        var timeToLive = _options.GetTimeToLive(request.RequestUri);
-        var cached = await _cache.GetAsync(key, cancellationToken).ConfigureAwait(false);
+        string key = request.RequestUri.AbsoluteUri;
+        TimeSpan timeToLive = _options.GetTimeToLive(request.RequestUri);
+        CachedResponse? cached = await _cache.GetAsync(key, cancellationToken).ConfigureAwait(false);
 
         if (cached is not null && cached.IsFresh(_timeProvider.GetUtcNow(), timeToLive))
         {
@@ -102,7 +102,7 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             return BuildResponse(request, cached, HttpStatusCode.OK);
         }
 
-        var result = _options.CoalesceConcurrentRequests
+        FetchResult result = _options.CoalesceConcurrentRequests
             ? await FetchCoalescedAsync(key, request, cached, timeToLive, cancellationToken).ConfigureAwait(false)
             : await FetchAsync(key, request, cached, timeToLive, cancellationToken).ConfigureAwait(false);
 
@@ -127,7 +127,7 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         // inner handler directly, so a waiter that succeeds still populates the
         // cache. Sending raw here would mean a leader's failure quietly cost
         // every waiter a cache entry.
-        var own = await FetchAsync(key, request, cached, timeToLive, cancellationToken).ConfigureAwait(false);
+        FetchResult own = await FetchAsync(key, request, cached, timeToLive, cancellationToken).ConfigureAwait(false);
 
         return own.Passthrough
             ?? BuildResponse(request, own.Cached!, HttpStatusCode.OK);
@@ -161,20 +161,20 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         // Only the cacheable part of the outcome is shared. An
         // HttpResponseMessage has a single content stream, so it cannot be
         // handed to several waiters.
-        var tcs = new TaskCompletionSource<CachedResponse?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var pending = _inFlight.GetOrAdd(key, tcs.Task);
+        TaskCompletionSource<CachedResponse?> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<CachedResponse?> pending = _inFlight.GetOrAdd(key, tcs.Task);
 
         if (!ReferenceEquals(pending, tcs.Task))
         {
             // Someone else is already fetching this URL.
-            var shared = await pending.ConfigureAwait(false);
+            CachedResponse? shared = await pending.ConfigureAwait(false);
 
             return shared is null ? FetchResult.None : FetchResult.FromCache(shared);
         }
 
         try
         {
-            var result = await FetchAsync(key, request, cached, timeToLive, cancellationToken).ConfigureAwait(false);
+            FetchResult result = await FetchAsync(key, request, cached, timeToLive, cancellationToken).ConfigureAwait(false);
 
             tcs.SetResult(result.Cached);
             return result;
@@ -208,14 +208,14 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
 
         // Not disposed with `using`: a non-cacheable response is returned to the
         // caller, who owns it from then on.
-        var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        HttpResponseMessage response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
         if (response.StatusCode == HttpStatusCode.NotModified && cached is not null)
         {
             response.Dispose();
             Interlocked.Increment(ref _revalidations);
 
-            var refreshed = cached with { StoredAt = _timeProvider.GetUtcNow() };
+            CachedResponse refreshed = cached with { StoredAt = _timeProvider.GetUtcNow() };
             await _cache.SetAsync(key, refreshed, timeToLive, cancellationToken).ConfigureAwait(false);
 
             return FetchResult.FromCache(refreshed);
@@ -233,9 +233,9 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
 
         Interlocked.Increment(ref _misses);
 
-        var body = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        byte[] body = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
 
-        var stored = new CachedResponse
+        CachedResponse stored = new()
         {
             Body = body,
             ETag = response.Headers.ETag?.ToString(),
@@ -259,20 +259,20 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         CachedResponse cached,
         HttpStatusCode statusCode)
     {
-        var response = new HttpResponseMessage(statusCode)
+        HttpResponseMessage response = new(statusCode)
         {
             RequestMessage = request,
             Content = new ByteArrayContent(cached.Body),
         };
 
         if (cached.ContentType is { Length: > 0 } contentType
-            && MediaTypeHeaderValue.TryParse(contentType, out var parsed))
+            && MediaTypeHeaderValue.TryParse(contentType, out MediaTypeHeaderValue? parsed))
         {
             response.Content.Headers.ContentType = parsed;
         }
 
         if (cached.ETag is { Length: > 0 } etag
-            && EntityTagHeaderValue.TryParse(etag, out var tag))
+            && EntityTagHeaderValue.TryParse(etag, out EntityTagHeaderValue? tag))
         {
             response.Headers.ETag = tag;
         }

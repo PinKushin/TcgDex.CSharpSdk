@@ -23,7 +23,7 @@ public sealed class CardShapeTests : LiveApiFixture
     [TestCase("sv09-119", "Furret", TestName = "Scarlet & Violet (2025)")]
     public async Task CardsAcrossEras_Deserialize(string id, string expectedName)
     {
-        var card = await Client.Cards.GetAsync(id, Timeout);
+        Card? card = await Client.Cards.GetAsync(id, Timeout);
 
         card.ShouldNotBeNull();
         card.Name.ShouldBe(expectedName);
@@ -40,9 +40,9 @@ public sealed class CardShapeTests : LiveApiFixture
     [Test]
     public async Task Abilities_Deserialize()
     {
-        var card = await Client.Cards.GetAsync("base1-1", Timeout);
+        Card? card = await Client.Cards.GetAsync("base1-1", Timeout);
 
-        var ability = card.ShouldNotBeNull().Abilities.ShouldHaveSingleItem();
+        Ability ability = card.ShouldNotBeNull().Abilities.ShouldHaveSingleItem();
         ability.Name.ShouldBe("Damage Swap");
         ability.Type.ShouldNotBeNullOrWhiteSpace();
     }
@@ -50,9 +50,9 @@ public sealed class CardShapeTests : LiveApiFixture
     [Test]
     public async Task Resistances_DeserializeAsSignedText()
     {
-        var card = await Client.Cards.GetAsync("pl1-1", Timeout);
+        Card? card = await Client.Cards.GetAsync("pl1-1", Timeout);
 
-        var resistance = card.ShouldNotBeNull().Resistances.ShouldHaveSingleItem();
+        WeaknessOrResistance resistance = card.ShouldNotBeNull().Resistances.ShouldHaveSingleItem();
         resistance.Value.ShouldBe("-20", "resistance values are signed text, not numbers");
     }
 
@@ -60,37 +60,37 @@ public sealed class CardShapeTests : LiveApiFixture
     public async Task Boosters_DeserializeAsObjects()
     {
         // An object array. Typing it as a string throws on this card.
-        var card = await Client.Cards.GetAsync("A4-139", Timeout);
+        Card? card = await Client.Cards.GetAsync("A4-139", Timeout);
 
-        var booster = card.ShouldNotBeNull().Boosters.ShouldHaveSingleItem();
+        Booster booster = card.ShouldNotBeNull().Boosters.ShouldHaveSingleItem();
         booster.Id.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Test]
     public async Task StringDamage_KeepsItsModifier()
     {
-        var card = await Client.Cards.GetAsync("swsh1-1", Timeout);
+        Card? card = await Client.Cards.GetAsync("swsh1-1", Timeout);
 
-        var damages = card.ShouldNotBeNull().Attacks.Select(a => a.Damage).ToList();
+        List<string?> damages = card.ShouldNotBeNull().Attacks.Select(a => a.Damage).ToList();
         damages.ShouldContain("50+");
 
-        var plus = card.Attacks.First(a => a.Damage == "50+");
+        Attack plus = card.Attacks.First(a => a.Damage == "50+");
         plus.BaseDamage.ShouldBe(50);
     }
 
     [Test]
     public async Task NumericDamage_NormalisesToText()
     {
-        var card = await Client.Cards.GetAsync("xy1-1", Timeout);
+        Card? card = await Client.Cards.GetAsync("xy1-1", Timeout);
 
-        var damaged = card.ShouldNotBeNull().Attacks.First(a => a.Damage is not null);
+        Attack damaged = card.ShouldNotBeNull().Attacks.First(a => a.Damage is not null);
         damaged.BaseDamage.ShouldNotBeNull();
     }
 
     [Test]
     public async Task EnergyCard_HasEnergyTypeAndNoAttacks()
     {
-        var card = await Client.Cards.GetAsync("base1-102", Timeout);
+        Card? card = await Client.Cards.GetAsync("base1-102", Timeout);
 
         card.ShouldNotBeNull().Category.ShouldBe(CardCategories.Energy);
         card.EnergyType.ShouldBe("Normal");
@@ -100,7 +100,7 @@ public sealed class CardShapeTests : LiveApiFixture
     [Test]
     public async Task CardWithoutImage_IsNullNotEmptyString()
     {
-        var card = await Client.Cards.GetAsync("exu-!", Timeout);
+        Card? card = await Client.Cards.GetAsync("exu-!", Timeout);
 
         card.ShouldNotBeNull().Image.ShouldBeNull();
         card.LocalId.ShouldBe("!");
@@ -109,9 +109,9 @@ public sealed class CardShapeTests : LiveApiFixture
     [Test]
     public async Task Pricing_DeserializesBothMarketplaces()
     {
-        var card = await Client.Cards.GetAsync("swsh3-136", Timeout);
+        Card? card = await Client.Cards.GetAsync("swsh3-136", Timeout);
 
-        var pricing = card.ShouldNotBeNull().Pricing.ShouldNotBeNull();
+        Pricing pricing = card.ShouldNotBeNull().Pricing.ShouldNotBeNull();
 
         pricing.Cardmarket.ShouldNotBeNull().Unit.ShouldBe("EUR");
         pricing.Tcgplayer.ShouldNotBeNull().Unit.ShouldBe("USD");
@@ -123,9 +123,9 @@ public sealed class CardShapeTests : LiveApiFixture
     [Test]
     public async Task VariantsDetailed_CarryPerPrintingPricing()
     {
-        var card = await Client.Cards.GetAsync("sv03.5-001", Timeout);
+        Card? card = await Client.Cards.GetAsync("sv03.5-001", Timeout);
 
-        var variants = card.ShouldNotBeNull().VariantsDetailed;
+        IReadOnlyList<DetailedVariant> variants = card.ShouldNotBeNull().VariantsDetailed;
 
         variants.ShouldNotBeEmpty("variants_detailed maps from a snake_case key");
         // `!= null` rather than `is not null`: ShouldContain takes an expression
@@ -138,12 +138,12 @@ public sealed class CardShapeTests : LiveApiFixture
     {
         // Proves ids returned by one endpoint resolve at another — the kind of
         // break that only shows up against the live service.
-        var set = await Client.Sets.GetAsync("swsh3", Timeout);
+        Set? set = await Client.Sets.GetAsync("swsh3", Timeout);
 
         set.ShouldNotBeNull().Cards.ShouldNotBeEmpty();
 
-        var first = set.Cards[0];
-        var card = await Client.Cards.GetAsync(first.Id, Timeout);
+        CardBrief first = set.Cards[0];
+        Card? card = await Client.Cards.GetAsync(first.Id, Timeout);
 
         card.ShouldNotBeNull().Set.Id.ShouldBe("swsh3");
     }
@@ -151,11 +151,11 @@ public sealed class CardShapeTests : LiveApiFixture
     [Test]
     public async Task Serie_RoundTripsThroughItsOwnSets()
     {
-        var serie = await Client.Series.GetAsync("swsh", Timeout);
+        Serie? serie = await Client.Series.GetAsync("swsh", Timeout);
 
         serie.ShouldNotBeNull().Sets.ShouldNotBeEmpty();
 
-        var set = await Client.Sets.GetAsync(serie.Sets[0].Id, Timeout);
+        Set? set = await Client.Sets.GetAsync(serie.Sets[0].Id, Timeout);
 
         set.ShouldNotBeNull().Serie.ShouldNotBeNull().Id.ShouldBe("swsh");
     }

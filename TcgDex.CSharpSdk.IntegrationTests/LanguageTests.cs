@@ -1,3 +1,5 @@
+using TcgDex.Models;
+
 namespace TcgDex.IntegrationTests;
 
 /// <summary>
@@ -42,16 +44,16 @@ public sealed class LanguageTests : LiveApiFixture
     [TestCaseSource(nameof(PopulatedLanguages))]
     public async Task PopulatedLanguages_ServeTheirOwnCards(string language)
     {
-        using var httpClient = new HttpClient();
-        var client = new TcgDexClient(httpClient, new TcgDexOptions { Language = language });
+        using HttpClient httpClient = new();
+        TcgDexClient client = new(httpClient, new TcgDexOptions { Language = language });
 
-        var page = await client.Cards.ListAsync(new CardQuery().Page(1, 1), Timeout);
+        IReadOnlyList<CardBrief> page = await client.Cards.ListAsync(new CardQuery().Page(1, 1), Timeout);
 
         page.ShouldNotBeEmpty($"language '{language}' is advertised as supported");
 
         // Round-trip that language's own card id, proving detail lookups work
         // there too and not just the list endpoint.
-        var card = await client.Cards.GetAsync(page[0].Id, Timeout);
+        Card? card = await client.Cards.GetAsync(page[0].Id, Timeout);
 
         card.ShouldNotBeNull($"'{page[0].Id}' came from the {language} list, so it must resolve there");
         card.Name.ShouldNotBeNullOrWhiteSpace();
@@ -60,10 +62,10 @@ public sealed class LanguageTests : LiveApiFixture
     [TestCaseSource(nameof(PopulatedLanguages))]
     public async Task PopulatedLanguages_ServeCatalogData(string language)
     {
-        using var httpClient = new HttpClient();
-        var client = new TcgDexClient(httpClient, new TcgDexOptions { Language = language });
+        using HttpClient httpClient = new();
+        TcgDexClient client = new(httpClient, new TcgDexOptions { Language = language });
 
-        var categories = await client.Catalog.CategoriesAsync(Timeout);
+        IReadOnlyList<string> categories = await client.Catalog.CategoriesAsync(Timeout);
 
         categories.ShouldNotBeEmpty($"language '{language}' should expose categories");
     }
@@ -74,11 +76,11 @@ public sealed class LanguageTests : LiveApiFixture
         // The API accepts these but has no card data for them. Empty results
         // are the correct outcome — the SDK must not turn them into errors, and
         // must not turn them into nulls either.
-        using var httpClient = new HttpClient();
-        var client = new TcgDexClient(httpClient, new TcgDexOptions { Language = language });
+        using HttpClient httpClient = new();
+        TcgDexClient client = new(httpClient, new TcgDexOptions { Language = language });
 
-        var cards = await client.Cards.ListAsync(new CardQuery().Page(1, 5), Timeout);
-        var categories = await client.Catalog.CategoriesAsync(Timeout);
+        IReadOnlyList<CardBrief> cards = await client.Cards.ListAsync(new CardQuery().Page(1, 5), Timeout);
+        IReadOnlyList<string> categories = await client.Catalog.CategoriesAsync(Timeout);
 
         cards.ShouldNotBeNull();
         cards.ShouldBeEmpty();
@@ -89,10 +91,10 @@ public sealed class LanguageTests : LiveApiFixture
     [TestCaseSource(nameof(LocalisedNameCases))]
     public async Task WesternLanguages_ReturnTranslatedNames(string language, string expected)
     {
-        using var httpClient = new HttpClient();
-        var client = new TcgDexClient(httpClient, new TcgDexOptions { Language = language });
+        using HttpClient httpClient = new();
+        TcgDexClient client = new(httpClient, new TcgDexOptions { Language = language });
 
-        var card = await client.Cards.GetAsync("swsh3-136", Timeout);
+        Card? card = await client.Cards.GetAsync("swsh3-136", Timeout);
 
         card.ShouldNotBeNull().Name.ShouldBe(expected);
     }
@@ -104,10 +106,10 @@ public sealed class LanguageTests : LiveApiFixture
     {
         // Documents the pool split rather than treating it as a defect: a
         // missing card is a clean null, not an exception.
-        using var httpClient = new HttpClient();
-        var client = new TcgDexClient(httpClient, new TcgDexOptions { Language = language });
+        using HttpClient httpClient = new();
+        TcgDexClient client = new(httpClient, new TcgDexOptions { Language = language });
 
-        var card = await client.Cards.GetAsync("swsh3-136", Timeout);
+        Card? card = await client.Cards.GetAsync("swsh3-136", Timeout);
 
         card.ShouldBeNull($"'{language}' has its own card pool and does not contain this Western id");
     }
@@ -117,9 +119,9 @@ public sealed class LanguageTests : LiveApiFixture
     {
         // Validation happens at construction, so no request is made at all and
         // the message names the valid set.
-        using var httpClient = new HttpClient();
+        using HttpClient httpClient = new();
 
-        var exception = Should.Throw<ArgumentException>(
+        ArgumentException exception = Should.Throw<ArgumentException>(
             () => new TcgDexClient(httpClient, new TcgDexOptions { Language = "zz" }));
 
         exception.Message.ShouldContain("zz");

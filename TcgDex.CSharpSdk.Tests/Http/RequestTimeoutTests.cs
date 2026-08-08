@@ -149,9 +149,9 @@ public sealed class RequestTimeoutTests
     [Test]
     public void AHangingRequest_FailsWithTheOneErrorType()
     {
-        using var client = Client(new HangingHandler(), TimeSpan.FromMilliseconds(200));
+        using TcgDexClient client = Client(new HangingHandler(), TimeSpan.FromMilliseconds(200));
 
-        var error = Should.Throw<TcgDexApiException>(
+        TcgDexApiException error = Should.Throw<TcgDexApiException>(
             () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
 
         error.Message.ShouldContain("timed out", Case.Insensitive);
@@ -168,7 +168,7 @@ public sealed class RequestTimeoutTests
         // deadline ever stops reaching the body read this fails in fifteen
         // seconds instead of hanging the suite, which is how the first version
         // of this test behaved.
-        using var client = Client(new StallingBodyHandler(), TimeSpan.FromMilliseconds(200));
+        using TcgDexClient client = Client(new StallingBodyHandler(), TimeSpan.FromMilliseconds(200));
 
         Should.Throw<TcgDexApiException>(
             () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
@@ -182,8 +182,8 @@ public sealed class RequestTimeoutTests
         // The distinction the error contract depends on. A caller who cancels
         // gets OperationCanceledException, which is theirs to observe; only an
         // expiry the SDK imposed becomes a TcgDexApiException.
-        using var client = Client(new HangingHandler(), TimeSpan.FromMinutes(5));
-        using var cancelled = new CancellationTokenSource();
+        using TcgDexClient client = Client(new HangingHandler(), TimeSpan.FromMinutes(5));
+        using CancellationTokenSource cancelled = new();
 
         cancelled.CancelAfter(TimeSpan.FromMilliseconds(100));
 
@@ -194,10 +194,10 @@ public sealed class RequestTimeoutTests
     [Test]
     public void AResponseInsideTheBudget_IsUnaffected()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.OK, Fixture.ReadText("card-pokemon-full.json"));
 
-        using var client = Client(handler, TimeSpan.FromSeconds(30));
+        using TcgDexClient client = Client(handler, TimeSpan.FromSeconds(30));
 
         client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult()
             .ShouldNotBeNull().Name.ShouldBe("Furret");
@@ -220,10 +220,10 @@ public sealed class RequestTimeoutTests
         // with it. That path skips the CancellationTokenSource entirely, so it
         // is the one branch of the timeout code nothing else reaches — the
         // coverage gate is what pointed it out.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.OK, Fixture.ReadText("card-pokemon-full.json"));
 
-        using var client = Client(handler, Timeout.InfiniteTimeSpan);
+        using TcgDexClient client = Client(handler, Timeout.InfiniteTimeSpan);
 
         client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult()
             .ShouldNotBeNull().Name.ShouldBe("Furret");
@@ -235,8 +235,8 @@ public sealed class RequestTimeoutTests
         // Removing the SDK's deadline must not remove the caller's. With no
         // budget the caller's token is passed through unwrapped, and this is
         // what proves it still arrives.
-        using var client = Client(new HangingHandler(), Timeout.InfiniteTimeSpan);
-        using var cancelled = new CancellationTokenSource();
+        using TcgDexClient client = Client(new HangingHandler(), Timeout.InfiniteTimeSpan);
+        using CancellationTokenSource cancelled = new();
 
         cancelled.CancelAfter(TimeSpan.FromMilliseconds(100));
 
@@ -248,9 +248,9 @@ public sealed class RequestTimeoutTests
     [TestCase(-5)]
     public void ANonPositiveTimeout_IsRejected(int seconds)
     {
-        var options = new TcgDexOptions { Timeout = TimeSpan.FromSeconds(seconds) };
+        TcgDexOptions options = new() { Timeout = TimeSpan.FromSeconds(seconds) };
 
-        var error = Should.Throw<ArgumentException>(options.Validate);
+        ArgumentException error = Should.Throw<ArgumentException>(options.Validate);
 
         error.Message.ShouldContain(nameof(TcgDexOptions.Timeout));
         error.Message.ShouldContain("InfiniteTimeSpan");

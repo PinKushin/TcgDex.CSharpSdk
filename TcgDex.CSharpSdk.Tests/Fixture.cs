@@ -13,7 +13,7 @@ internal static class Fixture
 {
     internal static string ReadText(string fileName)
     {
-        var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "Fixtures", fileName);
+        string path = Path.Combine(TestContext.CurrentContext.TestDirectory, "Fixtures", fileName);
 
         if (!File.Exists(path))
         {
@@ -29,8 +29,8 @@ internal static class Fixture
     internal static T Load<T>(string fileName)
         where T : notnull
     {
-        var typeInfo = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
-        var result = JsonSerializer.Deserialize(ReadText(fileName), typeInfo);
+        JsonTypeInfo<T> typeInfo = (JsonTypeInfo<T>)TcgDexJsonContext.Default.Options.GetTypeInfo(typeof(T));
+        T? result = JsonSerializer.Deserialize(ReadText(fileName), typeInfo);
 
         return result ?? throw new InvalidOperationException(
             $"Fixture '{fileName}' deserialized to null, which means the recorded " +

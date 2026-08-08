@@ -25,7 +25,7 @@ public sealed class CardLookup(ITcgDexClient tcgdex)
 {
     public async Task<string?> DescribeAsync(string id, CancellationToken ct)
     {
-        var card = await tcgdex.Cards.GetAsync(id, ct);
+        Card? card = await tcgdex.Cards.GetAsync(id, ct);
 
         return card is null ? null : $"{card.Name} ({card.Category}) — {card.Rarity}";
     }
@@ -89,10 +89,10 @@ return the same bytes, so this is saved in the parse rather than on the wire.
 ## Without a container
 
 ```csharp
-using var http = new HttpClient();
-var tcgdex = new TcgDexClient(http, new TcgDexOptions());
+using HttpClient http = new();
+TcgDexClient tcgdex = new(http, new TcgDexOptions());
 
-var card = await tcgdex.Cards.GetAsync("swsh3-136", cancellationToken);
+Card? card = await tcgdex.Cards.GetAsync("swsh3-136", cancellationToken);
 ```
 
 Reuse the `HttpClient`. Constructing one per call is the usual cause of socket
@@ -147,7 +147,7 @@ One rule:
 ```csharp
 try
 {
-    var card = await tcgdex.Cards.GetAsync(id, ct);
+    Card? card = await tcgdex.Cards.GetAsync(id, ct);
 
     if (card is null)
     {
@@ -190,7 +190,7 @@ absent — some cards genuinely have no artwork.
 ## Streaming large result sets
 
 ```csharp
-await foreach (var card in tcgdex.Cards.StreamAsync(
+await foreach (CardBrief card in tcgdex.Cards.StreamAsync(
     new CardQuery().Where(c => c.Category == "Pokemon"), pageSize: 100, ct))
 {
     // Pages are fetched as you consume them; breaking out stops the requests.

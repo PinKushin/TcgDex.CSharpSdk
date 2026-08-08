@@ -40,10 +40,10 @@ public sealed class TransportDetailTests
         // Kills a mutant that blanked this message entirely: the old test
         // asserted only that TcgDexApiException was thrown, which stays true
         // with an empty message and leaves a caller with nothing to act on.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(_ => throw new HttpRequestException("connection reset"));
 
-        var exception = Failing(handler);
+        TcgDexApiException exception = Failing(handler);
 
         exception.Message.ShouldContain("could not be completed");
         exception.Message.ShouldContain("https://api.tcgdex.net/v2/en/cards/swsh3-136");
@@ -55,9 +55,9 @@ public sealed class TransportDetailTests
         // The type name matters: this is the message someone sees when a proxy
         // returns an HTML error page, and knowing which model failed to parse
         // is what points them at the right request.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "<html>nope</html>");
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "<html>nope</html>");
 
-        var exception = Failing(handler);
+        TcgDexApiException exception = Failing(handler);
 
         exception.Message.ShouldContain("was not valid JSON");
         exception.Message.ShouldContain("Card");
@@ -69,9 +69,9 @@ public sealed class TransportDetailTests
     {
         // GetRequiredAsync is for endpoints that must always answer, so its
         // message has to identify which one did not.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.NotFound, "{}");
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.NotFound, "{}");
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler).Catalog.RaritiesAsync(CancellationToken.None)).Result;
 
         exception.Message.ShouldContain("rarities");
@@ -83,7 +83,7 @@ public sealed class TransportDetailTests
     [Test]
     public void FailureDescription_PrefersTheProblemDocument()
     {
-        var handler = new RecordingHandler().RespondWith(
+        RecordingHandler handler = new RecordingHandler().RespondWith(
             HttpStatusCode.InternalServerError,
             """{"type":"https://tcgdex.dev/errors/server","title":"Everything is on fire","status":500}""");
 
@@ -96,7 +96,7 @@ public sealed class TransportDetailTests
         // No problem document, so the HTTP reason phrase is the only detail
         // available. Without this the `?? response.ReasonPhrase` branch is
         // never exercised and could be deleted unnoticed.
-        var handler = new RecordingHandler().RespondWith(_ =>
+        RecordingHandler handler = new RecordingHandler().RespondWith(_ =>
             new HttpResponseMessage(HttpStatusCode.InternalServerError)
             {
                 ReasonPhrase = "Backend Exploded",
@@ -118,7 +118,7 @@ public sealed class TransportDetailTests
         // substitutes the standard phrase. Not a contrived case either —
         // HTTP/2 removed reason phrases from the protocol entirely, so a real
         // HTTP/2 response reaches this branch for any status.
-        var handler = new RecordingHandler().RespondWith(_ =>
+        RecordingHandler handler = new RecordingHandler().RespondWith(_ =>
             new HttpResponseMessage((HttpStatusCode)599)
             {
                 ReasonPhrase = null,
@@ -134,13 +134,13 @@ public sealed class TransportDetailTests
         // Distinguishes "blank body" from "parseable body", which is the branch
         // a mutant collapsed by forcing IsNullOrWhiteSpace to true. A body of
         // real JSON must still be read.
-        var withProblem = new RecordingHandler().RespondWith(
+        RecordingHandler withProblem = new RecordingHandler().RespondWith(
             HttpStatusCode.BadGateway,
             """{"type":"https://tcgdex.dev/errors/gateway","title":"Upstream refused","status":502}""");
 
         Failing(withProblem).Message.ShouldContain("Upstream refused");
 
-        var blank = new RecordingHandler().RespondWith(_ =>
+        RecordingHandler blank = new RecordingHandler().RespondWith(_ =>
             new HttpResponseMessage(HttpStatusCode.BadGateway)
             {
                 ReasonPhrase = "Bad Gateway",

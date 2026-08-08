@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using TcgDex;
+using TcgDex.Models;
 using TcgDex.Querying;
 
 /// <summary>
@@ -49,8 +50,8 @@ public sealed class ResponseLimitTests
     /// </remarks>
     private static string OversizedCard(int minimumBytes)
     {
-        var card = ValidCard().TrimEnd();
-        var padding = new string('x', minimumBytes);
+        string card = ValidCard().TrimEnd();
+        string padding = new('x', minimumBytes);
 
         // Unknown properties are ignored by the deserializer, so this changes
         // the size and nothing else. Remove rather than Substring: the
@@ -62,9 +63,9 @@ public sealed class ResponseLimitTests
     [Test]
     public void Rest_ResponseOverTheLimit_Throws()
     {
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, OversizedCard(64 * 1024));
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, OversizedCard(64 * 1024));
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler, 32768).Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
 
         exception.Message.ShouldContain("32768");
@@ -76,11 +77,11 @@ public sealed class ResponseLimitTests
         // The limit must not break the ordinary case, and a test that only
         // proves the throw would not notice an off-by-one that rejects
         // everything.
-        var handler = new RecordingHandler().RespondWith(
+        RecordingHandler handler = new RecordingHandler().RespondWith(
             HttpStatusCode.OK,
             ValidCard());
 
-        var card = CreateClient(handler, 1024 * 1024).Cards
+        Card? card = CreateClient(handler, 1024 * 1024).Cards
             .GetAsync("swsh3-136", CancellationToken.None).Result;
 
         card.ShouldNotBeNull().Name.ShouldBe("Furret");
@@ -92,11 +93,11 @@ public sealed class ResponseLimitTests
         // Zero is the documented escape hatch. Without a case for it the option
         // could be enforced as "reject everything" and every other test here
         // would still pass.
-        var handler = new RecordingHandler().RespondWith(
+        RecordingHandler handler = new RecordingHandler().RespondWith(
             HttpStatusCode.OK,
             ValidCard());
 
-        var card = CreateClient(handler, 0).Cards
+        Card? card = CreateClient(handler, 0).Cards
             .GetAsync("swsh3-136", CancellationToken.None).Result;
 
         card.ShouldNotBeNull().Name.ShouldBe("Furret");
@@ -108,15 +109,15 @@ public sealed class ResponseLimitTests
         // The Content-Length shortcut is the easy half. A chunked response
         // declares no length, so the only way to enforce the limit is to count
         // bytes while reading — and a hostile sender simply omits the header.
-        var handler = new RecordingHandler().RespondWith(_ =>
+        RecordingHandler handler = new RecordingHandler().RespondWith(_ =>
         {
-            var content = new StreamContent(
+            StreamContent content = new(
                 new MemoryStream(System.Text.Encoding.UTF8.GetBytes(OversizedCard(64 * 1024))));
 
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
         });
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler, 32768).Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
 
         exception.Message.ShouldContain("32768");
@@ -128,15 +129,15 @@ public sealed class ResponseLimitTests
         // A declared length under the limit while the body runs over it. If the
         // implementation checks only the header it will happily buffer the
         // whole thing, which is exactly the attack the limit exists to stop.
-        var handler = new RecordingHandler().RespondWith(_ =>
+        RecordingHandler handler = new RecordingHandler().RespondWith(_ =>
         {
-            var content = new StringContent(OversizedCard(64 * 1024));
+            StringContent content = new(OversizedCard(64 * 1024));
             content.Headers.ContentLength = 10;
 
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
         });
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler, 32768).Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
 
         // Asserting the message, not merely that something threw. Without this
@@ -154,10 +155,10 @@ public sealed class ResponseLimitTests
         // exceeded" — the status is the actionable part, and losing it to a
         // size complaint would make the SDK harder to debug against a broken
         // server.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.InternalServerError, OversizedCard(64 * 1024));
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler, 32768).Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
 
         exception.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
@@ -184,12 +185,12 @@ public sealed class ResponseLimitTests
         // testing flipped `>` to `>=` here and nothing noticed, which would
         // reject a response of exactly MaxResponseBytes — an off-by-one that
         // only ever fires on the one payload size nobody tests by accident.
-        var card = ValidCard();
-        var exactLength = System.Text.Encoding.UTF8.GetByteCount(card);
+        string card = ValidCard();
+        int exactLength = System.Text.Encoding.UTF8.GetByteCount(card);
 
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, card);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, card);
 
-        var result = CreateClient(handler, exactLength).Cards
+        Card? result = CreateClient(handler, exactLength).Cards
             .GetAsync("swsh3-136", CancellationToken.None).Result;
 
         result.ShouldNotBeNull().Name.ShouldBe("Furret");
@@ -201,10 +202,10 @@ public sealed class ResponseLimitTests
         // The other side of the same boundary. Without this the `>` could
         // become `>=` in the opposite direction — accepting one byte too many —
         // and the test above would still pass.
-        var card = ValidCard();
-        var oneByteShort = System.Text.Encoding.UTF8.GetByteCount(card) - 1;
+        string card = ValidCard();
+        int oneByteShort = System.Text.Encoding.UTF8.GetByteCount(card) - 1;
 
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, card);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, card);
 
         Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler, oneByteShort).Cards
@@ -220,10 +221,10 @@ public sealed class ResponseLimitTests
         // transferring the body. The message says "declared" precisely because
         // nothing was read — that word is the only evidence from outside that
         // the early exit happened rather than the streaming check.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.OK, OversizedCard(64 * 1024));
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler, 32768).Cards
                 .GetAsync("swsh3-136", CancellationToken.None)).Result;
 
@@ -236,13 +237,13 @@ public sealed class ResponseLimitTests
         // No Content-Length, so the limit can only be enforced by counting
         // bytes as they arrive. The message says "exceeded" rather than
         // "declared", which is what distinguishes this path from the one above.
-        var handler = new RecordingHandler().RespondWith(_ =>
+        RecordingHandler handler = new RecordingHandler().RespondWith(_ =>
             new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new UnknownLengthContent(OversizedCard(64 * 1024)),
             });
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler, 32768).Cards
                 .GetAsync("swsh3-136", CancellationToken.None)).Result;
 
@@ -269,16 +270,16 @@ public sealed class ResponseLimitTests
         // Sizing it one byte over rather than picking a number keeps the test
         // independent of the 16 KB chunk size — with the subtraction, the
         // running total can never reach a limit that close to the body length.
-        var card = OversizedCard(40 * 1024);
-        var oneByteShort = System.Text.Encoding.UTF8.GetByteCount(card) - 1;
+        string card = OversizedCard(40 * 1024);
+        int oneByteShort = System.Text.Encoding.UTF8.GetByteCount(card) - 1;
 
-        var handler = new RecordingHandler().RespondWith(_ =>
+        RecordingHandler handler = new RecordingHandler().RespondWith(_ =>
             new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new UnknownLengthContent(card),
             });
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler, oneByteShort).Cards
                 .GetAsync("swsh3-136", CancellationToken.None)).Result;
 
@@ -298,7 +299,7 @@ public sealed class ResponseLimitTests
     {
         protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context)
         {
-            var bytes = System.Text.Encoding.UTF8.GetBytes(body);
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(body);
             return stream.WriteAsync(bytes, 0, bytes.Length);
         }
 
@@ -315,10 +316,10 @@ public sealed class ResponseLimitTests
         // Someone hitting this needs to know which knob to turn. Without the
         // assertion the whole explanatory half of the message can be blanked
         // while the exception type and the number survive.
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.OK, OversizedCard(64 * 1024));
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler, 32768).Cards
                 .GetAsync("swsh3-136", CancellationToken.None)).Result;
 
@@ -331,9 +332,9 @@ public sealed class ResponseLimitTests
     {
         // The GraphQL transport reads bodies too, and an unbounded read there
         // would leave the limit half-applied.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, OversizedCard(64 * 1024));
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, OversizedCard(64 * 1024));
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler, 32768).Cards.SearchDetailedAsync(
                 new CardFilter { Name = "Furret" },
                 cancellationToken: CancellationToken.None)).Result;
