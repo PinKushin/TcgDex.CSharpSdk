@@ -84,10 +84,33 @@ Set it up at **nuget.org → your username → Trusted Publishing**, adding a po
 
 | Field | Value |
 |---|---|
+| Policy name | `TcgDex.CSharpSdk release.yml` — see below |
 | Repository Owner | `PinKushin` |
 | Repository | `TcgDex.CSharpSdk` |
 | Workflow File | `release.yml` — **filename only**, no `.github/workflows/` prefix |
 | Environment | leave empty unless the job declares `environment:` |
+
+**On the policy name.** Microsoft's page does not document this field, so treat
+it as an account-level label the way an API key name is — nothing on nuget.org
+appears to surface it, but that is observation rather than a documented
+guarantee, so do not put anything sensitive in it.
+
+Name it after the **repository and workflow**, not the package. A policy is not
+package-scoped: it *"will apply to all packages owned by the selected owner"*,
+constrained by the repository and workflow file. So when a second package
+appears, the repo and workflow are what tell two policies apart, and the package
+name would not.
+
+**`release.yml` does not exist yet, and that is fine.** The repository currently
+has `ci.yml`, `codeql.yml`, `docs.yml` and `fuzz.yml`; the release workflow is
+[created further down](#automated-afterwards). A policy naming a workflow that
+is not there yet is harmless — it is a rule about what *would* be trusted, and
+simply never matches until the file exists. Create the policy now, add the
+workflow when you automate.
+
+The one thing that must match exactly is the filename. A policy for `release.yml`
+does not trust `publish.yml`, and the failure is a rejected push at the moment
+you are trying to ship rather than anything earlier.
 
 Two behaviours worth knowing in advance:
 
