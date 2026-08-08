@@ -48,6 +48,20 @@
     <PackageReference Include="PublicApiGenerator" />
   </ItemGroup>
 
+  <!-- CsCheck ships a net8.0 asset and nothing older, so the net472 leg cannot
+       reference it. The properties under Properties/ are statements about pure
+       logic — an LRU that never exceeds its bound, an escaper that round-trips
+       — and those hold identically on every target, so proving them on the
+       modern legs is enough. The net472 leg exists to execute the
+       netstandard2.0 assembly, which these do not exercise differently. -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net472'">
+    <PackageReference Include="CsCheck" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <Compile Remove="Properties\**\*.cs" />
+  </ItemGroup>
+
   <!-- The baseline is C# by extension and data by purpose: it describes the
        SDK's surface rather than being part of this project's. Compiling it
        would redeclare every public type in the assembly under test. Kept as a
