@@ -252,7 +252,12 @@ public sealed class BranchCoverageTests
             await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
 
         exception.Problem.ShouldBeNull();
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+
+        // The reason phrase itself, not merely "some message". This is the
+        // middle rung of the fallback chain, and a message that had silently
+        // dropped to the last rung would still be non-blank — which is what the
+        // previous assertion accepted.
+        exception.Message.ShouldContain("Service Unavailable");
     }
 
     [Test]
