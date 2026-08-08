@@ -358,7 +358,72 @@ symbols are served language-neutral from `/univ/...`.
 
 ---
 
-## 7. GraphQL
+## 7. Pokémon TCG Pocket
+
+TCGdex now covers **Pokémon TCG Pocket**, the digital game, alongside the physical TCG. Its cards
+share the same endpoints, the same models and the same id space as printed cards — there is no
+separate API and no flag that says "this is a Pocket card". Verified 2026-08-08.
+
+This is where a good deal of apparent strangeness comes from: rarities you have never seen, cards
+with no printings, and languages whose catalogues look truncated.
+
+### Recognising a Pocket card
+
+There is no boolean. Three reliable markers, in order of directness:
+
+| Marker | Value |
+|---|---|
+| Serie | `tcgp` — *Pokémon TCG Pocket* |
+| Set ids | `A1`, `A1a`, `A2`, `A2a`, `A2b`, `A3`, `A4`, `A4a`, `B1a`, `B2`, `B2a`, `P-A`, … |
+| Asset path | `https://assets.tcgdex.net/{lang}/tcgp/{set}/{localId}` |
+
+The asset path is the one that survives new set ids: the `/tcgp/` segment is present on every
+Pocket image and absent from every physical one.
+
+Scale in `en` as of 2026-08-08: **15 Pocket sets out of 218**. In `pt-br` it is **all 11 of
+them** — that language has no physical coverage at all.
+
+### What differs
+
+| | Physical TCG | TCG Pocket |
+|---|---|---|
+| `rarity` vocabulary | `Common`, `Uncommon`, `Rare`, `Holo Rare`, `Illustration rare`, … | `One Diamond`, `Two Diamond`, `Three Diamond`, `Four Diamond`, `One Star`, `Two Star`, `Three Star`, `One Shiny`, `Two Shiny`, `Crown` |
+| `boosters` | absent | present — Pocket's pack structure, e.g. `{ "id": "boo_A4-ho-oh", "name": "Ho-Oh" }` |
+| `pricing` | populated from CardMarket / TCGplayer | **present but empty**: `{"cardmarket": null, "tcgplayer": null}` |
+| `variants_detailed[].variantId` | a real id, e.g. `endfynwn4n10gzq` | the literal string `generated` |
+| `regulationMark` | present on Standard-legal cards | absent |
+| Energy cards | yes | **none** — energy is a game mechanic in Pocket, not a collectible card |
+
+`legal` is present on both.
+
+### Consequences for a client
+
+- **`/rarities` is the union of two disjoint vocabularies.** Filtering `rarity=eq:Common` returns
+  only physical cards; `rarity=eq:One Diamond` returns only Pocket cards. Nothing in the response
+  says which game a rarity belongs to, so a rarity picker built from that endpoint will mix them
+  with no separator.
+- **A non-null `pricing` does not mean there is pricing.** Pocket cards carry the container with
+  both providers null, so check `Cardmarket`/`Tcgplayer` rather than the object itself. A digital
+  card has no secondary market to price.
+- **A language can be Pocket-only.** `pt-br` is, which is why its `/categories` returns two values
+  rather than three — see [Languages](#languages). Its card ids will not resolve in `en`.
+- **`boosters` is Pocket-only**, and there is no `/boosters` endpoint (404). The data exists only
+  embedded in a card.
+
+### Why this matters for the SDK's design
+
+Pocket is the part of this API that is actively growing, and it arrived carrying a **whole new
+rarity vocabulary**. Every one of those values would have thrown on a client that had modelled
+`rarity` as a closed enum, because they did not exist when such an enum would have been written.
+
+That is the concrete argument for the SDK typing `rarity`, `stage`, `suffix`, `category`, `types`,
+`trainerType` and `energyType` as `string` with the known values exposed as constants: an
+enumeration that grows is a source of new values, not a fixed set. See
+[architecture.md](architecture.md).
+
+---
+
+## 8. GraphQL
 
 `POST https://api.tcgdex.net/v2/graphql`, body `{"query": "..."}`. Introspection is enabled.
 
@@ -423,7 +488,7 @@ projection and nested fetch.
 
 ---
 
-## 8. Fields that do NOT exist
+## 9. Fields that do NOT exist
 
 Listed because they are plausible-sounding and easy to assume into a model. None of them appear in
 any live response or in the GraphQL schema:
@@ -436,7 +501,7 @@ Likewise, `Spell`, `Monster` and `Artifact` are not Pokémon TCG categories — 
 
 ---
 
-## 9. Fixture cards for tests
+## 10. Fixture cards for tests
 
 | Id | Why |
 |---|---|
@@ -455,7 +520,7 @@ Likewise, `Spell`, `Monster` and `Artifact` are not Pokémon TCG categories — 
 
 ---
 
-## 10. Sources
+## 11. Sources
 
 - Live API, verified 2026-08-05 (authoritative for this document)
 - https://tcgdex.dev/rest — endpoint overview

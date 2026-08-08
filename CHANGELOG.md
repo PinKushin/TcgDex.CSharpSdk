@@ -24,6 +24,16 @@ something an application can observe — those live in the commit history.
   resolve `netstandard2.0`**, not `net8.0`, so its two behavioural differences
   apply to them.
 
+- **Pokémon TCG Pocket** ([`docs/api-info.md`](docs/api-info.md)) — TCGdex now covers the digital
+  game alongside the physical TCG, in the same endpoints, models and id space, with no flag
+  saying which is which. Documents how to recognise a Pocket card (serie `tcgp`, the `/tcgp/`
+  asset path), and what differs: a separate rarity vocabulary (`One Diamond` … `Crown`),
+  Pocket-only `boosters`, `pricing` present but with both providers null, `variantId` as the
+  literal `generated`, no `regulationMark`, and no Energy cards at all.
+
+  This accounts for a lot of otherwise puzzling behaviour — unfamiliar rarities, cards with no
+  pricing, and languages whose catalogues look truncated.
+
 - **Two verified API findings** ([`docs/api-info.md`](docs/api-info.md)):
   - A broad GraphQL filter can fail outright with
     `Cannot return null for non-nullable field AttacksListItem.name` — the schema
