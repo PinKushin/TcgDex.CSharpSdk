@@ -13,6 +13,9 @@
 - name: Logging and tracing
   href: observability.md
 
+- name: Unity
+  href: unity.md
+
 - name: API reference
   href: api/
   homepage: api/index.md
