@@ -60,7 +60,9 @@ Names are genuinely localised where the pool is shared — `swsh3-136` is *Furre
 
 ## 2. Errors
 
-The live API returns an RFC 7807-shaped problem document:
+The live API returns an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)-shaped
+problem document. RFC 9457 obsoletes RFC 7807 — the wire format is the same, so
+older references to 7807 describe the same shape:
 
 ```json
 {
