@@ -30,7 +30,7 @@ public sealed class CardFilterTests
         // One filter with everything set, asserted exactly. A per-field test
         // would read better but would not catch a field rendered in the wrong
         // place or a separator that goes missing between two of them.
-        var filter = new CardFilter
+        CardFilter filter = new()
         {
             Name = "Furret",
             Category = "Pokemon",
@@ -81,7 +81,7 @@ public sealed class CardFilterTests
         // Each field on its own, which the combined test above cannot show:
         // there it is always surrounded by others, so a stray leading comma
         // would be invisible.
-        var filter = TextFilterFor(property);
+        CardFilter filter = TextFilterFor(property);
 
         filter.ToGraphQlArguments().ShouldBe(expected);
     }
@@ -93,7 +93,7 @@ public sealed class CardFilterTests
     {
         // Numbers must not be quoted: the GraphQL schema types these as Int,
         // and a quoted value is rejected outright rather than coerced.
-        var filter = NumberFilterFor(property);
+        CardFilter filter = NumberFilterFor(property);
 
         filter.ToGraphQlArguments().ShouldBe(expected);
     }

@@ -46,7 +46,7 @@ public sealed class CardQueryTests
     {
         // `100 < c.Hp` means the same as `c.Hp > 100`; the operator must flip
         // with the operands rather than being read off the node type.
-        var query = reversed
+        CardQuery query = reversed
             ? Query().Where(c => 100 < c.Hp)
             : Query().Where(c => c.Hp > 100);
 
@@ -112,7 +112,7 @@ public sealed class CardQueryTests
     {
         // The API can only OR within a single field. Silently dropping half the
         // predicate would return wrong data, so this fails loudly instead.
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Name == "Furret" || c.Hp > 100).ToQueryString());
 
         exception.Message.ShouldContain("name");
@@ -148,9 +148,9 @@ public sealed class CardQueryTests
         // moment a caller keeps a base query and branches off it — which is the
         // obvious way to use this, and would fail as a data race rather than as
         // an error anyone could debug.
-        var baseQuery = Query().Where(c => c.Name == "Furret");
+        CardQuery baseQuery = Query().Where(c => c.Name == "Furret");
 
-        var narrowed = baseQuery.Where(c => c.Hp > 100);
+        CardQuery narrowed = baseQuery.Where(c => c.Hp > 100);
 
         baseQuery.ToQueryString().ShouldBe("name=eq:Furret");
         narrowed.ToQueryString().ShouldBe("name=eq:Furret&hp=gt:100");
@@ -163,7 +163,7 @@ public sealed class CardQueryTests
         // A local rather than a literal: this is how the value actually
         // arrives, and it keeps CA1847 from pushing the call to the char
         // overload, which would exercise a different translator path.
-        var search = "*";
+        string search = "*";
 
         Query().Where(c => c.Name.Contains(search)).ToQueryString()
             .ShouldBe("name=*");
@@ -192,7 +192,7 @@ public sealed class CardQueryTests
     {
         // Expression.Compile() is not AOT-safe, so captured values are read
         // from the closure rather than compiled and invoked.
-        var minimumHp = 250;
+        int minimumHp = 250;
 
         Query().Where(c => c.Hp > minimumHp).ToQueryString().ShouldBe("hp=gt:250");
     }
@@ -240,7 +240,7 @@ public sealed class CardQueryTests
     {
         // Regression guard: `?q=` is not a TCGdex parameter. Filters are
         // top-level query parameters.
-        var queryString = Query()
+        string queryString = Query()
             .Where(c => c.Name == "Furret")
             .Where(c => c.Hp > 100)
             .Page(1, 10)
@@ -256,7 +256,7 @@ public sealed class CardQueryTests
     {
         // The API has no such operator, so translating this is impossible.
         // The message must say so rather than producing a silently wrong filter.
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Name.Length > 5).ToQueryString());
 
         exception.Message.ShouldContain("Length");
@@ -266,7 +266,7 @@ public sealed class CardQueryTests
     public void UnknownProperty_IsRejected()
     {
         // BaseDamage is computed client-side and has no API counterpart.
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Set.Name == "x").ToQueryString());
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();

@@ -17,7 +17,7 @@ dotnet add package TcgDex.CSharpSdk
 ```csharp
 builder.Services.AddTcgDex();
 
-var card = await tcgdex.Cards.GetAsync("swsh3-136", ct);
+Card? card = await tcgdex.Cards.GetAsync("swsh3-136", ct);
 Console.WriteLine(card?.Name);   // Furret
 ```
 

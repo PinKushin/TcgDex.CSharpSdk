@@ -41,10 +41,10 @@ internal sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing
         // No capacity hint. Sizing it for four printings was measured and made
         // allocations worse, not better — a card carries one to three, and the
         // extra buckets cost more than the resize they avoided.
-        var printings = new Dictionary<string, TcgPlayerPrice>(StringComparer.Ordinal);
+        Dictionary<string, TcgPlayerPrice> printings = new(StringComparer.Ordinal);
 
         // Resolved once rather than per printing.
-        var priceTypeInfo = PriceTypeInfo(options);
+        JsonTypeInfo<TcgPlayerPrice> priceTypeInfo = PriceTypeInfo(options);
 
         while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
         {
@@ -57,9 +57,9 @@ internal sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing
             // string is only ever compared and thrown away — so it is called
             // below for printing names alone, where the value is genuinely
             // needed as a dictionary key.
-            var isUnit = reader.ValueTextEquals(UnitPropertyUtf8);
-            var isUpdated = !isUnit && reader.ValueTextEquals(UpdatedPropertyUtf8);
-            var name = isUnit || isUpdated ? null : reader.GetString()!;
+            bool isUnit = reader.ValueTextEquals(UnitPropertyUtf8);
+            bool isUpdated = !isUnit && reader.ValueTextEquals(UpdatedPropertyUtf8);
+            string? name = isUnit || isUpdated ? null : reader.GetString()!;
 
             reader.Read();
 
@@ -84,7 +84,7 @@ internal sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing
                 continue;
             }
 
-            var price = JsonSerializer.Deserialize(ref reader, priceTypeInfo);
+            TcgPlayerPrice? price = JsonSerializer.Deserialize(ref reader, priceTypeInfo);
 
             if (price is not null)
             {
@@ -120,7 +120,7 @@ internal sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing
 
         // KeyValuePair<,> gained Deconstruct in .NET Core 2.0 but not in
         // netstandard2.0, so the pair is read through its properties.
-        foreach (var printing in value.Printings)
+        foreach (KeyValuePair<string, TcgPlayerPrice> printing in value.Printings)
         {
             writer.WritePropertyName(printing.Key);
             JsonSerializer.Serialize(writer, printing.Value, PriceTypeInfo(options));

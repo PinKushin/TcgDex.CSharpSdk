@@ -72,7 +72,7 @@ public sealed record CardFilter
     /// <returns>Text such as <c>name:"Furret",hp:110</c>.</returns>
     internal string ToGraphQlArguments()
     {
-        var builder = new StringBuilder();
+        StringBuilder builder = new();
 
         AppendText(builder, "name", Name);
         AppendText(builder, "category", Category);
@@ -143,10 +143,10 @@ public sealed record CardFilter
     /// </remarks>
     private static string Quote(string value)
     {
-        var builder = new StringBuilder(value.Length + 2);
+        StringBuilder builder = new(value.Length + 2);
         builder.Append('"');
 
-        foreach (var character in value)
+        foreach (char character in value)
         {
             switch (character)
             {

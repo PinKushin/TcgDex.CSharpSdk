@@ -22,13 +22,13 @@ using TcgDex.Models;
 /// </remarks>
 /// <example>
 /// <code>
-/// var query = new CardQuery()
+/// CardQuery query = new CardQuery()
 ///     .Where(c => c.Name.Contains("Pikachu"))
 ///     .Where(c => c.Hp > 100)
 ///     .OrderByDescending(c => c.Name)
 ///     .Page(1, 50);
 ///
-/// var cards = await client.Cards.ListAsync(query, cancellationToken);
+/// IReadOnlyList&lt;CardBrief&gt; cards = await client.Cards.ListAsync(query, cancellationToken);
 /// </code>
 /// </example>
 public sealed class CardQuery
@@ -74,7 +74,7 @@ public sealed class CardQuery
     /// </exception>
     public CardQuery Where(Expression<Func<Card, bool>> predicate)
     {
-        var translated = ExpressionTranslator.Translate(predicate);
+        IReadOnlyList<QueryFilter> translated = ExpressionTranslator.Translate(predicate);
 
         return new CardQuery(
             [.. _filters, .. translated],
@@ -126,9 +126,9 @@ public sealed class CardQuery
     /// </remarks>
     public string ToQueryString()
     {
-        var parts = new List<string>(_filters.Count + 4);
+        List<string> parts = new(_filters.Count + 4);
 
-        foreach (var filter in _filters)
+        foreach (QueryFilter filter in _filters)
         {
             parts.Add(filter.Render());
         }
@@ -152,7 +152,7 @@ public sealed class CardQuery
     /// <returns>A path such as <c>cards?name=eq:Furret</c>.</returns>
     internal string ToRelativePath()
     {
-        var queryString = ToQueryString();
+        string queryString = ToQueryString();
 
         return queryString.Length == 0 ? "cards" : $"cards?{queryString}";
     }
@@ -161,7 +161,7 @@ public sealed class CardQuery
     {
         Guard.NotNull(selector);
 
-        var field = ExpressionTranslator.SortFieldName(selector);
+        string field = ExpressionTranslator.SortFieldName(selector);
 
         return new CardQuery(_filters, field, order, _page, _itemsPerPage);
     }

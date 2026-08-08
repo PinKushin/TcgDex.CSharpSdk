@@ -30,9 +30,9 @@ internal static class JsonShape
     /// <returns>Paths such as <c>set.cardCount.official</c> mapped to <c>Number</c>.</returns>
     internal static IReadOnlyDictionary<string, string> Describe(string json)
     {
-        using var document = JsonDocument.Parse(json);
+        using JsonDocument document = JsonDocument.Parse(json);
 
-        var shape = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        SortedDictionary<string, string> shape = new(StringComparer.Ordinal);
         Walk(document.RootElement, prefix: string.Empty, shape);
 
         return shape;
@@ -43,9 +43,9 @@ internal static class JsonShape
         switch (element.ValueKind)
         {
             case JsonValueKind.Object:
-                foreach (var property in element.EnumerateObject())
+                foreach (JsonProperty property in element.EnumerateObject())
                 {
-                    var path = prefix.Length == 0 ? property.Name : $"{prefix}.{property.Name}";
+                    string path = prefix.Length == 0 ? property.Name : $"{prefix}.{property.Name}";
                     Record(path, property.Value, shape);
                     Walk(property.Value, path, shape);
                 }
@@ -55,7 +55,7 @@ internal static class JsonShape
             case JsonValueKind.Array:
                 // Union across elements: a field present on only some entries
                 // still belongs to the shape.
-                foreach (var item in element.EnumerateArray())
+                foreach (JsonElement item in element.EnumerateArray())
                 {
                     Walk(item, $"{prefix}[]", shape);
                 }
@@ -69,9 +69,9 @@ internal static class JsonShape
 
     private static void Record(string path, JsonElement value, IDictionary<string, string> shape)
     {
-        var kind = Describe(value.ValueKind);
+        string kind = Describe(value.ValueKind);
 
-        if (!shape.TryGetValue(path, out var existing))
+        if (!shape.TryGetValue(path, out string? existing))
         {
             shape[path] = kind;
             return;
@@ -125,12 +125,12 @@ internal static class JsonShape
         IReadOnlyDictionary<string, string> recorded,
         IReadOnlyDictionary<string, string> live)
     {
-        var breaking = new List<string>();
-        var additive = new List<string>();
+        List<string> breaking = new();
+        List<string> additive = new();
 
-        foreach (var (path, recordedKind) in recorded)
+        foreach ((string? path, string? recordedKind) in recorded)
         {
-            if (!live.TryGetValue(path, out var liveKind))
+            if (!live.TryGetValue(path, out string? liveKind))
             {
                 breaking.Add($"removed: '{path}' was {recordedKind}, now absent");
                 continue;
@@ -152,7 +152,7 @@ internal static class JsonShape
             breaking.Add($"retyped: '{path}' was {recordedKind}, now {liveKind}");
         }
 
-        foreach (var (path, liveKind) in live)
+        foreach ((string? path, string? liveKind) in live)
         {
             if (!recorded.ContainsKey(path))
             {
@@ -170,10 +170,10 @@ internal static class JsonShape
     /// <returns>A readable multi-line report.</returns>
     internal static string Report(string fixture, string source, IReadOnlyList<string> differences)
     {
-        var builder = new StringBuilder();
+        StringBuilder builder = new();
         builder.AppendLine($"'{fixture}' no longer matches {source}:");
 
-        foreach (var difference in differences)
+        foreach (string difference in differences)
         {
             builder.AppendLine($"    {difference}");
         }

@@ -1,3 +1,5 @@
+using TcgDex.Models;
+
 namespace TcgDex.IntegrationTests;
 
 /// <summary>
@@ -14,7 +16,7 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task Categories_AreTheThreeKnownValues()
     {
-        var categories = await Client.Catalog.CategoriesAsync(Timeout);
+        IReadOnlyList<string> categories = await Client.Catalog.CategoriesAsync(Timeout);
 
         categories.ShouldBe(["Energy", "Pokemon", "Trainer"], ignoreOrder: true);
     }
@@ -22,7 +24,7 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task Rarities_IncludeTheCommonOnes()
     {
-        var rarities = await Client.Catalog.RaritiesAsync(Timeout);
+        IReadOnlyList<string> rarities = await Client.Catalog.RaritiesAsync(Timeout);
 
         rarities.ShouldContain("Common");
         rarities.ShouldContain("Uncommon");
@@ -31,9 +33,9 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task Types_CoverTheElementalSet()
     {
-        var types = await Client.Catalog.TypesAsync(Timeout);
+        IReadOnlyList<string> types = await Client.Catalog.TypesAsync(Timeout);
 
-        foreach (var expected in new[] { "Colorless", "Fire", "Grass", "Water", "Psychic" })
+        foreach (string? expected in new[] { "Colorless", "Fire", "Grass", "Water", "Psychic" })
         {
             types.ShouldContain(expected);
         }
@@ -42,7 +44,7 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task Illustrators_AreNotEmpty()
     {
-        var illustrators = await Client.Catalog.IllustratorsAsync(Timeout);
+        IReadOnlyList<string> illustrators = await Client.Catalog.IllustratorsAsync(Timeout);
 
         illustrators.ShouldNotBeEmpty();
         illustrators.ShouldAllBe(i => !string.IsNullOrWhiteSpace(i));
@@ -51,7 +53,7 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task Stages_IncludeTheEvolutionLine()
     {
-        var stages = await Client.Catalog.StagesAsync(Timeout);
+        IReadOnlyList<string> stages = await Client.Catalog.StagesAsync(Timeout);
 
         stages.ShouldContain("Basic");
         stages.ShouldContain("Stage1");
@@ -61,7 +63,7 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task Suffixes_AreCaseSensitive()
     {
-        var suffixes = await Client.Catalog.SuffixesAsync(Timeout);
+        IReadOnlyList<string> suffixes = await Client.Catalog.SuffixesAsync(Timeout);
 
         // "EX" and "ex" are different eras, so casing is meaningful.
         suffixes.ShouldContain("EX");
@@ -71,7 +73,7 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task Variants_MatchTheVariantsModelFlags()
     {
-        var variants = await Client.Catalog.VariantsAsync(Timeout);
+        IReadOnlyList<string> variants = await Client.Catalog.VariantsAsync(Timeout);
 
         // If this drifts, the Variants record is missing a flag.
         variants.ShouldBe(
@@ -82,7 +84,7 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task EnergyTypes_AreNormalAndSpecial()
     {
-        var energyTypes = await Client.Catalog.EnergyTypesAsync(Timeout);
+        IReadOnlyList<string> energyTypes = await Client.Catalog.EnergyTypesAsync(Timeout);
 
         energyTypes.ShouldBe(["Normal", "Special"], ignoreOrder: true);
     }
@@ -90,7 +92,7 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task RegulationMarks_AreSingleLetters()
     {
-        var marks = await Client.Catalog.RegulationMarksAsync(Timeout);
+        IReadOnlyList<string> marks = await Client.Catalog.RegulationMarksAsync(Timeout);
 
         marks.ShouldNotBeEmpty();
         marks.ShouldContain("D");
@@ -99,9 +101,9 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task TrainerTypes_IncludeTheCoreSubtypes()
     {
-        var trainerTypes = await Client.Catalog.TrainerTypesAsync(Timeout);
+        IReadOnlyList<string> trainerTypes = await Client.Catalog.TrainerTypesAsync(Timeout);
 
-        foreach (var expected in new[] { "Item", "Supporter", "Stadium", "Tool" })
+        foreach (string? expected in new[] { "Item", "Supporter", "Stadium", "Tool" })
         {
             trainerTypes.ShouldContain(expected);
         }
@@ -112,7 +114,7 @@ public sealed class CatalogTests : LiveApiFixture
     {
         // /hp, /retreats and /dex-ids return numbers where the sibling
         // endpoints return strings.
-        var hitPoints = await Client.Catalog.HitPointsAsync(Timeout);
+        IReadOnlyList<int> hitPoints = await Client.Catalog.HitPointsAsync(Timeout);
 
         hitPoints.ShouldNotBeEmpty();
         hitPoints.ShouldAllBe(h => h > 0);
@@ -121,7 +123,7 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task RetreatCosts_DeserializeAsNumbers()
     {
-        var retreats = await Client.Catalog.RetreatCostsAsync(Timeout);
+        IReadOnlyList<int> retreats = await Client.Catalog.RetreatCostsAsync(Timeout);
 
         retreats.ShouldNotBeEmpty();
         retreats.ShouldAllBe(r => r >= 0);
@@ -130,7 +132,7 @@ public sealed class CatalogTests : LiveApiFixture
     [Test]
     public async Task DexIds_DeserializeAsNumbers()
     {
-        var dexIds = await Client.Catalog.DexIdsAsync(Timeout);
+        IReadOnlyList<int> dexIds = await Client.Catalog.DexIdsAsync(Timeout);
 
         dexIds.ShouldNotBeEmpty();
         dexIds.ShouldContain(1, "Bulbasaur is dex id 1");
@@ -142,10 +144,10 @@ public sealed class CatalogTests : LiveApiFixture
         // The point of these endpoints: their values must actually work as
         // filter arguments. A value the API lists but will not filter on would
         // be a contract break.
-        var rarities = await Client.Catalog.RaritiesAsync(Timeout);
-        var rarity = rarities.First(r => r == "Common");
+        IReadOnlyList<string> rarities = await Client.Catalog.RaritiesAsync(Timeout);
+        string rarity = rarities.First(r => r == "Common");
 
-        var cards = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Rarity == rarity).Page(1, 5),
             Timeout);
 

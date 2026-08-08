@@ -65,14 +65,14 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport g
         Guard.NotNull(query);
         Guard.NotLessThan(pageSize, 1);
 
-        for (var page = 1; ; page++)
+        for (int page = 1; ; page++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var batch = await ListAsync(query.Page(page, pageSize), cancellationToken)
+            IReadOnlyList<CardBrief> batch = await ListAsync(query.Page(page, pageSize), cancellationToken)
                 .ConfigureAwait(false);
 
-            foreach (var card in batch)
+            foreach (CardBrief card in batch)
             {
                 yield return card;
             }

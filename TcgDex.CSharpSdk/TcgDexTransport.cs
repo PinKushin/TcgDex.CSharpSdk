@@ -110,26 +110,26 @@ internal sealed class TcgDexTransport
     {
         Guard.NotNull(relativePath);
 
-        var uri = new Uri(_languageBase, relativePath);
+        Uri uri = new(_languageBase, relativePath);
 
-        using var activity = TcgDexActivity.Start($"TCGdex {typeof(T).Name}");
+        using Activity? activity = TcgDexActivity.Start($"TCGdex {typeof(T).Name}");
         activity?.AddTag("url.full", uri.ToString());
         activity?.AddTag("http.request.method", "GET");
 
-        var timestamp = Stopwatch.GetTimestamp();
+        long timestamp = Stopwatch.GetTimestamp();
         _logger.SendingRequest("GET", uri);
 
         // The budget covers the body as well as the headers. Responses are read
         // with ResponseHeadersRead, so a server that answers and then stops
         // sending would otherwise sit until HttpClient.Timeout — the 100-second
         // default this option exists to replace.
-        using var budget = CreateBudget(cancellationToken);
-        var deadline = budget?.Token ?? cancellationToken;
+        using CancellationTokenSource? budget = CreateBudget(cancellationToken);
+        CancellationToken deadline = budget?.Token ?? cancellationToken;
 
-        using var response = await SendAsync(uri, activity, deadline, cancellationToken)
+        using HttpResponseMessage response = await SendAsync(uri, activity, deadline, cancellationToken)
             .ConfigureAwait(false);
 
-        var elapsed = (long)ElapsedSince(timestamp).TotalMilliseconds;
+        long elapsed = (long)ElapsedSince(timestamp).TotalMilliseconds;
         activity?.AddTag("http.response.status_code", (int)response.StatusCode);
         _logger.RequestCompleted(uri, (int)response.StatusCode, elapsed);
 
@@ -140,9 +140,9 @@ internal sealed class TcgDexTransport
 
         // Checked before the body is read, not just before it is parsed: on a
         // hit there is nothing to read either.
-        var etag = response.Headers.ETag?.ToString();
+        string? etag = response.Headers.ETag?.ToString();
 
-        if (_deserialized is not null && _deserialized.TryGet<T>(uri, etag, out var cached))
+        if (_deserialized is not null && _deserialized.TryGet<T>(uri, etag, out T? cached))
         {
             _logger.ReusedDeserializedResponse(uri, typeof(T).Name);
 
@@ -161,7 +161,7 @@ internal sealed class TcgDexTransport
 
         try
         {
-            var body = await BoundedContent
+            ArraySegment<byte> body = await BoundedContent
                 .ReadAsBytesAsync(response.Content, _maxResponseBytes, uri, deadline)
                 .ConfigureAwait(false);
 
@@ -174,7 +174,7 @@ internal sealed class TcgDexTransport
             throw TimedOut(uri, activity, ex);
         }
 
-        var value = Deserialize<T>(new ArraySegment<byte>(bodyBuffer, bodyOffset, bodyCount), uri);
+        T? value = Deserialize<T>(new ArraySegment<byte>(bodyBuffer, bodyOffset, bodyCount), uri);
 
         if (value is not null)
         {
@@ -199,7 +199,7 @@ internal sealed class TcgDexTransport
     internal async Task<T> GetRequiredAsync<T>(string relativePath, CancellationToken cancellationToken)
         where T : class
     {
-        var result = await GetAsync<T>(relativePath, cancellationToken).ConfigureAwait(false);
+        T? result = await GetAsync<T>(relativePath, cancellationToken).ConfigureAwait(false);
 
         return result ?? throw new TcgDexApiException(
             $"The TCGdex API returned no content for '{relativePath}', which is " +
@@ -249,7 +249,7 @@ internal sealed class TcgDexTransport
             return null;
         }
 
-        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        CancellationTokenSource source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         source.CancelAfter(_timeout);
 
         return source;
@@ -276,7 +276,7 @@ internal sealed class TcgDexTransport
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            using HttpRequestMessage request = new(HttpMethod.Get, uri);
 
             return await _httpClient
                 .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline)
@@ -313,7 +313,7 @@ internal sealed class TcgDexTransport
         CancellationToken cancellationToken)
         where T : class
     {
-        var problem = await ReadProblemAsync(response, _maxResponseBytes, uri, cancellationToken)
+        TcgDexProblem? problem = await ReadProblemAsync(response, _maxResponseBytes, uri, cancellationToken)
             .ConfigureAwait(false);
 
         if (response.StatusCode == HttpStatusCode.NotFound && problem?.IsLanguageError != true)
@@ -323,11 +323,11 @@ internal sealed class TcgDexTransport
             return null;
         }
 
-        var description = problem?.Describe() ?? response.ReasonPhrase ?? "no detail supplied";
+        string description = problem?.Describe() ?? response.ReasonPhrase ?? "no detail supplied";
 
         _logger.RequestFailed(uri, (int)response.StatusCode, description);
 
-        var exception = new TcgDexApiException(
+        TcgDexApiException exception = new(
             $"The TCGdex API returned {(int)response.StatusCode} for '{uri}': {description}",
             response.StatusCode,
             problem);
@@ -358,14 +358,14 @@ internal sealed class TcgDexTransport
     {
         try
         {
-            var body = await BoundedContent
+            ArraySegment<byte> body = await BoundedContent
                 .ReadAsBytesAsync(response.Content, maxResponseBytes, uri, cancellationToken)
                 .ConfigureAwait(false);
 
             // An empty or all-whitespace body carries no problem document. The
             // span is trimmed rather than decoded to a string first — the whole
             // point of reading bytes is to not pay for that conversion.
-            var span = new ReadOnlySpan<byte>(body.Array, body.Offset, body.Count);
+            ReadOnlySpan<byte> span = new(body.Array, body.Offset, body.Count);
 
             return IsBlank(span)
                 ? null
@@ -390,7 +390,7 @@ internal sealed class TcgDexTransport
     /// <summary>Whether a body is empty or entirely ASCII whitespace.</summary>
     private static bool IsBlank(ReadOnlySpan<byte> body)
     {
-        foreach (var b in body)
+        foreach (byte b in body)
         {
             if (b is not ((byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n'))
             {
@@ -413,7 +413,7 @@ internal sealed class TcgDexTransport
     {
         try
         {
-            var typeInfo = (JsonTypeInfo<T>)_jsonOptions.GetTypeInfo(typeof(T));
+            JsonTypeInfo<T> typeInfo = (JsonTypeInfo<T>)_jsonOptions.GetTypeInfo(typeof(T));
 
             return JsonSerializer.Deserialize(
                 new ReadOnlySpan<byte>(body.Array, body.Offset, body.Count),

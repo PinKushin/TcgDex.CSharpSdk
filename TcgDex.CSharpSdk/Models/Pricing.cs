@@ -108,7 +108,7 @@ public sealed record TcgPlayerPricing
     /// <param name="printing">The printing name, for example <c>"normal"</c>.</param>
     /// <returns>The matching price block, or <see langword="null"/>.</returns>
     public TcgPlayerPrice? this[string printing]
-        => Printings.TryGetValue(printing, out var price) ? price : null;
+        => Printings.TryGetValue(printing, out TcgPlayerPrice? price) ? price : null;
 }
 
 /// <summary>

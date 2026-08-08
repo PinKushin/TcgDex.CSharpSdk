@@ -5,7 +5,9 @@ using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using TcgDex.Models;
 using TcgDex.Querying;
+using TCGDex.Models;
 
 /// <summary>
 /// This SDK against the other public C# TCGdex SDK, on identical work.
@@ -114,14 +116,14 @@ public class ComparisonBenchmarks : IDisposable
     [Benchmark(Baseline = true)]
     public async Task<string?> FetchCard_Mine()
     {
-        var card = await _mine.Cards.GetAsync(CardId, CancellationToken.None).ConfigureAwait(false);
+        Card? card = await _mine.Cards.GetAsync(CardId, CancellationToken.None).ConfigureAwait(false);
         return card?.Name;
     }
 
     [Benchmark]
     public async Task<string?> FetchCard_Theirs()
     {
-        var card = await _theirs.FetchCardAsync(CardId, cancellationToken: CancellationToken.None)
+        CardModel? card = await _theirs.FetchCardAsync(CardId, cancellationToken: CancellationToken.None)
             .ConfigureAwait(false);
 
         return card?.Name;
@@ -146,7 +148,7 @@ public class ComparisonBenchmarks : IDisposable
     [Benchmark]
     public async Task<string?> FetchCard_MineWithoutPricing()
     {
-        var card = await _mineNoPricing.Cards.GetAsync(CardId, CancellationToken.None)
+        Card? card = await _mineNoPricing.Cards.GetAsync(CardId, CancellationToken.None)
             .ConfigureAwait(false);
 
         return card?.Name;

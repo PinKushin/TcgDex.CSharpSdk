@@ -108,14 +108,14 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
     {
         _ownedHttpClient = ownsHttpClient ? httpClient : null;
 
-        var resolved = options ?? new TcgDexOptions();
+        TcgDexOptions resolved = options ?? new TcgDexOptions();
 
         // One category for the whole SDK, so a consumer can filter everything it
         // emits with a single rule on "TcgDex".
-        var logger = loggerFactory?.CreateLogger("TcgDex") ?? NullLogger.Instance;
+        ILogger logger = loggerFactory?.CreateLogger("TcgDex") ?? NullLogger.Instance;
 
-        var transport = new TcgDexTransport(httpClient, resolved, logger);
-        var graphQl = new GraphQlTransport(httpClient, resolved, logger);
+        TcgDexTransport transport = new(httpClient, resolved, logger);
+        GraphQlTransport graphQl = new(httpClient, resolved, logger);
 
         logger.ClientConfigured(resolved.Language, resolved.BaseAddress);
 
@@ -175,9 +175,9 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
     /// <example>
     /// <code>
     /// // Once, for the life of the application.
-    /// using var tcgdex = TcgDexClient.Create();
+    /// using TcgDexClient tcgdex = TcgDexClient.Create();
     ///
-    /// var card = await tcgdex.Cards.GetAsync("swsh3-136", cancellationToken);
+    /// Card? card = await tcgdex.Cards.GetAsync("swsh3-136", cancellationToken);
     /// </code>
     /// </example>
     public static TcgDexClient Create(
@@ -185,7 +185,7 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         Action<TcgDexCacheOptions>? configureCache = null,
         ILoggerFactory? loggerFactory = null)
     {
-        var resolved = options ?? new TcgDexOptions();
+        TcgDexOptions resolved = options ?? new TcgDexOptions();
         resolved.Validate();
 
         // Connections are recycled on this interval so DNS changes are picked
@@ -218,7 +218,7 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
 
         if (configureCache is not null)
         {
-            var cacheOptions = new TcgDexCacheOptions();
+            TcgDexCacheOptions cacheOptions = new();
             configureCache(cacheOptions);
 
             handler = new TcgDexCachingHandler(

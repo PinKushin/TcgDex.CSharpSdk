@@ -6,8 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using TcgDex;
-using TcgDex.Tests.Diagnostics;
+using TcgDex.Models;
 using TcgDex.Querying;
+using TcgDex.Tests.Diagnostics;
 
 /// <summary>
 /// The GraphQL search path: the document sent, and the failure handling.
@@ -38,7 +39,7 @@ public sealed class GraphQlTests
         await CreateClient(handler).Cards
             .SearchDetailedAsync(filter, page, itemsPerPage, CancellationToken.None);
 
-        using var document = JsonDocument.Parse(handler.SingleRequestBody);
+        using JsonDocument document = JsonDocument.Parse(handler.SingleRequestBody);
 
         return document.RootElement.GetProperty("query").GetString()!;
     }
@@ -46,7 +47,7 @@ public sealed class GraphQlTests
     [Test]
     public async Task SearchDetailed_PostsToTheGraphQlEndpoint()
     {
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
         await CreateClient(handler).Cards
             .SearchDetailedAsync(new CardFilter { Name = "Furret" }, cancellationToken: CancellationToken.None);
@@ -60,9 +61,9 @@ public sealed class GraphQlTests
     [Test]
     public async Task SearchDetailed_SendsEqualityFilterArguments()
     {
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
-        var query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret", Hp = 110 });
+        string query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret", Hp = 110 });
 
         query.ShouldContain("""filters:{name:"Furret",hp:110}""");
     }
@@ -70,9 +71,9 @@ public sealed class GraphQlTests
     [Test]
     public async Task SearchDetailed_SendsPaginationArguments()
     {
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
-        var query = await CaptureQueryAsync(handler, new CardFilter { Category = "Pokemon" }, 2, 25);
+        string query = await CaptureQueryAsync(handler, new CardFilter { Category = "Pokemon" }, 2, 25);
 
         query.ShouldContain("pagination:{page:2,itemsPerPage:25}");
     }
@@ -82,11 +83,11 @@ public sealed class GraphQlTests
     {
         // The entire point of this path is full detail in one round trip. If the
         // selection loses these, it is just a slower version of the REST list.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
-        var query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret" });
+        string query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret" });
 
-        foreach (var field in new[] { "hp", "types", "attacks", "weaknesses", "legal", "set" })
+        foreach (string? field in new[] { "hp", "types", "attacks", "weaknesses", "legal", "set" })
         {
             query.ShouldContain(field);
         }
@@ -97,9 +98,9 @@ public sealed class GraphQlTests
     {
         // GraphQL's Card has no pricing and no updated field; asking for either
         // fails the whole query.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
-        var query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret" });
+        string query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret" });
 
         query.ShouldNotContain("pricing");
         query.ShouldNotContain("updated");
@@ -111,9 +112,9 @@ public sealed class GraphQlTests
     {
         // An unescaped quote would terminate the GraphQL string literal and
         // change the query being executed.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
-        var query = await CaptureQueryAsync(handler, new CardFilter { Illustrator = "\"Big Mama\" Tagawa" });
+        string query = await CaptureQueryAsync(handler, new CardFilter { Illustrator = "\"Big Mama\" Tagawa" });
 
         // Quotes are backslash-escaped inside the GraphQL string literal, so the
         // value cannot break out of it and alter the query.
@@ -128,13 +129,13 @@ public sealed class GraphQlTests
         // *valid* query: the GraphQL grammar forbids raw control characters inside
         // a string, so passing one through unescaped turns a caller's odd input
         // into a syntax error from the server rather than a clean result.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
         // Built from char codes rather than written as literals: control bytes
         // pasted into a source file are invisible and get mangled in transit.
-        var hostile = "Furret" + (char)0x08 + (char)0x0C + (char)0x01 + (char)0x1F;
+        string hostile = "Furret" + (char)0x08 + (char)0x0C + (char)0x01 + (char)0x1F;
 
-        var query = await CaptureQueryAsync(handler, new CardFilter { Name = hostile });
+        string query = await CaptureQueryAsync(handler, new CardFilter { Name = hostile });
 
         // Backspace and form feed have dedicated escapes in the grammar;
         // everything else below U+0020 has to go out as a \u escape.
@@ -154,9 +155,9 @@ public sealed class GraphQlTests
     [Test]
     public async Task SearchDetailed_WithNoFilter_OmitsTheArgumentList()
     {
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
-        var query = await CaptureQueryAsync(handler, new CardFilter());
+        string query = await CaptureQueryAsync(handler, new CardFilter());
 
         query.ShouldContain("{ cards {");
     }
@@ -172,12 +173,12 @@ public sealed class GraphQlTests
             ]}}
             """;
 
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Response);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Response);
 
-        var cards = await CreateClient(handler).Cards
+        IReadOnlyList<Card> cards = await CreateClient(handler).Cards
             .SearchDetailedAsync(new CardFilter { Name = "Furret" }, cancellationToken: CancellationToken.None);
 
-        var card = cards.ShouldHaveSingleItem();
+        Card card = cards.ShouldHaveSingleItem();
         card.Name.ShouldBe("Furret");
         card.Hp.ShouldBe(110);
     }
@@ -191,9 +192,9 @@ public sealed class GraphQlTests
             {"errors":[{"message":"Cannot return null for non-nullable field Card.rarity."}]}
             """;
 
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Response);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Response);
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler).Cards.SearchDetailedAsync(
                 new CardFilter { Name = "Furret" }, cancellationToken: CancellationToken.None)).Result;
 
@@ -210,9 +211,9 @@ public sealed class GraphQlTests
              "set":{"id":"swsh3","name":"Darkness Ablaze"}}]}}
             """;
 
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Response);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Response);
 
-        var cards = await CreateClient(handler).Cards
+        IReadOnlyList<Card> cards = await CreateClient(handler).Cards
             .SearchDetailedAsync(new CardFilter { Name = "Furret" }, cancellationToken: CancellationToken.None);
 
         cards.ShouldHaveSingleItem().Name.ShouldBe("Furret");
@@ -228,11 +229,11 @@ public sealed class GraphQlTests
         // treating that as a failure would break every such response. Only a
         // present-but-empty array distinguishes the two — null and non-empty
         // both behave the same either way.
-        var handler = new RecordingHandler().RespondWith(
+        RecordingHandler handler = new RecordingHandler().RespondWith(
             HttpStatusCode.OK,
             """{"data":{"cards":[]},"errors":[]}""");
 
-        var cards = await CreateClient(handler).Cards.SearchDetailedAsync(
+        IReadOnlyList<Card> cards = await CreateClient(handler).Cards.SearchDetailedAsync(
             new CardFilter { Name = "Furret" },
             cancellationToken: CancellationToken.None);
 
@@ -244,11 +245,11 @@ public sealed class GraphQlTests
     {
         // Every message, separated — not just the first, and not run together.
         // A server reporting two problems should surface both.
-        var handler = new RecordingHandler().RespondWith(
+        RecordingHandler handler = new RecordingHandler().RespondWith(
             HttpStatusCode.OK,
             """{"errors":[{"message":"first problem"},{"message":"second problem"}]}""");
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler).Cards.SearchDetailedAsync(
                 new CardFilter { Name = "Furret" },
                 cancellationToken: CancellationToken.None)).Result;
@@ -264,15 +265,15 @@ public sealed class GraphQlTests
         // `dropped > 0` versus `>= 0`. The mutated form warns about zero
         // dropped entries on every successful search — noise that would train
         // a consumer to ignore the warning that matters.
-        var log = new RecordingLogger(LogLevel.Trace);
+        RecordingLogger log = new(LogLevel.Trace);
 
-        var handler = new RecordingHandler().RespondWith(
+        RecordingHandler handler = new RecordingHandler().RespondWith(
             HttpStatusCode.OK,
             """{"data":{"cards":[{"id":"swsh3-136","name":"Furret","category":"Pokemon","localId":"136","set":{"id":"swsh3","name":"Darkness Ablaze"}}]}}""");
 
-        var client = new TcgDexClient(new HttpClient(handler), new TcgDexOptions(), log.Factory);
+        TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions(), log.Factory);
 
-        var cards = await client.Cards.SearchDetailedAsync(
+        IReadOnlyList<Card> cards = await client.Cards.SearchDetailedAsync(
             new CardFilter { Name = "Furret" },
             cancellationToken: CancellationToken.None);
 
@@ -288,9 +289,9 @@ public sealed class GraphQlTests
         // The separator is only written between arguments. With the guard
         // removed the document opens with a stray comma, which the server
         // rejects — and no test looked at a single-argument query.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
-        var query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret" });
+        string query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret" });
 
         query.ShouldNotContain("(,");
         query.ShouldNotContain("(filters:{name:\"Furret\"},)");
@@ -301,9 +302,9 @@ public sealed class GraphQlTests
     {
         // And with more than one argument the separator must actually appear,
         // or the document runs them together into nonsense.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
-        var query = await CaptureQueryAsync(
+        string query = await CaptureQueryAsync(
             handler,
             new CardFilter { Name = "Furret" },
             page: 2,
@@ -317,9 +318,9 @@ public sealed class GraphQlTests
     [Test]
     public void AnHttpFailure_NamesTheStatusCode()
     {
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.BadGateway, "{}");
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.BadGateway, "{}");
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler).Cards.SearchDetailedAsync(
                 new CardFilter { Name = "Furret" },
                 cancellationToken: CancellationToken.None)).Result;
@@ -331,10 +332,10 @@ public sealed class GraphQlTests
     [Test]
     public void ANetworkFailure_SaysSo()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWith(_ => throw new HttpRequestException("connection reset"));
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler).Cards.SearchDetailedAsync(
                 new CardFilter { Name = "Furret" },
                 cancellationToken: CancellationToken.None)).Result;
@@ -345,9 +346,9 @@ public sealed class GraphQlTests
     [Test]
     public void AMalformedBody_SaysItWasNotValidJson()
     {
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "<html>nope</html>");
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "<html>nope</html>");
 
-        var exception = Should.ThrowAsync<TcgDexApiException>(async () =>
+        TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler).Cards.SearchDetailedAsync(
                 new CardFilter { Name = "Furret" },
                 cancellationToken: CancellationToken.None)).Result;

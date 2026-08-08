@@ -1,6 +1,8 @@
 namespace TcgDex.IntegrationTests;
 
+using System.Net.Http.Headers;
 using TcgDex.Caching;
+using TcgDex.Models;
 
 /// <summary>
 /// Caching against the live API.
@@ -16,14 +18,14 @@ public sealed class CachingTests : LiveApiFixture
     private static (ITcgDexClient Client, TcgDexCachingHandler Cache, HttpClient Http) CreateCachingClient(
         TcgDexCacheOptions? options = null)
     {
-        var caching = new TcgDexCachingHandler(
+        TcgDexCachingHandler caching = new(
             new MemoryTcgDexResponseCache(),
             options ?? new TcgDexCacheOptions())
         {
             InnerHandler = new HttpClientHandler(),
         };
 
-        var http = new HttpClient(caching);
+        HttpClient http = new(caching);
 
         return (new TcgDexClient(http, new TcgDexOptions()), caching, http);
     }
@@ -33,8 +35,8 @@ public sealed class CachingTests : LiveApiFixture
     {
         // If this ever stops being true, revalidation silently degrades into
         // re-downloading and this test is the warning.
-        using var http = new HttpClient();
-        using var response = await http.GetAsync(
+        using HttpClient http = new();
+        using HttpResponseMessage response = await http.GetAsync(
             new Uri("https://api.tcgdex.net/v2/en/cards/swsh3-136"),
             Timeout);
 
@@ -50,16 +52,16 @@ public sealed class CachingTests : LiveApiFixture
         // pricing that TCGdex updates server-side, so its ETag can legitimately
         // change between two reads and a 200 would be the correct answer — which
         // is a property of the data, not of conditional-request support.
-        using var http = new HttpClient();
-        var uri = new Uri("https://api.tcgdex.net/v2/en/rarities");
+        using HttpClient http = new();
+        Uri uri = new("https://api.tcgdex.net/v2/en/rarities");
 
-        using var first = await http.GetAsync(uri, Timeout);
-        var etag = first.Headers.ETag.ShouldNotBeNull();
+        using HttpResponseMessage first = await http.GetAsync(uri, Timeout);
+        EntityTagHeaderValue etag = first.Headers.ETag.ShouldNotBeNull();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        using HttpRequestMessage request = new(HttpMethod.Get, uri);
         request.Headers.IfNoneMatch.Add(etag);
 
-        using var second = await http.SendAsync(request, Timeout);
+        using HttpResponseMessage second = await http.SendAsync(request, Timeout);
 
         second.StatusCode.ShouldBe(System.Net.HttpStatusCode.NotModified);
         (await second.Content.ReadAsByteArrayAsync(Timeout)).ShouldBeEmpty();
@@ -68,13 +70,13 @@ public sealed class CachingTests : LiveApiFixture
     [Test]
     public async Task RepeatedReads_HitTheCacheNotTheNetwork()
     {
-        var (client, cache, http) = CreateCachingClient();
+        (ITcgDexClient? client, TcgDexCachingHandler? cache, HttpClient? http) = CreateCachingClient();
 
         using (http)
         {
-            var first = await client.Cards.GetAsync("swsh3-136", Timeout);
-            var second = await client.Cards.GetAsync("swsh3-136", Timeout);
-            var third = await client.Cards.GetAsync("swsh3-136", Timeout);
+            Card? first = await client.Cards.GetAsync("swsh3-136", Timeout);
+            Card? second = await client.Cards.GetAsync("swsh3-136", Timeout);
+            Card? third = await client.Cards.GetAsync("swsh3-136", Timeout);
 
             first.ShouldNotBeNull().Name.ShouldBe("Furret");
             second.ShouldNotBeNull().Name.ShouldBe("Furret");
@@ -94,19 +96,19 @@ public sealed class CachingTests : LiveApiFixture
         // answer, which made an earlier version of this test intermittently
         // fail for a reason that was never a defect. The rarity list has no
         // volatile data, so its ETag is stable across two immediate requests.
-        var options = new TcgDexCacheOptions
+        TcgDexCacheOptions options = new()
         {
             DefaultTimeToLive = TimeSpan.Zero,
             PricingTimeToLive = TimeSpan.Zero,
             CatalogTimeToLive = TimeSpan.Zero,
         };
 
-        var (client, cache, http) = CreateCachingClient(options);
+        (ITcgDexClient? client, TcgDexCachingHandler? cache, HttpClient? http) = CreateCachingClient(options);
 
         using (http)
         {
-            var first = await client.Catalog.RaritiesAsync(Timeout);
-            var second = await client.Catalog.RaritiesAsync(Timeout);
+            IReadOnlyList<string> first = await client.Catalog.RaritiesAsync(Timeout);
+            IReadOnlyList<string> second = await client.Catalog.RaritiesAsync(Timeout);
 
             second.ShouldBe(first);
             cache.Revalidations.ShouldBe(1, "the second read should have been a 304");
@@ -121,13 +123,13 @@ public sealed class CachingTests : LiveApiFixture
         // change between reads, the SDK must return the right answer either way.
         // Only the outcome is asserted, because which path the server chooses is
         // the server's business.
-        var options = new TcgDexCacheOptions { PricingTimeToLive = TimeSpan.Zero };
-        var (client, cache, http) = CreateCachingClient(options);
+        TcgDexCacheOptions options = new() { PricingTimeToLive = TimeSpan.Zero };
+        (ITcgDexClient? client, TcgDexCachingHandler? cache, HttpClient? http) = CreateCachingClient(options);
 
         using (http)
         {
-            var first = await client.Cards.GetAsync("swsh3-136", Timeout);
-            var second = await client.Cards.GetAsync("swsh3-136", Timeout);
+            Card? first = await client.Cards.GetAsync("swsh3-136", Timeout);
+            Card? second = await client.Cards.GetAsync("swsh3-136", Timeout);
 
             first.ShouldNotBeNull().Name.ShouldBe("Furret");
             second.ShouldNotBeNull().Name.ShouldBe("Furret");
@@ -143,12 +145,12 @@ public sealed class CachingTests : LiveApiFixture
     {
         // A replayed body must produce the same model as the original, including
         // the awkward shapes.
-        var (client, _, http) = CreateCachingClient();
+        (ITcgDexClient? client, TcgDexCachingHandler _, HttpClient? http) = CreateCachingClient();
 
         using (http)
         {
-            var live = await client.Cards.GetAsync("swsh3-136", Timeout);
-            var cached = await client.Cards.GetAsync("swsh3-136", Timeout);
+            Card? live = await client.Cards.GetAsync("swsh3-136", Timeout);
+            Card? cached = await client.Cards.GetAsync("swsh3-136", Timeout);
 
             live.ShouldNotBeNull();
             cached.ShouldNotBeNull();
@@ -157,8 +159,8 @@ public sealed class CachingTests : LiveApiFixture
             cached.Hp.ShouldBe(live.Hp);
             cached.Attacks.Count.ShouldBe(live.Attacks.Count);
             cached.Set.Id.ShouldBe(live.Set.Id);
-            var livePrintings = live.Pricing?.Tcgplayer?.Printings.Count;
-            var cachedPrintings = cached.Pricing?.Tcgplayer?.Printings.Count;
+            int? livePrintings = live.Pricing?.Tcgplayer?.Printings.Count;
+            int? cachedPrintings = cached.Pricing?.Tcgplayer?.Printings.Count;
             cachedPrintings.ShouldBe(livePrintings);
         }
     }
@@ -168,12 +170,12 @@ public sealed class CachingTests : LiveApiFixture
     {
         // A full set is around 22 KB, so this is the case the cache earns its
         // keep on.
-        var (client, cache, http) = CreateCachingClient();
+        (ITcgDexClient? client, TcgDexCachingHandler? cache, HttpClient? http) = CreateCachingClient();
 
         using (http)
         {
-            var first = await client.Sets.GetAsync("swsh3", Timeout);
-            var second = await client.Sets.GetAsync("swsh3", Timeout);
+            Set? first = await client.Sets.GetAsync("swsh3", Timeout);
+            Set? second = await client.Sets.GetAsync("swsh3", Timeout);
 
             first.ShouldNotBeNull().Cards.Count.ShouldBeGreaterThan(200);
             second.ShouldNotBeNull().Cards.Count.ShouldBe(first.Cards.Count);
@@ -186,14 +188,14 @@ public sealed class CachingTests : LiveApiFixture
     [Test]
     public async Task ConcurrentReads_ShareOneRequest()
     {
-        var (client, cache, http) = CreateCachingClient();
+        (ITcgDexClient? client, TcgDexCachingHandler? cache, HttpClient? http) = CreateCachingClient();
 
         using (http)
         {
-            var reads = Enumerable.Range(0, 10)
+            IEnumerable<Task<Card?>> reads = Enumerable.Range(0, 10)
                 .Select(_ => client.Cards.GetAsync("swsh3-136", Timeout));
 
-            var cards = await Task.WhenAll(reads);
+            Card?[] cards = await Task.WhenAll(reads);
 
             cards.ShouldAllBe(c => c != null && c.Name == "Furret");
             cache.Misses.ShouldBe(1, "ten concurrent readers should share one fetch");
@@ -203,7 +205,7 @@ public sealed class CachingTests : LiveApiFixture
     [Test]
     public async Task MissingCard_IsNotCached()
     {
-        var (client, _, http) = CreateCachingClient();
+        (ITcgDexClient? client, TcgDexCachingHandler _, HttpClient? http) = CreateCachingClient();
 
         using (http)
         {
@@ -218,7 +220,7 @@ public sealed class CachingTests : LiveApiFixture
     public async Task GraphQlRequests_AreNotCached()
     {
         // GraphQL is a POST, so it must bypass the cache entirely.
-        var (client, cache, http) = CreateCachingClient();
+        (ITcgDexClient? client, TcgDexCachingHandler? cache, HttpClient? http) = CreateCachingClient();
 
         using (http)
         {

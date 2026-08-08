@@ -67,7 +67,7 @@ public static class ImageUrl
 
         // Tolerates a trailing slash so a caller who has already normalised the
         // value does not end up with a doubled separator.
-        var trimmed = baseUrl.TrimEnd('/');
+        string trimmed = baseUrl.TrimEnd('/');
 
         return $"{trimmed}/{Name(quality)}.{Name(format)}";
     }

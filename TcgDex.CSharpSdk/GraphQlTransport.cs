@@ -87,21 +87,21 @@ internal sealed class GraphQlTransport(
     {
         Guard.NotNull(filter);
 
-        var query = BuildQuery(filter, page, itemsPerPage);
-        var response = await PostAsync(query, cancellationToken).ConfigureAwait(false);
+        string query = BuildQuery(filter, page, itemsPerPage);
+        GraphQlCardsResponse response = await PostAsync(query, cancellationToken).ConfigureAwait(false);
 
         // GraphQL answers 200 even when the query failed, so the errors array is
         // the only reliable failure signal.
         if (response.Errors is { Count: > 0 })
         {
-            var messages = string.Join("; ", response.Errors.Select(e => e.Message));
+            string messages = string.Join("; ", response.Errors.Select(e => e.Message));
 
             _logger.GraphQlErrors(messages);
 
             throw new TcgDexApiException($"The TCGdex GraphQL endpoint reported errors: {messages}");
         }
 
-        var cards = response.Data?.Cards;
+        IReadOnlyList<Card?>? cards = response.Data?.Cards;
 
         if (cards is null)
         {
@@ -112,9 +112,9 @@ internal sealed class GraphQlTransport(
         // for that card. Dropping it beats handing back a null the caller has to
         // guard on every iteration — but it is logged, so a missing card is
         // explainable rather than mysterious.
-        var resolved = cards.Where(card => card is not null).Select(card => card!).ToArray();
+        Card[] resolved = cards.Where(card => card is not null).Select(card => card!).ToArray();
 
-        var dropped = cards.Count - resolved.Length;
+        int dropped = cards.Count - resolved.Length;
         if (dropped > 0)
         {
             _logger.GraphQlDroppedEntries(dropped);
@@ -127,8 +127,8 @@ internal sealed class GraphQlTransport(
 
     private static string BuildQuery(CardFilter filter, int? page, int? itemsPerPage)
     {
-        var arguments = new StringBuilder();
-        var filterArguments = filter.ToGraphQlArguments();
+        StringBuilder arguments = new();
+        string filterArguments = filter.ToGraphQlArguments();
 
         if (filterArguments.Length > 0)
         {
@@ -162,7 +162,7 @@ internal sealed class GraphQlTransport(
             arguments.Append('}');
         }
 
-        var argumentList = arguments.Length > 0 ? $"({arguments})" : string.Empty;
+        string argumentList = arguments.Length > 0 ? $"({arguments})" : string.Empty;
 
         return $"{{ cards{argumentList} {{ {CardSelection} }} }}";
     }
@@ -171,15 +171,15 @@ internal sealed class GraphQlTransport(
     {
         try
         {
-            using var content = JsonContent.Create(
+            using JsonContent content = JsonContent.Create(
                 new GraphQlRequest(query),
                 GraphQlJsonContext.Default.GraphQlRequest);
 
-            using var httpResponse = await _httpClient
+            using HttpResponseMessage httpResponse = await _httpClient
                 .PostAsync(_options.GraphQlEndpoint, content, cancellationToken)
                 .ConfigureAwait(false);
 
-            var body = await BoundedContent
+            ArraySegment<byte> body = await BoundedContent
                 .ReadAsBytesAsync(
                     httpResponse.Content,
                     _options.MaxResponseBytes,

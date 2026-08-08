@@ -57,7 +57,7 @@ public sealed class MemoryTcgDexResponseCache : ITcgDexResponseCache
         // reports removing this block as equivalent, and it is. It stays
         // because arriving at "expired" for something that was never stored is
         // the wrong reason to be right.
-        if (!_entries.TryGet(key, out var entry))
+        if (!_entries.TryGet(key, out (CachedResponse Response, DateTimeOffset ExpiresAt) entry))
         {
             return new ValueTask<CachedResponse?>((CachedResponse?)null);
         }
@@ -89,7 +89,7 @@ public sealed class MemoryTcgDexResponseCache : ITcgDexResponseCache
         // FromTicks rather than `timeToLive * multiplier`: the TimeSpan
         // multiplication operator is .NET Core 3.0+ and this also builds for
         // netstandard2.0. Same arithmetic.
-        var absoluteLifetime = timeToLive > TimeSpan.Zero
+        TimeSpan absoluteLifetime = timeToLive > TimeSpan.Zero
             ? TimeSpan.FromTicks(timeToLive.Ticks * RevalidationLifetimeMultiplier)
             : TimeSpan.FromMinutes(1);
 

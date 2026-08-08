@@ -72,16 +72,16 @@ public sealed class MalformedResponseTests
     [Test]
     public async Task CorruptedBodies_NeverEscapeTheErrorContract()
     {
-        var random = new Random(Seed);
-        var failures = new List<string>();
+        Random random = new(Seed);
+        List<string> failures = new();
 
-        foreach (var fixture in Fixtures)
+        foreach (string fixture in Fixtures)
         {
-            var original = System.Text.Encoding.UTF8.GetBytes(Fixture.ReadText(fixture));
+            byte[] original = System.Text.Encoding.UTF8.GetBytes(Fixture.ReadText(fixture));
 
-            foreach (var (name, body) in Corruptions(original, random))
+            foreach ((string? name, byte[]? body) in Corruptions(original, random))
             {
-                var failure = await ObserveAsync(body).ConfigureAwait(false);
+                string? failure = await ObserveAsync(body).ConfigureAwait(false);
 
                 if (failure is not null)
                 {
@@ -101,7 +101,7 @@ public sealed class MalformedResponseTests
     /// <returns><see langword="null"/> when the contract held.</returns>
     private static async Task<string?> ObserveAsync(byte[] body)
     {
-        using var client = Client(body);
+        using TcgDexClient client = Client(body);
 
         try
         {
@@ -135,13 +135,13 @@ public sealed class MalformedResponseTests
         // Truncation at every tenth of the body. JSON parsers are at their most
         // fragile mid-token, and a socket closing early is the most ordinary
         // real-world corruption there is.
-        for (var i = 1; i < 10; i++)
+        for (int i = 1; i < 10; i++)
         {
-            var cut = original.Length * i / 10;
+            int cut = original.Length * i / 10;
 
             // Array.Copy rather than a range expression: System.Index and
             // System.Range do not exist on net472, which this suite also runs.
-            var truncated = new byte[cut];
+            byte[] truncated = new byte[cut];
             Array.Copy(original, truncated, cut);
 
             yield return ($"truncated at {cut}", truncated);
@@ -149,18 +149,18 @@ public sealed class MalformedResponseTests
 
         // Single-byte flips. Enough of them to hit structural characters as well
         // as string contents.
-        for (var i = 0; i < 40; i++)
+        for (int i = 0; i < 40; i++)
         {
-            var copy = (byte[])original.Clone();
+            byte[] copy = (byte[])original.Clone();
             copy[random.Next(copy.Length)] ^= (byte)(1 << random.Next(8));
             yield return ($"bit flip #{i}", copy);
         }
 
         // Injected structural bytes, which is what turns a valid document into
         // one that is nearly valid — the case a hand-written test never covers.
-        foreach (var injected in new[] { (byte)'{', (byte)'}', (byte)'[', (byte)']', (byte)'"', (byte)0 })
+        foreach (byte injected in new[] { (byte)'{', (byte)'}', (byte)'[', (byte)']', (byte)'"', (byte)0 })
         {
-            var copy = (byte[])original.Clone();
+            byte[] copy = (byte[])original.Clone();
             copy[random.Next(copy.Length)] = injected;
             yield return ($"injected '{(char)injected}'", copy);
         }

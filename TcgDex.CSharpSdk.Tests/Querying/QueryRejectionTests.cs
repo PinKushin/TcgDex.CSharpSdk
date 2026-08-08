@@ -21,7 +21,7 @@ public sealed class QueryRejectionTests
     {
         // `set` is filterable but `set.name` is not — the API has no nested
         // field syntax.
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Set.Name == "Darkness Ablaze"));
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();
@@ -30,7 +30,7 @@ public sealed class QueryRejectionTests
     [Test]
     public void PropertyOfAProperty_IsRejected()
     {
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Name.Length == 6));
 
         exception.Message.ShouldContain("Length");
@@ -39,7 +39,7 @@ public sealed class QueryRejectionTests
     [Test]
     public void UnsupportedStringMethod_IsRejected()
     {
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Name.Trim() == "Furret"));
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();
@@ -48,7 +48,7 @@ public sealed class QueryRejectionTests
     [Test]
     public void OrAcrossDifferentFields_NamesBothFields()
     {
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Name == "Furret" || c.Rarity == "Common"));
 
         exception.Message.ShouldContain("name");
@@ -66,7 +66,7 @@ public sealed class QueryRejectionTests
     public void OrWithMismatchedOperators_NamesBothOperators()
     {
         // `name=eq:a|b` requires both sides to use the same operator.
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Name == "Furret" || c.Name.Contains("Pika")));
 
         exception.Message.ShouldContain("name");
@@ -86,7 +86,7 @@ public sealed class QueryRejectionTests
         // carries: without it a caller learns only that their predicate is
         // unsupported, with no way to discover what would work short of
         // reading the source.
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Name.Length == 5));
 
         exception.Message.ShouldContain("no filter matching");
@@ -97,7 +97,7 @@ public sealed class QueryRejectionTests
     [Test]
     public void ComparisonBetweenTwoConstants_IsRejected()
     {
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => "a" == "b"));
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();
@@ -108,7 +108,7 @@ public sealed class QueryRejectionTests
     {
         // There is no "not greater than" operator; the caller should invert the
         // comparison themselves rather than get a silently wrong filter.
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => !(c.Hp > 100)));
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();
@@ -117,7 +117,7 @@ public sealed class QueryRejectionTests
     [Test]
     public void BooleanMemberWithoutComparison_IsRejected()
     {
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Attacks.Count > 0));
 
         exception.Message.ShouldNotBeNullOrWhiteSpace();
@@ -126,7 +126,7 @@ public sealed class QueryRejectionTests
     [Test]
     public void SortByNestedMember_IsRejected()
     {
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().OrderBy(c => c.Set.Name));
 
         exception.Message.ShouldContain("direct property");
@@ -137,7 +137,7 @@ public sealed class QueryRejectionTests
     {
         // A caller who hits this should be able to fix it without reading the
         // source.
-        var exception = Should.Throw<NotSupportedException>(
+        NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Name.Length == 6));
 
         exception.Message.ShouldContain("Contains");
@@ -157,7 +157,7 @@ public sealed class QueryRejectionTests
     [Test]
     public void CapturedField_IsResolved()
     {
-        var filter = new CapturedValues { Name = "Furret" };
+        CapturedValues filter = new() { Name = "Furret" };
 
         Query().Where(c => c.Name == filter.Name).ToQueryString().ShouldBe("name=eq:Furret");
     }

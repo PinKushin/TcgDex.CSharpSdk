@@ -31,7 +31,7 @@ public sealed class UntrustedInputTests
 
     private static string RequestUriFor(string id)
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
 
         _ = CreateClient(handler).Cards.GetAsync(id, CancellationToken.None).Result;
@@ -52,7 +52,7 @@ public sealed class UntrustedInputTests
     [TestCase("a/b", TestName = "Traversal_PlainSlash")]
     public void HostileId_CannotEscapeTheConfiguredPath(string id)
     {
-        var uri = RequestUriFor(id);
+        string uri = RequestUriFor(id);
 
         // The whole property in one assertion: whatever the id contains, the
         // request still addresses a card below the configured language root.
@@ -69,7 +69,7 @@ public sealed class UntrustedInputTests
         // The dangerous shape: if the id were concatenated rather than escaped,
         // Uri resolution would treat an absolute URL as a replacement and the
         // request would leave for another host entirely.
-        var uri = RequestUriFor("https://evil.example/x");
+        string uri = RequestUriFor("https://evil.example/x");
 
         uri.ShouldStartWith(Base + "cards/");
         uri.ShouldNotContain("evil.example/x");

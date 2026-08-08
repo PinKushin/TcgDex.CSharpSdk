@@ -106,7 +106,7 @@ internal sealed class BoundedLru<TKey, TValue>
     /// <returns><see langword="true"/> when the key was present.</returns>
     internal bool TryGet(TKey key, out TValue value)
     {
-        if (!_entries.TryGetValue(key, out var entry))
+        if (!_entries.TryGetValue(key, out Entry? entry))
         {
             value = default!;
             return false;
@@ -125,7 +125,7 @@ internal sealed class BoundedLru<TKey, TValue>
     /// <param name="value">The value to store.</param>
     internal void Set(TKey key, TValue value)
     {
-        var entry = new Entry(value, Interlocked.Increment(ref _clock));
+        Entry entry = new(value, Interlocked.Increment(ref _clock));
 
         // TryAdd rather than the indexer, because the two cases have to be told
         // apart: replacing an existing value is not growth, and counting it as
@@ -184,14 +184,14 @@ internal sealed class BoundedLru<TKey, TValue>
     /// </remarks>
     private void Evict()
     {
-        var batch = Math.Max(1, _maxEntries / EvictionBatchDivisor);
-        var snapshot = _entries.ToArray();
+        int batch = Math.Max(1, _maxEntries / EvictionBatchDivisor);
+        KeyValuePair<TKey, Entry>[] snapshot = _entries.ToArray();
 
         Array.Sort(snapshot, CompareByLastAccess);
 
-        var evicting = Math.Min(batch, snapshot.Length);
+        int evicting = Math.Min(batch, snapshot.Length);
 
-        for (var i = 0; i < evicting; i++)
+        for (int i = 0; i < evicting; i++)
         {
             _entries.TryRemove(snapshot[i].Key, out _);
         }

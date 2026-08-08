@@ -115,7 +115,7 @@ internal sealed class CountingHandler : HttpMessageHandler
         TimeSpan delay,
         int repeat = 1)
     {
-        for (var i = 0; i < repeat; i++)
+        for (int i = 0; i < repeat; i++)
         {
             _responses.Enqueue(async _ =>
             {
@@ -145,7 +145,7 @@ internal sealed class CountingHandler : HttpMessageHandler
 
     internal CountingHandler Throw(Exception exception, int repeat = 1)
     {
-        for (var i = 0; i < repeat; i++)
+        for (int i = 0; i < repeat; i++)
         {
             _responses.Enqueue(_ => Task.FromException<HttpResponseMessage>(exception));
         }
@@ -162,7 +162,7 @@ internal sealed class CountingHandler : HttpMessageHandler
             Requests.Add(CloneForInspection(request));
         }
 
-        if (!_responses.TryDequeue(out var responder))
+        if (!_responses.TryDequeue(out Func<HttpRequestMessage, Task<HttpResponseMessage>>? responder))
         {
             throw new InvalidOperationException(
                 $"The client made {Requests.Count} request(s) but fewer responses were queued. " +
@@ -178,9 +178,9 @@ internal sealed class CountingHandler : HttpMessageHandler
     /// </summary>
     private static HttpRequestMessage CloneForInspection(HttpRequestMessage request)
     {
-        var clone = new HttpRequestMessage(request.Method, request.RequestUri);
+        HttpRequestMessage clone = new(request.Method, request.RequestUri);
 
-        foreach (var header in request.Headers)
+        foreach (KeyValuePair<string, IEnumerable<string>> header in request.Headers)
         {
             clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
@@ -190,12 +190,12 @@ internal sealed class CountingHandler : HttpMessageHandler
 
     private static HttpResponseMessage Build(HttpStatusCode status, string body, string? etag)
     {
-        var response = new HttpResponseMessage(status)
+        HttpResponseMessage response = new(status)
         {
             Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
         };
 
-        if (etag is { Length: > 0 } && EntityTagHeaderValue.TryParse(etag, out var tag))
+        if (etag is { Length: > 0 } && EntityTagHeaderValue.TryParse(etag, out EntityTagHeaderValue? tag))
         {
             response.Headers.ETag = tag;
         }

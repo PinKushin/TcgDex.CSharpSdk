@@ -13,9 +13,9 @@ public sealed class PricingContractTests
     [Test]
     public void Deserialize_Cardmarket_MapsHyphenatedKeys()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
-        var cardmarket = card.Pricing.ShouldNotBeNull().Cardmarket.ShouldNotBeNull();
+        CardmarketPricing cardmarket = card.Pricing.ShouldNotBeNull().Cardmarket.ShouldNotBeNull();
 
         cardmarket.Unit.ShouldBe("EUR");
         cardmarket.IdProduct.ShouldBe(483559);
@@ -32,14 +32,14 @@ public sealed class PricingContractTests
     [Test]
     public void Deserialize_TcgPlayer_KeysPrintingsByName()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
-        var tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
 
         tcgplayer.Unit.ShouldBe("USD");
         tcgplayer.Printings.Keys.ShouldBe(["normal", "reverse-holofoil"], ignoreOrder: true);
 
-        var normal = tcgplayer["normal"].ShouldNotBeNull();
+        TcgPlayerPrice normal = tcgplayer["normal"].ShouldNotBeNull();
         normal.ProductId.ShouldBe(219333);
         normal.LowPrice.ShouldBe(0.02m);
         normal.MarketPrice.ShouldBe(0.09m);
@@ -51,9 +51,9 @@ public sealed class PricingContractTests
     {
         // Recorded specifically because this card is keyed `holofoil` rather
         // than `normal` — fixed properties would silently drop it.
-        var card = Fixture.Load<Card>("card-pricing-holofoil.json");
+        Card card = Fixture.Load<Card>("card-pricing-holofoil.json");
 
-        var tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
 
         tcgplayer.Printings.Keys.ShouldContain("holofoil");
         tcgplayer["holofoil"].ShouldNotBeNull().MarketPrice.ShouldNotBeNull();
@@ -62,8 +62,8 @@ public sealed class PricingContractTests
     [Test]
     public void Indexer_ForUnknownPrinting_ReturnsNull()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
-        var tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
+        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
 
         tcgplayer["a-printing-that-does-not-exist"].ShouldBeNull();
     }
@@ -71,12 +71,12 @@ public sealed class PricingContractTests
     [Test]
     public void Deserialize_VariantsDetailed_CarriesPerPrintingPricing()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
         card.VariantsDetailed.ShouldNotBeEmpty(
             "variants_detailed maps from a snake_case key and is easy to lose");
 
-        var first = card.VariantsDetailed[0];
+        DetailedVariant first = card.VariantsDetailed[0];
         first.Type.ShouldNotBeNullOrWhiteSpace();
         first.VariantId.ShouldNotBeNullOrWhiteSpace("variantId is REST-only and must not be dropped");
         first.Pricing.ShouldNotBeNull();
@@ -85,9 +85,9 @@ public sealed class PricingContractTests
     [Test]
     public void Deserialize_Variants_MapsAllFlags()
     {
-        var card = Fixture.Load<Card>("card-pokemon-full.json");
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
-        var variants = card.Variants.ShouldNotBeNull();
+        Variants variants = card.Variants.ShouldNotBeNull();
         variants.Normal.ShouldBeTrue();
         variants.Reverse.ShouldBeTrue();
         variants.Holo.ShouldBeFalse();

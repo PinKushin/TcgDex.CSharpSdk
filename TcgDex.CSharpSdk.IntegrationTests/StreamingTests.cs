@@ -12,9 +12,9 @@ public sealed class StreamingTests : LiveApiFixture
     public async Task StreamAsync_ReturnsEveryMatchAcrossPages()
     {
         // A page size below the number of Furrets forces real paging.
-        var streamed = new List<CardBrief>();
+        List<CardBrief> streamed = new();
 
-        await foreach (var card in Client.Cards.StreamAsync(
+        await foreach (CardBrief card in Client.Cards.StreamAsync(
             new CardQuery().Where(c => c.Name == "Furret"), pageSize: 3, Timeout))
         {
             streamed.Add(card);
@@ -25,7 +25,7 @@ public sealed class StreamingTests : LiveApiFixture
 
         // Matches what a single large page returns, so nothing was dropped or
         // duplicated at a page boundary.
-        var single = await Client.Cards.ListAsync(
+        IReadOnlyList<CardBrief> single = await Client.Cards.ListAsync(
             new CardQuery().Where(c => c.Name == "Furret").Page(1, 100), Timeout);
 
         streamed.Select(c => c.Id).OrderBy(id => id)
@@ -36,9 +36,9 @@ public sealed class StreamingTests : LiveApiFixture
     public async Task StreamAsync_StopsEarlyWithoutFetchingEverything()
     {
         // Against a set of 20,000+ cards, taking five must not enumerate them all.
-        var taken = new List<CardBrief>();
+        List<CardBrief> taken = new();
 
-        await foreach (var card in Client.Cards.StreamAsync(new CardQuery(), pageSize: 5, Timeout))
+        await foreach (CardBrief card in Client.Cards.StreamAsync(new CardQuery(), pageSize: 5, Timeout))
         {
             taken.Add(card);
 
@@ -54,9 +54,9 @@ public sealed class StreamingTests : LiveApiFixture
     [Test]
     public async Task StreamAsync_WithNoMatches_CompletesImmediately()
     {
-        var count = 0;
+        int count = 0;
 
-        await foreach (var _ in Client.Cards.StreamAsync(
+        await foreach (CardBrief _ in Client.Cards.StreamAsync(
             new CardQuery().Where(c => c.Name == "NotARealPokemonName"), pageSize: 10, Timeout))
         {
             count++;
@@ -70,13 +70,13 @@ public sealed class StreamingTests : LiveApiFixture
     {
         // The base URL 404s without a quality and extension, so this proves the
         // helper appends what the asset server actually expects.
-        var card = await Client.Cards.GetAsync("swsh3-136", Timeout);
+        Card? card = await Client.Cards.GetAsync("swsh3-136", Timeout);
 
-        var url = card.ShouldNotBeNull().GetImageUrl(ImageQuality.High, ImageFormat.Png);
+        string? url = card.ShouldNotBeNull().GetImageUrl(ImageQuality.High, ImageFormat.Png);
         url.ShouldNotBeNull();
 
-        using var http = new HttpClient();
-        using var response = await http.GetAsync(new Uri(url), Timeout);
+        using HttpClient http = new();
+        using HttpResponseMessage response = await http.GetAsync(new Uri(url), Timeout);
 
         response.IsSuccessStatusCode.ShouldBeTrue($"'{url}' should be a real asset");
         response.Content.Headers.ContentType?.MediaType.ShouldBe("image/png");
@@ -85,20 +85,20 @@ public sealed class StreamingTests : LiveApiFixture
     [Test]
     public async Task ImageUrls_ResolveForEveryFormat()
     {
-        var card = await Client.Cards.GetAsync("swsh3-136", Timeout);
+        Card? card = await Client.Cards.GetAsync("swsh3-136", Timeout);
         card.ShouldNotBeNull();
 
-        using var http = new HttpClient();
+        using HttpClient http = new();
 
-        foreach (var (quality, format) in new[]
+        foreach ((ImageQuality quality, ImageFormat format) in new[]
         {
             (ImageQuality.High, ImageFormat.Png),
             (ImageQuality.Low, ImageFormat.Webp),
         })
         {
-            var url = card.GetImageUrl(quality, format).ShouldNotBeNull();
+            string url = card.GetImageUrl(quality, format).ShouldNotBeNull();
 
-            using var response = await http.GetAsync(new Uri(url), Timeout);
+            using HttpResponseMessage response = await http.GetAsync(new Uri(url), Timeout);
             response.IsSuccessStatusCode.ShouldBeTrue($"'{url}' should resolve");
         }
     }
@@ -106,11 +106,11 @@ public sealed class StreamingTests : LiveApiFixture
     [Test]
     public async Task SetLogoUrl_Resolves()
     {
-        var card = await Client.Cards.GetAsync("swsh3-136", Timeout);
-        var url = card.ShouldNotBeNull().Set.GetLogoUrl().ShouldNotBeNull();
+        Card? card = await Client.Cards.GetAsync("swsh3-136", Timeout);
+        string url = card.ShouldNotBeNull().Set.GetLogoUrl().ShouldNotBeNull();
 
-        using var http = new HttpClient();
-        using var response = await http.GetAsync(new Uri(url), Timeout);
+        using HttpClient http = new();
+        using HttpResponseMessage response = await http.GetAsync(new Uri(url), Timeout);
 
         response.IsSuccessStatusCode.ShouldBeTrue($"'{url}' should be a real asset");
     }
@@ -118,7 +118,7 @@ public sealed class StreamingTests : LiveApiFixture
     [Test]
     public async Task CardWithoutArtwork_YieldsNoUrl()
     {
-        var card = await Client.Cards.GetAsync("exu-!", Timeout);
+        Card? card = await Client.Cards.GetAsync("exu-!", Timeout);
 
         card.ShouldNotBeNull().GetImageUrl().ShouldBeNull();
     }
@@ -127,9 +127,9 @@ public sealed class StreamingTests : LiveApiFixture
     public void CreatedClient_WorksEndToEnd()
     {
         // The non-DI entry point, exercised as a consumer would use it.
-        using var client = TcgDexClient.Create();
+        using TcgDexClient client = TcgDexClient.Create();
 
-        var card = client.Cards.GetAsync("swsh3-136", Timeout).GetAwaiter().GetResult();
+        Card? card = client.Cards.GetAsync("swsh3-136", Timeout).GetAwaiter().GetResult();
 
         card.ShouldNotBeNull().Name.ShouldBe("Furret");
     }
@@ -137,10 +137,10 @@ public sealed class StreamingTests : LiveApiFixture
     [Test]
     public async Task CreatedClientWithCaching_ServesRepeatedReadsLocally()
     {
-        using var client = TcgDexClient.Create(configureCache: _ => { });
+        using TcgDexClient client = TcgDexClient.Create(configureCache: _ => { });
 
-        var first = await client.Cards.GetAsync("swsh3-136", Timeout);
-        var second = await client.Cards.GetAsync("swsh3-136", Timeout);
+        Card? first = await client.Cards.GetAsync("swsh3-136", Timeout);
+        Card? second = await client.Cards.GetAsync("swsh3-136", Timeout);
 
         first.ShouldNotBeNull().Name.ShouldBe("Furret");
         second.ShouldNotBeNull().Name.ShouldBe("Furret");

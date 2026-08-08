@@ -79,11 +79,11 @@ internal static class Program
             return;
         }
 
-        var mode = bytes[0] % ModeCount;
+        int mode = bytes[0] % ModeCount;
 
         // Copied because the span does not outlive the callback and the request
         // is served asynchronously.
-        var payload = bytes.Slice(1).ToArray();
+        byte[] payload = bytes.Slice(1).ToArray();
 
         try
         {
@@ -113,8 +113,8 @@ internal static class Program
     /// <param name="payload">The fuzzer's bytes, used as the response body.</param>
     private static void Run<T>(Func<TcgDexClient, Task<T>> call, byte[] payload)
     {
-        using var http = new HttpClient(new FuzzHandler(payload, HttpStatusCode.OK));
-        using var client = new TcgDexClient(http, Options());
+        using HttpClient http = new(new FuzzHandler(payload, HttpStatusCode.OK));
+        using TcgDexClient client = new(http, Options());
 
         call(client).GetAwaiter().GetResult();
     }
@@ -132,8 +132,8 @@ internal static class Program
     /// </remarks>
     private static void ProblemDetails(byte[] payload)
     {
-        using var http = new HttpClient(new FuzzHandler(payload, HttpStatusCode.BadRequest));
-        using var client = new TcgDexClient(http, Options());
+        using HttpClient http = new(new FuzzHandler(payload, HttpStatusCode.BadRequest));
+        using TcgDexClient client = new(http, Options());
 
         client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult();
     }
@@ -142,8 +142,8 @@ internal static class Program
     /// <param name="payload">The fuzzer's bytes, used as the GraphQL response.</param>
     private static void GraphQl(byte[] payload)
     {
-        using var http = new HttpClient(new FuzzHandler(payload, HttpStatusCode.OK));
-        using var client = new TcgDexClient(http, Options());
+        using HttpClient http = new(new FuzzHandler(payload, HttpStatusCode.OK));
+        using TcgDexClient client = new(http, Options());
 
         client.Cards
             .SearchDetailedAsync(
@@ -173,8 +173,8 @@ internal static class Program
     /// </remarks>
     private static void QueryBuilding(byte[] payload)
     {
-        var value = System.Text.Encoding.UTF8.GetString(payload);
-        var query = new CardQuery().Where(c => c.Name == value).ToQueryString();
+        string value = System.Text.Encoding.UTF8.GetString(payload);
+        string query = new CardQuery().Where(c => c.Name == value).ToQueryString();
 
         if (query.Length == 0)
         {

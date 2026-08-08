@@ -81,7 +81,7 @@ public class TcgDexCacheOptions
     {
         Guard.NotNull(requestUri);
 
-        var path = requestUri.AbsolutePath;
+        string path = requestUri.AbsolutePath;
 
         if (IsCatalogPath(path))
         {
@@ -103,7 +103,7 @@ public class TcgDexCacheOptions
     /// </remarks>
     private static bool IsCatalogPath(string path)
     {
-        foreach (var endpoint in CatalogEndpoints)
+        foreach (string endpoint in CatalogEndpoints)
         {
             if (path.EndsWith(endpoint, StringComparison.OrdinalIgnoreCase))
             {
@@ -119,7 +119,7 @@ public class TcgDexCacheOptions
     /// </summary>
     private static bool IsSingleCardPath(string path)
     {
-        var cards = path.IndexOf("/cards/", StringComparison.OrdinalIgnoreCase);
+        int cards = path.IndexOf("/cards/", StringComparison.OrdinalIgnoreCase);
 
         return cards >= 0 && path.Length > cards + "/cards/".Length;
     }

@@ -156,7 +156,7 @@ mutable is shared.
 The handler counts what it did:
 
 ```csharp
-var handler = new TcgDexCachingHandler(new MemoryTcgDexResponseCache());
+TcgDexCachingHandler handler = new(new MemoryTcgDexResponseCache());
 
 handler.FreshHits;      // served with no network at all
 handler.Revalidations;  // refreshed by a 304, no body transferred
@@ -166,13 +166,13 @@ handler.Misses;         // full responses fetched
 ## Without a container
 
 ```csharp
-var caching = new TcgDexCachingHandler(new MemoryTcgDexResponseCache())
+TcgDexCachingHandler caching = new(new MemoryTcgDexResponseCache())
 {
     InnerHandler = new HttpClientHandler(),
 };
 
-using var http = new HttpClient(caching);
-var tcgdex = new TcgDexClient(http, new TcgDexOptions());
+using HttpClient http = new(caching);
+TcgDexClient tcgdex = new(http, new TcgDexOptions());
 ```
 
 ## A note on what caching cannot speed up

@@ -46,7 +46,7 @@ public sealed class PublicApiTests
     [Test]
     public void ThePublicSurface_MatchesTheApprovedBaseline()
     {
-        var actual = typeof(TcgDexClient).Assembly.GeneratePublicApi(new ApiGeneratorOptions
+        string actual = typeof(TcgDexClient).Assembly.GeneratePublicApi(new ApiGeneratorOptions
         {
             // The generated header carries the assembly version, which changes
             // on every version bump and would make the baseline churn for a
@@ -54,7 +54,7 @@ public sealed class PublicApiTests
             IncludeAssemblyAttributes = false,
         });
 
-        var baselinePath = Path.Combine(SourceDirectory(), BaselineFileName);
+        string baselinePath = Path.Combine(SourceDirectory(), BaselineFileName);
 
         if (!File.Exists(baselinePath))
         {
@@ -66,7 +66,7 @@ public sealed class PublicApiTests
                 "accepted without being read proves nothing.");
         }
 
-        var approved = File.ReadAllText(baselinePath);
+        string approved = File.ReadAllText(baselinePath);
 
         if (string.Equals(Normalise(approved), Normalise(actual), StringComparison.Ordinal))
         {
@@ -75,7 +75,7 @@ public sealed class PublicApiTests
 
         // Written beside the baseline so the diff can be inspected with ordinary
         // tools rather than read out of an assertion message.
-        var receivedPath = Path.Combine(SourceDirectory(), "PublicApi.received.cs");
+        string receivedPath = Path.Combine(SourceDirectory(), "PublicApi.received.cs");
         File.WriteAllText(receivedPath, actual);
 
         Assert.Fail(
@@ -103,10 +103,10 @@ public sealed class PublicApiTests
     /// <returns>A description of where the two first diverge.</returns>
     private static string FirstDifference(string approved, string actual)
     {
-        var expectedLines = Normalise(approved).Split('\n');
-        var actualLines = Normalise(actual).Split('\n');
+        string[] expectedLines = Normalise(approved).Split('\n');
+        string[] actualLines = Normalise(actual).Split('\n');
 
-        for (var i = 0; i < Math.Min(expectedLines.Length, actualLines.Length); i++)
+        for (int i = 0; i < Math.Min(expectedLines.Length, actualLines.Length); i++)
         {
             if (!string.Equals(expectedLines[i], actualLines[i], StringComparison.Ordinal))
             {

@@ -31,7 +31,7 @@ Verified with an isolated probe against .NET 10.0.302 — all three cases produc
 This is not specific to `required`, and not specific to omitted properties.
 
 **Why it matters here:** most `Card` fields are category-specific. A Trainer card
-has no `attacks` key at all, so `foreach (var a in card.Attacks)` on any Trainer
+has no `attacks` key at all, so `foreach (Attack a in card.Attacks)` on any Trainer
 would have thrown. The contract test
 `Deserialize_TrainerCard_MapsTrainerTypeAndEffect` caught it.
 

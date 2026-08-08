@@ -27,7 +27,7 @@ public sealed class ResourceCoverageTests
         Func<ITcgDexClient, CancellationToken, Task> call,
         string responseFixture = "list-categories.json")
     {
-        var handler = new RecordingHandler().RespondWithJsonFile(HttpStatusCode.OK, responseFixture);
+        RecordingHandler handler = new RecordingHandler().RespondWithJsonFile(HttpStatusCode.OK, responseFixture);
 
         await call(CreateClient(handler), CancellationToken.None);
 
@@ -101,7 +101,7 @@ public sealed class ResourceCoverageTests
     [Test]
     public async Task Sets_GetAsync_WhenMissing_ReturnsNull()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.NotFound, "error-not-found.json");
 
         (await CreateClient(handler).Sets.GetAsync("nope", CancellationToken.None)).ShouldBeNull();
@@ -110,7 +110,7 @@ public sealed class ResourceCoverageTests
     [Test]
     public async Task Series_GetAsync_WhenMissing_ReturnsNull()
     {
-        var handler = new RecordingHandler()
+        RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.NotFound, "error-not-found.json");
 
         (await CreateClient(handler).Series.GetAsync("nope", CancellationToken.None)).ShouldBeNull();
@@ -121,7 +121,7 @@ public sealed class ResourceCoverageTests
     [Test]
     public void Options_WithRelativeBaseAddress_AreRejected()
     {
-        var options = new TcgDexOptions { BaseAddress = new Uri("/v2/", UriKind.Relative) };
+        TcgDexOptions options = new() { BaseAddress = new Uri("/v2/", UriKind.Relative) };
 
         Should.Throw<ArgumentException>(options.Validate)
             .Message.ShouldContain("absolute");
@@ -132,7 +132,7 @@ public sealed class ResourceCoverageTests
     {
         // GraphQL sits outside the language segment, so it is configured
         // independently rather than derived from BaseAddress.
-        var options = new TcgDexOptions();
+        TcgDexOptions options = new();
 
         options.GraphQlEndpoint.ToString().ShouldNotContain("/en/");
         options.GraphQlEndpoint.ToString().ShouldEndWith("/graphql");
@@ -148,13 +148,13 @@ public sealed class ResourceCoverageTests
         // Asserted by looking for the escaped two-character sequence inside the
         // filter argument — the document as a whole legitimately contains
         // newlines, because the field selection spans several lines.
-        var handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, """{"data":{"cards":[]}}""");
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, """{"data":{"cards":[]}}""");
 
         await CreateClient(handler).Cards.SearchDetailedAsync(
             new CardFilter { Illustrator = value }, cancellationToken: CancellationToken.None);
 
-        using var document = JsonDocument.Parse(handler.SingleRequestBody);
-        var query = document.RootElement.GetProperty("query").GetString()!;
+        using JsonDocument document = JsonDocument.Parse(handler.SingleRequestBody);
+        string query = document.RootElement.GetProperty("query").GetString()!;
 
         query.ShouldContain(expectedEscaped);
     }
@@ -168,7 +168,7 @@ public sealed class ResourceCoverageTests
     [Test]
     public void ApiException_DefaultConstructor_HasNoStatus()
     {
-        var exception = new TcgDexApiException();
+        TcgDexApiException exception = new();
 
         exception.StatusCode.ShouldBeNull();
         exception.Problem.ShouldBeNull();
@@ -182,9 +182,9 @@ public sealed class ResourceCoverageTests
     [Test]
     public void ApiException_WithInnerException_KeepsBoth()
     {
-        var inner = new InvalidOperationException("cause");
+        InvalidOperationException inner = new("cause");
 
-        var exception = new TcgDexApiException("outer", inner);
+        TcgDexApiException exception = new("outer", inner);
 
         exception.Message.ShouldBe("outer");
         exception.InnerException.ShouldBeSameAs(inner);

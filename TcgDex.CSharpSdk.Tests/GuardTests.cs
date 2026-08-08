@@ -28,7 +28,7 @@ public sealed class GuardTests
     {
         object? value = null;
 
-        var exception = Should.Throw<ArgumentNullException>(() => Guard.NotNull(value));
+        ArgumentNullException exception = Should.Throw<ArgumentNullException>(() => Guard.NotNull(value));
 
         // The name comes from CallerArgumentExpression, so it is the caller's
         // own expression text rather than the parameter name inside Guard.
@@ -46,7 +46,7 @@ public sealed class GuardTests
     {
         string? value = null;
 
-        var exception = Should.Throw<ArgumentNullException>(() => Guard.NotNullOrWhiteSpace(value));
+        ArgumentNullException exception = Should.Throw<ArgumentNullException>(() => Guard.NotNullOrWhiteSpace(value));
 
         exception.ParamName.ShouldBe("value");
     }
@@ -56,7 +56,7 @@ public sealed class GuardTests
     [TestCase("\t")]
     public void NotNullOrWhiteSpace_WithBlank_ThrowsArgumentExceptionExplainingWhy(string value)
     {
-        var exception = Should.Throw<ArgumentException>(() => Guard.NotNullOrWhiteSpace(value));
+        ArgumentException exception = Should.Throw<ArgumentException>(() => Guard.NotNullOrWhiteSpace(value));
 
         // Not ArgumentNullException: the value is present, just useless. And
         // the message has to say which of the two happened, or the caller
@@ -77,7 +77,7 @@ public sealed class GuardTests
     [TestCase(int.MinValue)]
     public void NotLessThan_BelowTheMinimum_ThrowsStatingTheMinimum(int value)
     {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(() => Guard.NotLessThan(value, 1));
+        ArgumentOutOfRangeException exception = Should.Throw<ArgumentOutOfRangeException>(() => Guard.NotLessThan(value, 1));
 
         exception.ParamName.ShouldBe("value");
         exception.ActualValue.ShouldBe(value);
