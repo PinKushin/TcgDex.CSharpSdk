@@ -63,7 +63,12 @@ public sealed class CardShapeTests : LiveApiFixture
         Card? card = await Client.Cards.GetAsync("A4-139", Timeout);
 
         Booster booster = card.ShouldNotBeNull().Boosters.ShouldHaveSingleItem();
-        booster.Id.ShouldNotBeNullOrWhiteSpace();
+
+        // Named, because the failure this guards against is the array binding
+        // while its objects come back blank — which "not blank" on one field
+        // would catch, but only by accident of which field was checked.
+        booster.Id.ShouldBe("boo_A4-ho-oh");
+        booster.Name.ShouldBe("Ho-Oh");
     }
 
     [Test]
@@ -84,7 +89,11 @@ public sealed class CardShapeTests : LiveApiFixture
         Card? card = await Client.Cards.GetAsync("xy1-1", Timeout);
 
         Attack damaged = card.ShouldNotBeNull().Attacks.First(a => a.Damage is not null);
-        damaged.BaseDamage.ShouldNotBeNull();
+
+        // The text is the point of the test name and was never asserted.
+        // Printed damage does not change, so 60 is safe to pin.
+        damaged.Damage.ShouldBe("60");
+        damaged.BaseDamage.ShouldBe(60);
     }
 
     [Test]

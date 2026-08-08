@@ -224,7 +224,12 @@ public sealed class LoggingTests
 
         TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
 
-        (await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).ShouldNotBeNull();
+        // Named, not merely non-null: the risk with no logger is a null factory
+        // reaching the logging call and throwing, and a card that deserialized
+        // to the right name proves the whole path ran rather than that some
+        // object came back.
+        (await client.Cards.GetAsync("swsh3-136", CancellationToken.None))
+            .ShouldNotBeNull().Name.ShouldBe("Furret");
     }
 
     [Test]

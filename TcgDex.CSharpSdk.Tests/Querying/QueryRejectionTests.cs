@@ -24,7 +24,10 @@ public sealed class QueryRejectionTests
         NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Set.Name == "Darkness Ablaze"));
 
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+        // Naming the nested access is the whole value of the message: `set` on
+        // its own is filterable, so "unsupported" without saying which part
+        // would look like a contradiction.
+        exception.Message.ShouldContain("c.Set.Name");
     }
 
     [Test]
@@ -42,7 +45,9 @@ public sealed class QueryRejectionTests
         NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Name.Trim() == "Furret"));
 
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+        // `Trim` is one identifier away from `Contains`, which is supported, so
+        // the message has to name the method that was actually rejected.
+        exception.Message.ShouldContain("c.Name.Trim()");
     }
 
     [Test]
@@ -100,7 +105,13 @@ public sealed class QueryRejectionTests
         NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => "a" == "b"));
 
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+        // The message says 'False', not '"a" == "b"' — Roslyn folds a constant
+        // comparison before the expression tree is ever built, so the translator
+        // never sees a comparison at all. Asserting the folded value is what
+        // makes this test honest about the shape it actually rejects; predicting
+        // the source text would fail and send someone hunting in the translator
+        // for a bug that lives in the compiler's constant folding.
+        exception.Message.ShouldContain("'False'");
     }
 
     [Test]
@@ -111,7 +122,10 @@ public sealed class QueryRejectionTests
         NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => !(c.Hp > 100)));
 
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+        // The inner comparison is what gets named, not the negation — `Hp` is
+        // `int?`, so the tree carries a Convert around the constant and
+        // asserting the full rendering would pin a compiler detail.
+        exception.Message.ShouldContain("c.Hp >");
     }
 
     [Test]
@@ -120,7 +134,7 @@ public sealed class QueryRejectionTests
         NotSupportedException exception = Should.Throw<NotSupportedException>(
             () => Query().Where(c => c.Attacks.Count > 0));
 
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+        exception.Message.ShouldContain("c.Attacks.Count > 0");
     }
 
     [Test]

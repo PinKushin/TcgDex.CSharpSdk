@@ -73,13 +73,21 @@ public sealed class PricingContractTests
     {
         Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
-        card.VariantsDetailed.ShouldNotBeEmpty(
-            "variants_detailed maps from a snake_case key and is easy to lose");
+        // Counted and named. "Not empty" would have been satisfied by one
+        // entry with every field null, which is exactly what a broken
+        // snake_case mapping produces — the array binds, the contents do not.
+        card.VariantsDetailed.Count.ShouldBe(
+            2,
+            "swsh3-136 is printed in a normal and a reverse variant");
 
         DetailedVariant first = card.VariantsDetailed[0];
-        first.Type.ShouldNotBeNullOrWhiteSpace();
-        first.VariantId.ShouldNotBeNullOrWhiteSpace("variantId is REST-only and must not be dropped");
-        first.Pricing.ShouldNotBeNull();
+        first.Type.ShouldBe("normal");
+        first.Size.ShouldBe("standard");
+        first.VariantId.ShouldBe("endfynwn4n10gzq", "variantId is REST-only and must not be dropped");
+
+        // Reaching a leaf value proves the nested pricing really deserialized,
+        // rather than an empty object having been constructed.
+        first.Pricing.ShouldNotBeNull().Cardmarket.ShouldNotBeNull().Unit.ShouldBe("EUR");
     }
 
     [Test]

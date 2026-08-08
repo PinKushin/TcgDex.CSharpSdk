@@ -225,11 +225,15 @@ public sealed class CardContractTests
         // Attacks throws NullReferenceException.
         Card trainer = Fixture.Load<Card>("card-trainer.json");
 
-        trainer.Attacks.ShouldNotBeNull();
-        trainer.Abilities.ShouldNotBeNull();
-        trainer.Weaknesses.ShouldNotBeNull();
-        trainer.Resistances.ShouldNotBeNull();
-        trainer.Types.ShouldNotBeNull();
+        // Empty, which is what the test name claims and what it did not check.
+        // Every assertion here was ShouldNotBeNull, so a guard that returned a
+        // one-element list of nulls — or any non-empty collection — would have
+        // passed a test called AreEmptyNotNull.
+        trainer.Attacks.ShouldBeEmpty();
+        trainer.Abilities.ShouldBeEmpty();
+        trainer.Weaknesses.ShouldBeEmpty();
+        trainer.Resistances.ShouldBeEmpty();
+        trainer.Types.ShouldBeEmpty();
         trainer.DexId.ShouldNotBeNull();
         trainer.Boosters.ShouldNotBeNull();
     }

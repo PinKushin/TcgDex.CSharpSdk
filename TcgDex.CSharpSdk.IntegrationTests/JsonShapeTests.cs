@@ -104,7 +104,14 @@ public sealed class JsonShapeTests
             JsonShape.Describe("""{"id":"x","pricing":{"avg":1}}"""));
 
         breaking.ShouldBeEmpty();
-        additive.ShouldNotBeEmpty("a field the API started serving is the drift worth knowing about");
+
+        // Both the container and its child, named and typed. This was
+        // `ShouldNotBeEmpty()` on the first pass, which would have been happy
+        // with one entry, the wrong path, or the wrong kind — it detected that
+        // *something* was reported without checking that the report was usable.
+        additive.ShouldBe(
+            ["added: 'pricing' (Object)", "added: 'pricing.avg' (Number)"],
+            ignoreOrder: true);
     }
 
     [Test]
