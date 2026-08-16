@@ -41,6 +41,54 @@ WORKDIR="${TCGDEX_DIR:-$HOME/tcgdex}"
 # not a stuck lock, it is NO lock.
 LOCK="/tmp/measurement-box.lock"
 
+# The corpus is shared with the GitHub runner through a release asset. Reading is
+# unauthenticated because the repo is public; writing needs the token below.
+GH_REPO="PinKushin/TcgDex.CSharpSdk"
+CORPUS_TAG="fuzz-corpus"
+SHARED_CORPUS_URL="https://github.com/${GH_REPO}/releases/download/${CORPUS_TAG}/corpus.tar.zst"
+TOKEN_FILE="${HOME}/.tcgdex-gh-token"
+
+# Pack a corpus directory and replace the release asset with it.
+#
+# The upload endpoint REFUSES a duplicate asset name rather than replacing it, so
+# the old one is deleted first. Every step's HTTP status is checked: a failed
+# publish that looked like a success would leave both machines quietly diverging,
+# which is the whole problem this is meant to solve.
+publish_corpus() {
+  local dir="$1" id old code cfg
+  # The token goes in a curl config file rather than on the command line: an
+  # argument is visible in `ps` to every process on the box, and several projects
+  # share this machine as the same user. Trap-cleaned so a failure cannot leave it.
+  cfg=$(mktemp)
+  chmod 600 "$cfg"
+  trap 'rm -f "$cfg"' RETURN
+  printf 'header = "Authorization: Bearer %s"\n' "$(cat "$TOKEN_FILE")" > "$cfg"
+  local auth=(--config "$cfg" -H "Accept: application/vnd.github+json")
+
+  tar -C "$dir" -cf - . | zstd -19 -T0 -q -o /tmp/corpus-publish.tar.zst -f
+
+  id=$(curl -fsS "${auth[@]}" \
+    "https://api.github.com/repos/${GH_REPO}/releases/tags/${CORPUS_TAG}" | jq -r '.id // empty')
+  [ -n "$id" ] || { echo "    publish: release ${CORPUS_TAG} not found" >&2; return 1; }
+
+  old=$(curl -fsS "${auth[@]}" \
+    "https://api.github.com/repos/${GH_REPO}/releases/${id}/assets" \
+    | jq -r '.[]|select(.name=="corpus.tar.zst")|.id')
+  [ -n "$old" ] && curl -fsS -X DELETE "${auth[@]}" \
+    "https://api.github.com/repos/${GH_REPO}/releases/assets/${old}" >/dev/null
+
+  code=$(curl -s -o /tmp/corpus-publish.json -w '%{http_code}' -X POST "${auth[@]}" \
+    -H "Content-Type: application/zstd" --data-binary @/tmp/corpus-publish.tar.zst \
+    "https://uploads.github.com/repos/${GH_REPO}/releases/${id}/assets?name=corpus.tar.zst")
+  rm -f /tmp/corpus-publish.tar.zst
+
+  if [ "$code" != "201" ]; then
+    echo "    publish: HTTP ${code} -- $(jq -r '.message // "no message"' /tmp/corpus-publish.json)" >&2
+    return 1
+  fi
+  echo "    published $(ls "$dir" | wc -l) inputs to the ${CORPUS_TAG} release"
+}
+
 MODE="${1:-}"
 shift || true
 
@@ -114,6 +162,36 @@ case "$MODE" in
       done
     done
 
+    # Pull whatever the CI runner has found and fold it in.
+    #
+    # The corpus is shared between this box and the GitHub runner through a
+    # release asset, because there is no filesystem between them and an Actions
+    # cache cannot be read from outside a runner. Reading needs no credential --
+    # the repo is public.
+    #
+    # The point is not speed. Both sides run the SAME inputs against DIFFERENT
+    # architectures: this box is ARM64, the runner is x64. An input discovered on
+    # one is currently never executed on the other, so a fault that only shows on
+    # one architecture is unreachable from the machine that found the input.
+    # Pooling is what makes it reachable.
+    #
+    # A fetch failure is not fatal. The local corpus and the seeds above still
+    # make the run useful; it just starts further back.
+    echo "==> fetching the shared corpus"
+    if curl -fsSL -o /tmp/shared-corpus.tar.zst "$SHARED_CORPUS_URL"; then
+      rm -rf /tmp/shared-corpus && mkdir -p /tmp/shared-corpus
+      if tar -C /tmp/shared-corpus -xf /tmp/shared-corpus.tar.zst 2>/dev/null; then
+        before=$(ls "$CORPUS" | wc -l)
+        cp -n /tmp/shared-corpus/* "$CORPUS/" 2>/dev/null || true
+        echo "    merged: ${before} -> $(ls "$CORPUS" | wc -l) inputs"
+      else
+        echo "    WARNING: the asset did not unpack; continuing with the local corpus" >&2
+      fi
+      rm -rf /tmp/shared-corpus /tmp/shared-corpus.tar.zst
+    else
+      echo "    none published yet, or fetch failed; continuing with the local corpus"
+    fi
+
     # PROVE THE INSTRUMENT BEFORE TRUSTING THE MEASUREMENT.
     #
     # `-artifact_prefix` writes NOTHING through libfuzzer-dotnet: a managed exception
@@ -184,6 +262,20 @@ case "$MODE" in
       rm -rf "$CORPUS" && mv "$MIN" "$CORPUS"
     fi
     echo "corpus ${before} -> $(ls "$CORPUS" | wc -l)"
+
+    # Publish the minimised result back, so the runner starts from what this box
+    # learned. Only after a clean run: the escape check above exits before here,
+    # so a crashing run cannot overwrite the shared corpus with a partial one.
+    #
+    # Writing needs a credential, unlike reading. A fine-grained token scoped to
+    # this repo with Contents:write lives at $TOKEN_FILE, 0600. Absent, the run
+    # still succeeds and simply does not publish -- the box keeps its own corpus
+    # and nothing is lost.
+    if [ -r "$TOKEN_FILE" ]; then
+      publish_corpus "$CORPUS" || echo "    WARNING: publish failed; the local corpus is unaffected" >&2
+    else
+      echo "    no token at $TOKEN_FILE; not publishing"
+    fi
     ;;
 
   stryker)
