@@ -67,6 +67,18 @@ internal static class Program
     /// <summary>How many modes the first byte selects between.</summary>
     private const int ModeCount = 7;
 
+    /// <summary>Where an escaping input is preserved. Matches the workflow's upload path.</summary>
+    private const string FindingsDirectory = "findings";
+
+    /// <summary>
+    /// Set to make every input throw, so a run can prove it is capable of
+    /// recording a finding at all.
+    /// </summary>
+    private const string SelfTestVariable = "TCGDEX_FUZZ_SELFTEST";
+
+    private static readonly bool SelfTest =
+        !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(SelfTestVariable));
+
     private static void Main() => Fuzzer.LibFuzzer.Run(Consume);
 
     private static void Consume(ReadOnlySpan<byte> bytes)
@@ -87,6 +99,13 @@ internal static class Program
 
         try
         {
+            if (SelfTest)
+            {
+                throw new InvalidOperationException(
+                    $"{SelfTestVariable} is set, so every input throws. This is the gate that " +
+                    "proves a finding can be recorded; it must never fire in a real run.");
+            }
+
             switch (mode)
             {
                 case 0: Run(c => c.Cards.GetAsync("swsh3-136", CancellationToken.None), payload); break;
@@ -105,6 +124,71 @@ internal static class Program
             // so catching broadly here would make this a program that proves
             // nothing.
         }
+        catch (Exception) when (Preserve(mode, payload))
+        {
+            // Unreachable: Preserve always returns false, so the filter declines
+            // to handle and the exception carries on with its stack intact.
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Writes the offending input to <see cref="FindingsDirectory"/> and always
+    /// returns <see langword="false"/> so the exception keeps propagating.
+    /// </summary>
+    /// <param name="mode">The mode byte, restored so the file replays exactly.</param>
+    /// <param name="payload">The rest of the input.</param>
+    /// <returns>Always <see langword="false"/>.</returns>
+    /// <remarks>
+    /// <para>
+    /// <b>Why the harness saves its own input rather than trusting
+    /// <c>-artifact_prefix</c>.</b> On a managed exception SharpFuzz aborts the
+    /// .NET child; the bridge process dies with it, and libFuzzer's crash
+    /// handler never runs. No <c>crash-*</c> file is written and no "Test unit
+    /// written to" line appears — while the exception prints in full. The run
+    /// therefore <em>reports</em> the defect and <em>loses</em> the input, which
+    /// is the worst possible split: you know something broke and cannot replay
+    /// it.
+    /// </para>
+    /// <para>
+    /// The corpus is not a fallback either. libFuzzer only keeps inputs that
+    /// increase coverage, so a crashing input is usually never in it.
+    /// </para>
+    /// <para>
+    /// <b>Why an exception filter rather than a catch.</b> A filter runs during
+    /// the first pass, while the exception is still propagating and before any
+    /// stack unwinding. Returning <see langword="false"/> means this frame never
+    /// handles it, so the stack trace that reaches libFuzzer is the original
+    /// one — the other half of a finding.
+    /// </para>
+    /// </remarks>
+    private static bool Preserve(int mode, byte[] payload)
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(FindingsDirectory);
+
+            byte[] input = new byte[payload.Length + 1];
+            input[0] = (byte)mode;
+            payload.CopyTo(input, 1);
+
+            // Named by content hash so the same input twice is one file, and so
+            // a name can never collide across concurrent workers.
+            string name = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(input))[..16];
+
+            System.IO.File.WriteAllBytes(
+                System.IO.Path.Combine(FindingsDirectory, $"escaped-m{mode}-{name}.bin"),
+                input);
+        }
+        catch (System.IO.IOException error)
+        {
+            // Losing the input is bad; losing the *finding* by throwing from a
+            // filter would be worse, because it would replace the real exception
+            // with this one. Report and let the original carry on.
+            Console.Error.WriteLine($"could not preserve the failing input: {error.Message}");
+        }
+
+        return false;
     }
 
     /// <summary>Serves <paramref name="payload"/> as a 200 and runs one call.</summary>

@@ -112,6 +112,57 @@ jobs:
           done
           echo "restored $restored from cache, now $(ls corpus | wc -l) inputs"
 
+      # An empty findings directory and a harness that has lost the ability to
+      # record one look identical, so this proves the instrument before the
+      # measurement is trusted.
+      #
+      # It is not theatre. On a managed exception SharpFuzz aborts the .NET
+      # child and libFuzzer's crash handler never runs, so `-artifact_prefix`
+      # writes nothing while the exception prints in full — the run reports the
+      # defect and loses the input. The harness therefore saves the input
+      # itself, and this step is what checks that it still does.
+      #
+      # Both directions are required. The positive run must produce a file, and
+      # the control must produce none — without the control, a step that wrote
+      # a file unconditionally would pass.
+      - name: Prove the harness can record a finding
+        run: |
+          rm -rf selftest-findings && mkdir -p selftest-findings
+          printf '\000{}' > selftest-input.bin
+
+          # Positive: every input throws, so one execution must leave a file.
+          ( cd selftest-findings && TCGDEX_FUZZ_SELFTEST=1 \
+            ../libfuzzer-dotnet \
+              --target_path=../fuzz-out/TcgDex.CSharpSdk.Fuzz \
+              -runs=1 ../selftest-input.bin ) || true
+
+          found=$(find selftest-findings/findings -type f 2>/dev/null | wc -l)
+
+          if [ "$found" -eq 0 ]; then
+            echo "::error::The fuzz harness did not record a finding when every input throws."
+            echo "A clean weekly run would therefore be meaningless: no crash could be reported."
+            exit 1
+          fi
+
+          echo "selftest wrote $found finding(s)"
+
+          # Control: same input, flag unset, must write nothing.
+          rm -rf control-findings && mkdir -p control-findings
+          ( cd control-findings && ../libfuzzer-dotnet \
+              --target_path=../fuzz-out/TcgDex.CSharpSdk.Fuzz \
+              -runs=1 ../selftest-input.bin ) || true
+
+          leaked=$(find control-findings/findings -type f 2>/dev/null | wc -l)
+
+          if [ "$leaked" -ne 0 ]; then
+            echo "::error::The control run wrote $leaked file(s) with $TCGDEX_FUZZ_SELFTEST unset."
+            echo "The file seen above is then not evidence the harness works."
+            exit 1
+          fi
+
+          echo "control wrote 0 findings, as required"
+          rm -rf selftest-findings control-findings selftest-input.bin
+
       - name: Fuzz
         env:
           BUDGET: ${{ github.event.inputs.seconds || '300' }}
@@ -122,6 +173,21 @@ jobs:
             -artifact_prefix=findings/ \
             -print_final_stats=1 \
             corpus
+
+      # The harness writes escaped inputs itself, so a finding can exist even
+      # when libFuzzer reported success and the step above exited zero. Checked
+      # explicitly rather than left to the artifact upload, where nobody looks.
+      - name: Fail if anything escaped
+        run: |
+          escaped=$(find findings -type f 2>/dev/null | wc -l)
+
+          if [ "$escaped" -ne 0 ]; then
+            echo "::error::$escaped input(s) escaped the documented outcome. See the fuzz-findings artifact."
+            find findings -type f -printf '  %f  %s bytes\n'
+            exit 1
+          fi
+
+          echo "no inputs escaped"
 
       # Without this the cached corpus grows every week and each run spends more
       # of its budget loading inputs than mutating them. -merge=1 keeps the
