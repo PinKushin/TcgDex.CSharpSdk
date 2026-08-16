@@ -164,8 +164,22 @@ jobs:
           rm -rf selftest-findings control-findings selftest-input.bin
 
       - name: Fuzz
+        # The fallback applies ONLY to scheduled runs. A workflow_dispatch always
+        # populates inputs.seconds from its declared default, so a manual run
+        # takes 300 unless told otherwise, while `schedule` leaves inputs null
+        # and lands here.
+        #
+        # An hour, because the target is not exhausted at fifteen minutes.
+        # Measured on the fuzz box, same corpus, same harness:
+        #
+        #   301s  ->  2,774,637 execs, cov 8,  ft 4220
+        #   901s  ->  8,490,851 execs, cov 10, ft 4517
+        #
+        # Both counters still climbing, so a short budget was leaving findings
+        # unfound. This repo is public, so Actions minutes are free and the only
+        # real ceiling is the 6-hour job limit.
         env:
-          BUDGET: ${{ github.event.inputs.seconds || '300' }}
+          BUDGET: ${{ github.event.inputs.seconds || '3600' }}
         run: |
           ./libfuzzer-dotnet \
             --target_path=fuzz-out/TcgDex.CSharpSdk.Fuzz \
