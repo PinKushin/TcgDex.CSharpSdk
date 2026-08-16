@@ -22,7 +22,10 @@ on:
         default: "300"
 
 permissions:
-  contents: read
+  # write, because the minimised corpus is published to the `fuzz-corpus`
+  # release so the Oracle fuzz box can start from what this run found. Release
+  # assets live under Contents.
+  contents: write
 
 env:
   DOTNET_NOLOGO: true
@@ -97,6 +100,35 @@ jobs:
       # 3,085 and reached 3,990. Proper seeding begins above where the other run
       # ended.
       #
+      # Fold in whatever the Oracle fuzz box has found.
+      #
+      # The two machines share a corpus through this release asset, because there
+      # is no filesystem between them and an Actions cache cannot be read from
+      # outside a runner.
+      #
+      # The point is not speed. Both sides run the same inputs against DIFFERENT
+      # architectures — this runner is x64, the box is ARM64. An input discovered
+      # on one is otherwise never executed on the other, so a fault that only
+      # manifests on one architecture is unreachable from the machine that found
+      # the input. Pooling is what makes it reachable.
+      #
+      # Failure is not fatal: the cache and the seeds below still make the run
+      # useful, it just starts further back. `|| true` on a 404 is deliberate —
+      # the first ever run has nothing to fetch.
+      - name: Fold in the shared corpus
+        run: |
+          mkdir -p corpus
+          before=$(ls corpus | wc -l)
+          if curl -fsSL -o shared.tar.zst \
+              "https://github.com/${{ github.repository }}/releases/download/fuzz-corpus/corpus.tar.zst"; then
+            mkdir -p shared && tar -C shared -xf shared.tar.zst
+            cp -n shared/* corpus/ 2>/dev/null || true
+            rm -rf shared shared.tar.zst
+            echo "shared corpus folded in: $before -> $(ls corpus | wc -l) inputs"
+          else
+            echo "no shared corpus published yet; continuing with cache and seeds"
+          fi
+
       # Seeds are written every run rather than only on a cache miss, so a
       # corpus minimised by libFuzzer cannot lose the known good inputs. Adding
       # one that is already present costs nothing.
@@ -221,6 +253,33 @@ jobs:
           rm -rf corpus
           mv corpus-min corpus
           echo "minimised $before inputs to $(ls corpus | wc -l)"
+
+      # Publish the minimised corpus so the Oracle box starts from what this run
+      # found. `if: success()` matters: the escape check above fails the job when
+      # something was found, and a crashing run must not overwrite the shared
+      # corpus with a partial one.
+      #
+      # The release is created on first use rather than assumed to exist, so this
+      # works on a clean repo. `--clobber` replaces the asset — the upload API
+      # refuses a duplicate name rather than overwriting.
+      - name: Publish the shared corpus
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tar -C corpus -cf - . | zstd -19 -T0 -q -o corpus.tar.zst -f
+
+          gh release view fuzz-corpus >/dev/null 2>&1 || gh release create fuzz-corpus \
+            --prerelease \
+            --title "Fuzz corpus (shared)" \
+            --notes "Minimised libFuzzer corpus for \`TcgDex.CSharpSdk.Fuzz\`, shared between the CI runner (x64) and the Oracle fuzz box (ARM64).
+
+          Not a software release. Whichever side finishes most recently overwrites the asset; each side folds it into its own corpus before fuzzing, so coverage accumulates across both architectures.
+
+          Regenerable from the recorded fixtures at any time — this is an optimisation, not data."
+
+          gh release upload fuzz-corpus corpus.tar.zst --clobber
+          echo "published $(ls corpus | wc -l) inputs ($(du -h corpus.tar.zst | cut -f1))"
 
       # A crash is written as the exact bytes that caused it, which is a
       # regression fixture rather than a bug report. Uploaded on failure as
