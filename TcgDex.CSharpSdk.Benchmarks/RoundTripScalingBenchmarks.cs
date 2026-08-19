@@ -28,7 +28,7 @@ using TcgDex.Querying;
 /// </para>
 /// <para>
 /// <b>This resolves it by manipulating exactly one variable.</b> A single name
-/// with many printings (<c>Pikachu</c>) is used throughout, and both legs are
+/// with many printings (<c>Gyarados</c>) is used throughout, and both legs are
 /// capped to the same <see cref="Cards"/> count — the REST list with
 /// <see cref="CardQuery.Page(int,int)"/>, the GraphQL search with
 /// <c>itemsPerPage</c>. So the only thing that changes across params is how many
@@ -46,15 +46,26 @@ using TcgDex.Querying;
 /// <b>Cost, and why this is a hand-run one-off.</b> Like the base benchmark this
 /// hits the real API — nothing else can measure round trips honestly. The REST
 /// leg alone issues <c>sum(N+1)</c> requests per iteration, which for the params
-/// below is ~209, times warmup + iterations. Budget a few hundred requests
+/// below is ~144, times warmup + iterations. Budget a few hundred requests
 /// against a free API somebody else pays for: defensible once, indefensible on a
 /// schedule, so there is no workflow for it.
+/// </para>
+/// <para>
+/// <b>Why Gyarados and not Pikachu.</b> The obvious pick — Pikachu, 120 printings
+/// — cannot be used, and the reason is itself a finding. TCGdex's GraphQL schema
+/// marks <c>AttacksListItem.name</c> non-nullable, but the API serves cards whose
+/// attacks have no name (<c>2017sm-5</c>). So a GraphQL search that returns such a
+/// card fails outright with <c>Cannot return null for non-nullable field</c> — the
+/// REST leg reads it (since 0.2.0), the GraphQL leg cannot. Measured 2026-08-19,
+/// this poisons Pikachu, Eevee, Charizard, Mewtwo and Snorlax. Gyarados (71
+/// printings, all with named attacks) is the largest name that runs both legs
+/// clean, which is why N tops out at 70 here rather than 120.
 /// </para>
 /// <code>
 /// dotnet run -c Release --project TcgDex.CSharpSdk.Benchmarks -- --filter "*Scaling*"
 /// </code>
 /// <para>
-/// <b>Read the params as requests, not truth.</b> If Pikachu has fewer than the
+/// <b>Read the params as requests, not truth.</b> If Gyarados has fewer than the
 /// largest N, that param silently measures the max available instead — the real
 /// count is the list length, and the writeup records it rather than the label,
 /// exactly as the base benchmark does.
@@ -69,17 +80,19 @@ public class RoundTripScalingBenchmarks : IDisposable
 
     /// <summary>
     /// A name with enough printings that the largest <see cref="Cards"/> value is
-    /// actually reachable. The base benchmark records "Pikachu would be 121
-    /// requests per iteration", which is why it is absent there and used here.
+    /// reachable, AND whose every card has named attacks so the GraphQL leg does
+    /// not hit the non-nullable-name schema bug. Gyarados (71 printings) is the
+    /// largest such name; the marquee Pokémon with more printings all fail the
+    /// GraphQL query. See the remarks above.
     /// </summary>
-    private const string Name = "Pikachu";
+    private const string Name = "Gyarados";
 
     /// <summary>
     /// How many cards each leg fetches — the one variable this benchmark moves.
-    /// A wide spread so a linear trend is distinguishable from a flat one; kept
-    /// to four points to stay courteous to a free API.
+    /// A wide spread (14x) so a linear trend is distinguishable from a flat one;
+    /// four points to stay courteous to a free API, all within Gyarados's 71.
     /// </summary>
-    [Params(5, 20, 60, 120)]
+    [Params(5, 20, 45, 70)]
     public int Cards { get; set; } = 20;
 
     [GlobalSetup]

@@ -213,8 +213,9 @@ barely moved between 13 and 16 requests — 560 ms against 575 ms, under 3% for
 23% more requests. If per-request latency dominated, that should have been
 nearer 690 ms. Three iterations cannot resolve why: connection reuse, server-side
 variance and the size of the initial list response are all candidates. The
-headline ratio is not in doubt at these sizes; the *scaling* is not established,
-so nothing here should be extrapolated to a 200-card set without measuring it.
+headline ratio is not in doubt at these sizes; the *scaling* was not yet
+established here — it is, in [the scaling section below](#scaling-the-win-grows-and-the-flat-rest-anomaly-was-connection-reuse),
+which found the flatness is connection reuse and the win widens with N.
 
 **What is compared is what the SDK ships.** The GraphQL section of
 [api-info.md](api-info.md) illustrates the win with `set(id){cards{…}}` — real in
@@ -222,6 +223,50 @@ the API, but **not exposed by this SDK**, because `CardFilter` has no set field.
 The flat detailed search is what a caller can actually reach, so that is what was
 timed. Benchmarking the nested form would have produced a number for a feature
 nobody can call.
+
+### Scaling: the win grows, and the flat-REST anomaly was connection reuse
+
+The paragraph above refused to extrapolate the 13-vs-16 result, and flagged an
+unexplained flatness in the REST leg. `RoundTripScalingBenchmarks` settles both by
+moving one variable — the number of cards `N` — across a 14× range, both legs
+capped to exactly `N` (REST via `Page`, GraphQL via `itemsPerPage`). Measured
+2026-08-19 against the live API:
+
+| N | REST (N+1 requests) | GraphQL (1 request) | ratio |
+|---|---|---|---|
+| 5 | 220 ms | 84 ms | 0.38 |
+| 20 | 943 ms | 80 ms | 0.09 |
+| 45 | 1,134 ms | 80 ms | 0.07 |
+| 70 | 1,164 ms | 103 ms | 0.09 |
+
+**GraphQL is flat** — one request, ~80–100 ms, whatever `N` is. **REST rises then
+flattens**: 5→20 nearly quadruples, but 20→45→70 barely moves despite roughly
+three times the requests. So the cost per REST request is *not* constant — it is
+high while the connection warms (TLS, the first round trips) and cheap once
+keep-alive reuses it. That is the answer to the earlier anomaly: the flat 13-vs-16
+pair was not noise, it was two points already past the warm-up knee. "Per-request
+latency dominates" was too simple; **connection reuse dominates**, and it is why
+the marginal card is nearly free once the pipe is open.
+
+**The win grows with N** — ~2.6× at five cards, ~11–14× from twenty up — and then
+holds. So the GraphQL round-trip advantage is not a fixed constant; it widens as
+the result set does, exactly where it matters.
+
+**Read the shape, not the milliseconds.** Three iterations against a home
+connection and someone else's servers give enormous error bars — the N=20 REST
+mean carried a 99.9%-CI margin wider than the mean itself. The absolute numbers
+are soft; what survives the variance is the shape (GraphQL flat, REST knee-then-
+plateau, ratio widening). GraphQL's single request is also fast enough (~80 ms)
+that BenchmarkDotNet warns its iteration window is below the recommended 100 ms —
+another reason to trust the ordering over the exact figures.
+
+**Name choice was forced, and is itself a finding.** The obvious high-count name,
+Pikachu (120 printings), cannot be used: its GraphQL leg fails outright with
+`Cannot return null for non-nullable field AttacksListItem.name`, because the API
+serves cards with nameless attacks (`2017sm-5`) while the schema forbids them. The
+REST leg reads such a card as of 0.2.0; the GraphQL leg cannot. This poisons
+Pikachu, Eevee, Charizard, Mewtwo and Snorlax. Gyarados (71, all named attacks) is
+the largest name that runs both legs clean.
 
 ### What is not measured, and why
 
