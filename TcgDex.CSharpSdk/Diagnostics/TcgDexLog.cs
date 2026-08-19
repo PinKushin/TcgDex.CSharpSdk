@@ -28,7 +28,7 @@ using Microsoft.Extensions.Logging;
 /// </para>
 /// <para>
 /// <b>Event id ranges.</b> 1000 request lifecycle · 1100 caching ·
-/// 1200 configuration · 1300 GraphQL. Ids are part of the contract and are not
+/// 1200 configuration · 1300 GraphQL · 1400 data quality. Ids are part of the contract and are not
 /// renumbered.
 /// </para>
 /// </remarks>
@@ -198,4 +198,19 @@ internal static partial class TcgDexLog
         Level = LogLevel.Warning,
         Message = "TCGdex GraphQL returned {Count} unresolvable card entr(ies), which were dropped")]
     internal static partial void GraphQlDroppedEntries(this ILogger logger, int count);
+
+    // ----- 1400: data quality -----
+
+    /// <remarks>
+    /// The SDK reads what the API sends rather than rejecting it, so a malformed
+    /// record deserializes to a card with a hole in it — a nameless attack, for
+    /// example, which <c>2017sm-5</c> ships. The hole is honest data; this is how
+    /// the SDK says the API, not the caller, produced it, without inventing a
+    /// value to paper over it.
+    /// </remarks>
+    [LoggerMessage(
+        EventId = 1400,
+        Level = LogLevel.Warning,
+        Message = "TCGdex card {CardId} has malformed data: {Detail}")]
+    internal static partial void MalformedCardData(this ILogger logger, string cardId, string detail);
 }

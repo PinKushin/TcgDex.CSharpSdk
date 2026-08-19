@@ -124,7 +124,7 @@ namespace TcgDex.Models
     {
         public Ability() { }
         public string? Effect { get; init; }
-        public required string Name { get; init; }
+        public string? Name { get; init; }
         public string? Type { get; init; }
     }
     public sealed class Attack : System.IEquatable<TcgDex.Models.Attack>

@@ -17,6 +17,14 @@ something an application can observe — those live in the commit history.
 
 ### Added
 
+- **A warning is logged when the API serves a malformed card.** When a card
+  deserializes with a hole the API left — a nameless attack or ability — the SDK
+  logs a `Warning` (event id 1400) naming the card and the field, e.g.
+  `TCGdex card 2017sm-5 has malformed data: attack 2 has no name`. The field
+  stays an honest `null`; the SDK does not invent a placeholder name, so a caller
+  can tell the API produced the hole rather than the SDK. The whole check sits
+  behind one `IsEnabled(Warning)` branch, so it costs nothing when warnings are
+  off.
 - **"When the API is having a moment"** ([`docs/getting-started.md`](docs/getting-started.md))
   — what a `502 Bad Gateway` from TCGdex looks like through the SDK, prompted by
   a real outage: it arrives as `TcgDexApiException` with the status code, a
@@ -64,14 +72,15 @@ something an application can observe — those live in the commit history.
 
 ### Fixed
 
-- **A card with a nameless attack no longer fails to deserialize.** `Attack.Name`
-  was `required`, so a real card the API serves with an unnamed attack threw a
-  `JsonException` and became unreadable *in full* — one bad nested field took the
-  whole card down. `Attack.Name` is now `string?`. Found on `2017sm-5` (the
-  McDonald's Collection 2017 Pikachu), whose "Electro Ball" attack ships with no
-  `name` in the API data; the SDK now reads the card and reports that name as
-  `null` rather than rejecting it. Callers that read attack names should treat
-  them as nullable.
+- **A card with a nameless attack or ability no longer fails to deserialize.**
+  `Attack.Name` and `Ability.Name` were `required`, so a real card the API serves
+  with an unnamed attack threw a `JsonException` and became unreadable *in full* —
+  one bad nested field took the whole card down. Both are now `string?`. Found on
+  `2017sm-5` (the McDonald's Collection 2017 Pikachu), whose "Electro Ball" attack
+  ships with no `name` in the API data; the SDK now reads the card and reports
+  that name as `null` rather than rejecting it. `Ability.Name` is the same
+  descriptive-nested-object class and was relaxed alongside it. Callers that read
+  attack or ability names should treat them as nullable.
 - The install page claimed the package targets ".NET 8 and .NET 10", omitting
   `netstandard2.0` — the target that reaches .NET Framework, Unity and everything
   between.
