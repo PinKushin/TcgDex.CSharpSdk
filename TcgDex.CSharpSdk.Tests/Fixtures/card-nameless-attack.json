@@ -1,0 +1,122 @@
+{
+    "category": "Pokemon",
+    "id": "2017sm-5",
+    "illustrator": "kirisAki",
+    "localId": "5",
+    "name": "Pikachu",
+    "rarity": "None",
+    "set": {
+        "cardCount": {
+            "official": 12,
+            "total": 12
+        },
+        "id": "2017sm",
+        "name": "McDonald's Collection 2017"
+    },
+    "variants": {
+        "firstEdition": false,
+        "holo": true,
+        "normal": false,
+        "reverse": false,
+        "wPromo": false
+    },
+    "variants_detailed": [
+        {
+            "type": "holo",
+            "size": "standard",
+            "variantId": "jr7oetx1mqug9",
+            "pricing": {
+                "cardmarket": {
+                    "updated": "2026-08-19T08:02:24.825Z",
+                    "unit": "EUR",
+                    "idProduct": 301847,
+                    "avg": 13.48,
+                    "low": 1,
+                    "trend": 12.49,
+                    "avg1": 7,
+                    "avg7": 11.53,
+                    "avg30": 12.35,
+                    "avg-holo": null,
+                    "low-holo": null,
+                    "trend-holo": 10.21,
+                    "avg1-holo": 15.45,
+                    "avg7-holo": 9.59,
+                    "avg30-holo": 6.48
+                },
+                "tcgplayer": {
+                    "unit": "USD",
+                    "updated": "2026-08-19T08:02:47.731Z",
+                    "holofoil": {
+                        "productId": 152685,
+                        "lowPrice": 14.22,
+                        "midPrice": 20.99,
+                        "highPrice": 300.8,
+                        "marketPrice": 30.23,
+                        "directLowPrice": null
+                    }
+                }
+            }
+        }
+    ],
+    "dexId": [
+        25
+    ],
+    "hp": 70,
+    "types": [
+        "Lightning"
+    ],
+    "stage": "Basic",
+    "attacks": [
+        {
+            "cost": [
+                "Lightning"
+            ],
+            "name": "Thudner Wave",
+            "effect": "Flip a coin, If heads your opponent's active Pok\u00c3\u00a9mon is now Paralyzed."
+        },
+        {
+            "cost": [
+                "Lightning",
+                "Colorless",
+                "Colorless"
+            ],
+            "damage": "50"
+        }
+    ],
+    "legal": {
+        "standard": false,
+        "expanded": false
+    },
+    "updated": "2026-04-19T20:57:59Z",
+    "pricing": {
+        "cardmarket": {
+            "updated": "2026-08-19T08:02:24.825Z",
+            "unit": "EUR",
+            "idProduct": 301847,
+            "avg": 13.48,
+            "low": 1,
+            "trend": 12.49,
+            "avg1": 7,
+            "avg7": 11.53,
+            "avg30": 12.35,
+            "avg-holo": null,
+            "low-holo": null,
+            "trend-holo": 10.21,
+            "avg1-holo": 15.45,
+            "avg7-holo": 9.59,
+            "avg30-holo": 6.48
+        },
+        "tcgplayer": {
+            "unit": "USD",
+            "updated": "2026-08-19T08:02:47.731Z",
+            "holofoil": {
+                "productId": 152685,
+                "lowPrice": 14.22,
+                "midPrice": 20.99,
+                "highPrice": 300.8,
+                "marketPrice": 30.23,
+                "directLowPrice": null
+            }
+        }
+    }
+}

@@ -265,4 +265,25 @@ public sealed class CardContractTests
         // "EX" and "ex" denote different eras, so casing must survive.
         card.Suffix.ShouldBe("EX");
     }
+
+    [Test]
+    public void Deserialize_CardWithNamelessAttack_ReadsTheCardRatherThanRejectingIt()
+    {
+        // 2017sm-5, the McDonald's Collection 2017 Pikachu, is a real card the API
+        // serves with a data bug: its second attack — "Electro Ball" on the
+        // physical card — has no `name` at all, and the first is typo'd as
+        // "Thudner Wave" with a mojibake effect. The API ships malformed records,
+        // so the SDK must degrade to a null name rather than throw and make the
+        // whole card unreadable. See docs/api-info.md.
+        Card card = Fixture.Load<Card>("card-nameless-attack.json");
+
+        card.Id.ShouldBe("2017sm-5");
+        card.Name.ShouldBe("Pikachu");
+        card.Attacks.Count.ShouldBe(2);
+
+        // The API's typo is preserved verbatim — the SDK reports what it is sent.
+        card.Attacks[0].Name.ShouldBe("Thudner Wave");
+        card.Attacks[1].Name.ShouldBeNull("the API omits this attack's name");
+        card.Attacks[1].Damage.ShouldBe("50");
+    }
 }
