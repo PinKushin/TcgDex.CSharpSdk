@@ -9,8 +9,14 @@ public sealed record Attack
     // initializer: the JSON source generator discards initializers.
     private readonly IReadOnlyList<string> _cost = [];
 
-    /// <summary>The attack's printed name.</summary>
-    public required string Name { get; init; }
+    /// <summary>
+    /// The attack's printed name, or <see langword="null"/> when the API omits
+    /// it. Not <c>required</c>: TCGdex serves real cards with a nameless attack
+    /// — the McDonald's Collection 2017 Pikachu (<c>2017sm-5</c>) has an "Electro
+    /// Ball" attack with no <c>name</c> in the data — and the SDK degrades to a
+    /// null name rather than making the whole card unreadable.
+    /// </summary>
+    public string? Name { get; init; }
 
     /// <summary>
     /// The energy required, one entry per energy symbol — for example

@@ -176,6 +176,14 @@ internal sealed class TcgDexTransport
 
         T? value = Deserialize<T>(new ArraySegment<byte>(bodyBuffer, bodyOffset, bodyCount), uri);
 
+        // Report a card the API sent malformed, once, here on the deserialize
+        // path rather than on the cache-hit path above, so a warm hit does not
+        // re-log what a caller has already been told.
+        if (value is Card card)
+        {
+            CardDiagnostics.WarnOnAnomalies(_logger, card);
+        }
+
         if (value is not null)
         {
             _deserialized?.Set(uri, etag, value);

@@ -400,4 +400,57 @@ public sealed class LoggingTests
     [Test]
     public void TheActivitySourceName_IsStableAndPublic()
         => TcgDexActivity.SourceName.ShouldBe("TcgDex.CSharpSdk");
+
+    [Test]
+    public async Task ACardWithANamelessAttack_WarnsThatTheApiDataIsMalformed()
+    {
+        // 2017sm-5 is served with a nameless second attack ("Electro Ball" on the
+        // physical card). The SDK reads it — Name is null — and says so in the log
+        // rather than fabricating a name, so a caller can tell the API, not the
+        // SDK, produced the hole.
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWithJsonFile(HttpStatusCode.OK, "card-nameless-attack.json");
+        (TcgDexClient client, RecordingLogger log) = Build(handler);
+
+        await client.Cards.GetAsync("2017sm-5", CancellationToken.None);
+
+        LogEntry entry = log.Entries.Where(e => e.EventId == 1400).ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Warning);
+        entry.Message.ShouldContain("2017sm-5");
+        entry.Message.ShouldContain("attack 2 has no name");
+    }
+
+    [Test]
+    public async Task ACleanCard_LogsNoMalformedDataWarning()
+    {
+        // The control: a card with every attack named must produce no 1400 event.
+        // Without it, a warning that fired on every card would pass the test above
+        // and be pure noise.
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
+        (TcgDexClient client, RecordingLogger log) = Build(handler);
+
+        await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+
+        log.Entries.ShouldNotContain(e => e.EventId == 1400);
+    }
+
+    [Test]
+    public async Task ACardWithANamelessAbility_WarnsAndReadsTheCard()
+    {
+        // Synthetic — no confirmed real card has a nameless ability, but
+        // Ability.Name is nullable for the same robustness reason as Attack.Name,
+        // so the ability path warns too. The card also has a *named* attack, which
+        // must NOT warn, so this pins that the two branches are independent.
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWithJsonFile(HttpStatusCode.OK, "card-nameless-ability.json");
+        (TcgDexClient client, RecordingLogger log) = Build(handler);
+
+        TcgDex.Models.Card card = (await client.Cards.GetAsync(
+            "synthetic-nameless-ability", CancellationToken.None)).ShouldNotBeNull();
+
+        card.Abilities.ShouldHaveSingleItem().Name.ShouldBeNull();
+        LogEntry entry = log.Entries.Where(e => e.EventId == 1400).ShouldHaveSingleItem();
+        entry.Message.ShouldContain("ability 1 has no name");
+    }
 }

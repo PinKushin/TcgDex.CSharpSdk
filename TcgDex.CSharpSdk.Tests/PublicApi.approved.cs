@@ -124,7 +124,7 @@ namespace TcgDex.Models
     {
         public Ability() { }
         public string? Effect { get; init; }
-        public required string Name { get; init; }
+        public string? Name { get; init; }
         public string? Type { get; init; }
     }
     public sealed class Attack : System.IEquatable<TcgDex.Models.Attack>
@@ -133,10 +133,10 @@ namespace TcgDex.Models
         [System.Text.Json.Serialization.JsonIgnore]
         public int? BaseDamage { get; }
         public System.Collections.Generic.IReadOnlyList<string> Cost { get; init; }
-        [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.FlexibleStringConverter))]
+        [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.FlexibleStringConverter?))]
         public string? Damage { get; init; }
         public string? Effect { get; init; }
-        public required string Name { get; init; }
+        public string? Name { get; init; }
     }
     public sealed class Booster : System.IEquatable<TcgDex.Models.Booster>
     {
