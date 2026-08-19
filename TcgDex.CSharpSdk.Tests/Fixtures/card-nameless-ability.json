@@ -1,0 +1,30 @@
+{
+    "category": "Pokemon",
+    "id": "synthetic-nameless-ability",
+    "localId": "1",
+    "name": "Test Pokemon",
+    "set": {
+        "id": "test",
+        "name": "Synthetic Set"
+    },
+    "hp": 70,
+    "types": [
+        "Colorless"
+    ],
+    "stage": "Basic",
+    "abilities": [
+        {
+            "type": "Ability",
+            "effect": "This ability has no name in the data."
+        }
+    ],
+    "attacks": [
+        {
+            "cost": [
+                "Colorless"
+            ],
+            "name": "Tackle",
+            "damage": 10
+        }
+    ]
+}

@@ -434,4 +434,23 @@ public sealed class LoggingTests
 
         log.Entries.ShouldNotContain(e => e.EventId == 1400);
     }
+
+    [Test]
+    public async Task ACardWithANamelessAbility_WarnsAndReadsTheCard()
+    {
+        // Synthetic — no confirmed real card has a nameless ability, but
+        // Ability.Name is nullable for the same robustness reason as Attack.Name,
+        // so the ability path warns too. The card also has a *named* attack, which
+        // must NOT warn, so this pins that the two branches are independent.
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWithJsonFile(HttpStatusCode.OK, "card-nameless-ability.json");
+        (TcgDexClient client, RecordingLogger log) = Build(handler);
+
+        TcgDex.Models.Card card = (await client.Cards.GetAsync(
+            "synthetic-nameless-ability", CancellationToken.None)).ShouldNotBeNull();
+
+        card.Abilities.ShouldHaveSingleItem().Name.ShouldBeNull();
+        LogEntry entry = log.Entries.Where(e => e.EventId == 1400).ShouldHaveSingleItem();
+        entry.Message.ShouldContain("ability 1 has no name");
+    }
 }
