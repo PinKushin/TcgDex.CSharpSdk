@@ -35,7 +35,10 @@ jobs:
     name: Publish to NuGet
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # write, not read: the announcement step below creates a GitHub Release
+      # through the API, which needs contents:write. The OIDC publish does not
+      # need it, so this is the only reason it is elevated.
+      contents: write
       # Lets this job request the OIDC token. Without it NuGet/login fails with
       # an unhelpful error, and it is the commonest reason trusted publishing
       # does not work first time.
@@ -133,3 +136,46 @@ jobs:
           name: published-package
           path: ./artifacts/*
           if-no-files-found: warn
+
+      # Turn the CHANGELOG.md section for this version into a copy-paste-ready
+      # Discord post in the job summary. Consumer-scoped by construction — the
+      # changelog already excludes internal, CI and test-only work. Runs only on
+      # a successful publish (the implicit success() guard), so nothing is
+      # announced that did not actually ship. The post still has to be pasted by
+      # a human: the project channel lives in a Discord we do not administer, so
+      # a webhook is not ours to create — this automates the writing, not the
+      # sending.
+      - name: Build release announcement
+        shell: pwsh
+        run: |
+          $post = ./scripts/New-ReleaseAnnouncement.ps1 -Version "$env:VERSION" -OutputDir "$env:RUNNER_TEMP"
+          $summary = @(
+            "## Discord announcement for $env:VERSION",
+            "",
+            "Copy the block below into the tcgdex project channel:",
+            "",
+            '```text',
+            $post,
+            '```'
+          )
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      # A permanent, formatted home for the same notes. Idempotent: a re-run
+      # edits the existing release rather than failing, mirroring the
+      # --skip-duplicate on the push above. Tag-triggered runs only — a
+      # workflow_dispatch has no tag to attach a release to.
+      - name: Create or update the GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            gh release edit "v$VERSION" \
+              --title "v$VERSION" \
+              --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create "v$VERSION" \
+              --title "v$VERSION" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" \
+              --verify-tag
+          fi
