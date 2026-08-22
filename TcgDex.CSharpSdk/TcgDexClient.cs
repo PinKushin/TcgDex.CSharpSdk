@@ -188,6 +188,24 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         TcgDexOptions resolved = options ?? new TcgDexOptions();
         resolved.Validate();
 
+        // Run the caller's cache configuration before any handler exists, so no
+        // user code runs in the window between constructing the transport handler
+        // and handing ownership to HttpClient below — the only path on which a
+        // handler could leak (what CA2000 flags on the construction that follows).
+        TcgDexCacheOptions? cacheOptions = null;
+        if (configureCache is not null)
+        {
+            cacheOptions = new();
+            configureCache(cacheOptions);
+        }
+
+        // CA2000: every handler constructed below is owned by the HttpClient at
+        // the end of this method (ownsHttpClient: true), whose Dispose disposes
+        // the whole chain. The cache callback above is the only user code, and it
+        // has already run, so nothing executes between construction and that
+        // ownership transfer — there is no path on which a handler leaks.
+#pragma warning disable CA2000
+
         // Connections are recycled on this interval so DNS changes are picked
         // up. A long-lived HttpClient over the default handler never does this.
 #if NETSTANDARD2_0
@@ -216,11 +234,8 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         };
 #endif
 
-        if (configureCache is not null)
+        if (cacheOptions is not null)
         {
-            TcgDexCacheOptions cacheOptions = new();
-            configureCache(cacheOptions);
-
             handler = new TcgDexCachingHandler(
                 new MemoryTcgDexResponseCache(cacheOptions.MaxEntries),
                 cacheOptions)
@@ -230,6 +245,7 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         }
 
         return new TcgDexClient(new HttpClient(handler), resolved, ownsHttpClient: true, loggerFactory);
+#pragma warning restore CA2000
     }
 
     /// <summary>

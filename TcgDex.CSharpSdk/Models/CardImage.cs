@@ -164,6 +164,18 @@ public static class ImageExtensions
         return ImageUrl.BuildAsset(set.Logo, format);
     }
 
+    /// <summary>Builds the URL for this set's logo.</summary>
+    /// <param name="set">The set.</param>
+    /// <param name="format">The file format to request.</param>
+    /// <returns>The logo URL, or <see langword="null"/> when the set has none.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="set"/> is null.</exception>
+    public static string? GetLogoUrl(this Set set, ImageFormat format = ImageFormat.Png)
+    {
+        Guard.NotNull(set);
+
+        return ImageUrl.BuildAsset(set.Logo, format);
+    }
+
     /// <summary>Builds the URL for this set's symbol.</summary>
     /// <param name="set">The set.</param>
     /// <param name="format">The file format to request.</param>
@@ -178,18 +190,6 @@ public static class ImageExtensions
         Guard.NotNull(set);
 
         return ImageUrl.BuildAsset(set.Symbol, format);
-    }
-
-    /// <summary>Builds the URL for this set's logo.</summary>
-    /// <param name="set">The set.</param>
-    /// <param name="format">The file format to request.</param>
-    /// <returns>The logo URL, or <see langword="null"/> when the set has none.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="set"/> is null.</exception>
-    public static string? GetLogoUrl(this Set set, ImageFormat format = ImageFormat.Png)
-    {
-        Guard.NotNull(set);
-
-        return ImageUrl.BuildAsset(set.Logo, format);
     }
 
     /// <summary>Builds the URL for this set's symbol.</summary>

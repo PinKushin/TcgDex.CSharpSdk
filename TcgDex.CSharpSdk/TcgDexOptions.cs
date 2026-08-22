@@ -174,6 +174,12 @@ public sealed class TcgDexOptions
     /// </remarks>
     public void Validate()
     {
+        // S3928: the names passed to ArgumentException below are this options
+        // object's own properties, not parameters of Validate() (parameterless
+        // by design — it validates instance state). Reporting the offending
+        // property is the actionable diagnostic for the caller, and the
+        // ArgumentException contract is part of the pinned public API.
+#pragma warning disable S3928
         if (!BaseAddress.IsAbsoluteUri)
         {
             throw new ArgumentException(
@@ -218,5 +224,6 @@ public sealed class TcgDexOptions
                 $"Supported languages are: {string.Join(", ", TcgDexLanguages.All)}.",
                 nameof(Language));
         }
+#pragma warning restore S3928
     }
 }

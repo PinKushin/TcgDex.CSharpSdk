@@ -15,6 +15,17 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-22
+
+### Fixed
+
+- **`TcgDexClient.Create` no longer leaks a transport handler if the
+  `configureCache` callback throws.** The HTTP handler was constructed before the
+  caller's `configureCache` delegate ran, so a delegate that threw left that
+  handler undisposed — it had not yet been handed to the `HttpClient` that owns
+  and disposes it. The callback now runs first, before any handler exists, so no
+  handler can leak on that path. Normal configuration is unaffected.
+
 ## [0.2.0] - 2026-08-19
 
 ### Added
@@ -162,7 +173,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/releases/tag/v0.1.0

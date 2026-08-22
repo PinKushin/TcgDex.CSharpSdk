@@ -139,7 +139,12 @@ internal static class BoundedContent
                     throw TooLarge(uri, maxBytes, null);
                 }
 
+                // CA1849/S6966: buffered is a MemoryStream; its WriteAsync
+                // completes synchronously with no I/O, so the async form only
+                // adds state-machine overhead. Sync Write is correct here.
+#pragma warning disable CA1849, S6966
                 buffered.Write(buffer, 0, read);
+#pragma warning restore CA1849, S6966
             }
 
             // TryGetBuffer rather than ToArray: the segment views the stream's
