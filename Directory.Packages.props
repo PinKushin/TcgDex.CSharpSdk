@@ -107,4 +107,12 @@
     <PackageVersion Include="CsCheck" Version="4.8.0" />
   </ItemGroup>
 
+  <!-- Analyzer-only, referenced by the shipped library project alone (see the
+       PackageReference in TcgDex.CSharpSdk.csproj) — not the test or benchmark
+       projects, where its rules are near-all noise. PrivateAssets=all there keeps
+       it out of any consumer's dependency graph. -->
+  <ItemGroup>
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.31.0.145097" />
+  </ItemGroup>
+
 </Project>

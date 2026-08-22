@@ -65,6 +65,10 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport g
         Guard.NotNull(query);
         Guard.NotLessThan(pageSize, 1);
 
+        // S1994: intentionally unbounded. The API reports no total and sends no
+        // pagination headers, so a short page (checked and broken on below) is
+        // the only end-of-results signal there is.
+#pragma warning disable S1994
         for (int page = 1; ; page++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -86,6 +90,7 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport g
                 yield break;
             }
         }
+#pragma warning restore S1994
     }
 }
 

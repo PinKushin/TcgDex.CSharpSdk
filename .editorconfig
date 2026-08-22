@@ -83,6 +83,25 @@ dotnet_diagnostic.IDE0055.severity = suggestion
 # guarded public method as unvalidated.
 dotnet_code_quality.CA1062.null_check_validation_methods = NotNull|NotNullOrWhiteSpace
 
+# --- Analyzer decisions carried when the stack moved to AnalysisMode=All +
+#     SonarAnalyzer (chore/analyzer-full-all-sonar). Each is a considered
+#     project stance or a demonstrable false positive, not a silenced bug.
+#     Site-specific suppressions (CA2000, S3928, S1994, CA1819, CA1849/S6966)
+#     live at their call sites with the reason; these are the categorical ones.
+# CA1055/CA1054: the image-URL helpers (GetImageUrl/GetLogoUrl/GetSymbolUrl)
+# return and accept `string`, not `Uri` — mirrors the official TCGdex SDKs'
+# getImageURL convention, is what consumers want for an <img src>, and is pinned
+# in PublicApi.approved.cs. Uri would break the surface for no benefit.
+dotnet_diagnostic.CA1055.severity = none
+dotnet_diagnostic.CA1054.severity = none
+# S3267: "simplify this loop with .Where()" — rejected repo-wide. The LINQ form
+# allocates an iterator and a closure per call; the SDK keeps its paths
+# loop-based for allocation/AOT discipline. Style rule vs measured constraint.
+dotnet_diagnostic.S3267.severity = none
+# S1075: the "hardcoded path-delimiter" is a URL '/', which is universal and not
+# an OS path separator. False positive for a REST client building request paths.
+dotnet_diagnostic.S1075.severity = none
+
 # Model types deliberately mirror the wrapped API's vocabulary so that this
 # SDK's surface maps one-to-one onto the TCGdex documentation. `Set` collides
 # with a VB.NET keyword (CA1716); renaming it to something like `CardSet` would

@@ -11,7 +11,13 @@ namespace TcgDex.Caching;
 public sealed record CachedResponse
 {
     /// <summary>The raw response body.</summary>
+    // CA1819: byte[] is the natural round-trip contract for a cache body that
+    // custom backends (Redis, disk) persist and replay. The type is part of the
+    // pinned public surface, and CachedResponse is only ever produced inside the
+    // SDK, so exposing the array carries no real mutation risk.
+#pragma warning disable CA1819
     public required byte[] Body { get; init; }
+#pragma warning restore CA1819
 
     /// <summary>
     /// The <c>ETag</c> the API returned, used to revalidate once the entry is no

@@ -25,7 +25,12 @@
          leaves most of the CA3xxx injection and CA5xxx cryptography rules off,
          which is the wrong default for a library that parses responses from a
          remote service. Combined with TreatWarningsAsErrors, a security finding
-         fails the build rather than joining a warning list nobody reads. -->
+         fails the build rather than joining a warning list nobody reads.
+
+         The shipped library goes further still — AnalysisMode=All + SonarAnalyzer
+         — in TcgDex.CSharpSdk.csproj. That strictness is scoped to the code that
+         ships rather than applied here, because on the test and benchmark
+         projects those rules are almost entirely noise. -->
     <AnalysisModeSecurity>All</AnalysisModeSecurity>
 
     <!-- Fail restore on a dependency with a known advisory. `all` covers
