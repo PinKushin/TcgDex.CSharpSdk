@@ -112,7 +112,7 @@
        projects, where its rules are near-all noise. PrivateAssets=all there keeps
        it out of any consumer's dependency graph. -->
   <ItemGroup>
-    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.31.0.145097" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.33.0.1635" />
   </ItemGroup>
 
 </Project>
