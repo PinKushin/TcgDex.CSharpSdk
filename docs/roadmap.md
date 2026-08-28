@@ -58,7 +58,7 @@ existed to undo (the old SDK shipped ~10 fields the API never served).
   appearing as a new field. As of 2026-08-28 it is **not yet live** on
   `api.tcgdex.net` — `base1-4` shows no `thirdParty` field. Additive and
   non-breaking (the SDK ignores unknown fields), so there is no rush and no risk
-  in waiting. The daily [`live-api.yml`](../.github/workflows/live-api.yml) drift
+  in waiting. The daily [`live-api.yml`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/.github/workflows/live-api.yml) drift
   check is the trigger: when the Live API run goes red on it, the failure message
   carries the exact shape — model against *that*, verify it round-trips, ship it.
 
