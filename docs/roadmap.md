@@ -46,6 +46,24 @@ passes through.
 
 ---
 
+## Committed — waiting on upstream
+
+Decided, not started, and deliberately blocked on TCGdex shipping the field —
+because modelling against a *guessed* shape is the exact mistake the rewrite
+existed to undo (the old SDK shipped ~10 fields the API never served).
+
+- **Model `thirdParty` external IDs.** [`cards-database#2184`](https://github.com/tcgdex/cards-database/pull/2184)
+  (merged 2026-08-27) removes the `deepOmit` that stripped `thirdParty` IDs
+  (tcgplayer / cardmarket product IDs) from card responses, so they will start
+  appearing as a new field. As of 2026-08-28 it is **not yet live** on
+  `api.tcgdex.net` — `base1-4` shows no `thirdParty` field. Additive and
+  non-breaking (the SDK ignores unknown fields), so there is no rush and no risk
+  in waiting. The daily [`live-api.yml`](../.github/workflows/live-api.yml) drift
+  check is the trigger: when the Live API run goes red on it, the failure message
+  carries the exact shape — model against *that*, verify it round-trips, ship it.
+
+---
+
 ## Done
 
 Recorded because the reasoning behind each is worth keeping, and because a
