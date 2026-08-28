@@ -38,6 +38,26 @@ public sealed class FixtureDriftTests : LiveApiFixture
     /// </remarks>
     private static readonly Dictionary<string, string> Excluded = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Fixtures that are <em>authored</em> rather than recorded, so there is no
+    /// live endpoint to drift-check them against and no manifest entry to expect.
+    /// </summary>
+    /// <remarks>
+    /// Each needs a comment saying why a real recording could not be used. An
+    /// authored fixture is a shape the SDK claims the API can produce but that no
+    /// known card exhibits — the one place a fixture cannot be re-verified against
+    /// the source, which is exactly why it must be named here rather than slipping
+    /// past <see cref="EveryFixtureIsListedInTheManifest"/> unnoticed.
+    /// </remarks>
+    private static readonly HashSet<string> Synthetic = new(StringComparer.Ordinal)
+    {
+        // No card with a nameless *ability* is known. 2017sm-5 gives a nameless
+        // attack (recorded as card-nameless-attack.json and drift-checked), but the
+        // ability path had to be authored to prove Ability.Name tolerates null the
+        // same way Attack.Name does.
+        "card-nameless-ability.json",
+    };
+
     [TestCaseSource(nameof(FixtureCases))]
     public async Task RecordedFixture_StillMatchesTheLiveApi(string fixture, string source)
     {
@@ -90,7 +110,7 @@ public sealed class FixtureDriftTests : LiveApiFixture
         List<string?> onDisk = Directory
             .EnumerateFiles(FixtureDirectory, "*.json")
             .Select(Path.GetFileName)
-            .Where(name => name is not null && name != "manifest.json")
+            .Where(name => name is not null && name != "manifest.json" && !Synthetic.Contains(name))
             .ToList();
 
         Dictionary<string, string>.KeyCollection listed = LoadManifest().Keys;
