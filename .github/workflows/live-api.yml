@@ -13,9 +13,11 @@ name: Live API
 # API drift, so gating a PR on it would block merges on a third party's change.
 on:
   schedule:
-    # Weekly, Monday 06:17 UTC. Off the hour to avoid the scheduling spike that
-    # makes on-the-hour runs queue.
-    - cron: "17 6 * * 1"
+    # Daily, 06:17 UTC. Off the hour to avoid the scheduling spike that makes
+    # on-the-hour runs queue. Daily rather than weekly so an API change is caught
+    # within a day instead of up to a week — the check is shape-only, so price and
+    # timestamp churn never trips it, only a genuine field change does.
+    - cron: "17 6 * * *"
   workflow_dispatch:
 
 permissions:
