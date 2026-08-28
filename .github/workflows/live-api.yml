@@ -1,0 +1,52 @@
+name: Live API
+
+# Re-checks the recorded fixtures against the real TCGdex API so the offline
+# suite cannot silently fall out of sync when the API changes.
+#
+# Deliberately its own workflow, separate from CI: this hits a third-party
+# service, so a TCGdex outage or a newly-served field is NOT a defect in this
+# repository's code and must never redden the CI badge. A red run here means
+# "go refresh a recording" (scripts/Update-Fixtures.ps1) or "model a new field",
+# not "the build is broken".
+#
+# Schedule + manual only, never on push or pull_request: no code change can fix
+# API drift, so gating a PR on it would block merges on a third party's change.
+on:
+  schedule:
+    # Weekly, Monday 06:17 UTC. Off the hour to avoid the scheduling spike that
+    # makes on-the-hour runs queue.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  live-api:
+    name: Live API contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Integration tests
+        run: >
+          dotnet test TcgDex.CSharpSdk.IntegrationTests/TcgDex.CSharpSdk.IntegrationTests.csproj
+          --configuration Release
+          --filter "TestCategory=Integration"
+          --logger "trx;LogFileName=integration-tests.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: integration-test-results
+          path: "**/TestResults/**"
