@@ -4,7 +4,10 @@ A .NET SDK for the [TCGdex](https://tcgdex.dev) Pokémon TCG API — strongly ty
 models, a fluent query builder over the full REST filter syntax, and first-class
 support for dependency injection, trimming and Native AOT.
 
-[![CI](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/ci.yml/badge.svg)](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/ci.yml)
+[![CI](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/codeql.yml)
+[![Docs](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/docs.yml)
+[![Live API](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/live-api.yml/badge.svg)](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/live-api.yml)
 
 Targets **.NET 8**, **.NET 10** and **netstandard2.0** — so it runs on modern
 .NET and on **.NET Framework 4.6.1+**. No API key required — TCGdex is a free,

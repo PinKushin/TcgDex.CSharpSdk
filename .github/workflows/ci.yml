@@ -5,10 +5,6 @@ on:
     branches: ["**"]
   pull_request:
     branches: [main]
-  schedule:
-    # Weekly, Monday 06:17 UTC. Off the hour to avoid the scheduling spike that
-    # makes on-the-hour runs queue.
-    - cron: "17 6 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -216,31 +212,3 @@ jobs:
       - name: Run the native binary
         shell: pwsh
         run: ./TcgDex.CSharpSdk.AotSmokeTest/bin/Release/net10.0/win-x64/publish/TcgDex.CSharpSdk.AotSmokeTest.exe
-
-  # Hits the real TCGdex API, so it is kept off the per-push path: a third-party
-  # outage must not turn a pull request red. A failure here means the API
-  # changed and the SDK needs attention.
-  live-api:
-    name: Live API contract
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Integration tests
-        run: >
-          dotnet test TcgDex.CSharpSdk.IntegrationTests/TcgDex.CSharpSdk.IntegrationTests.csproj
-          --configuration Release
-          --filter "TestCategory=Integration"
-          --logger "trx;LogFileName=integration-tests.trx"
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: integration-test-results
-          path: "**/TestResults/**"
