@@ -33,6 +33,42 @@ public sealed class TcgDexOptions
     public Uri GraphQlEndpoint { get; set; } = new("https://api.tcgdex.net/v2/graphql");
 
     /// <summary>
+    /// Routes both <see cref="BaseAddress"/> and <see cref="GraphQlEndpoint"/> to
+    /// a specific regional server node, and returns this instance so it can be
+    /// chained.
+    /// </summary>
+    /// <param name="mirror">The node to target.</param>
+    /// <returns>This <see cref="TcgDexOptions"/>.</returns>
+    /// <remarks>
+    /// A convenience over setting <see cref="BaseAddress"/> and
+    /// <see cref="GraphQlEndpoint"/> by hand. The nodes serve the same
+    /// catalogue — see <see cref="TcgDexMirror"/> for the one pricing caveat.
+    /// For a node not listed there, or a local test server, set the two
+    /// endpoints directly instead.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="mirror"/> is not a defined <see cref="TcgDexMirror"/>.
+    /// </exception>
+    public TcgDexOptions UseMirror(TcgDexMirror mirror)
+    {
+        string host = mirror switch
+        {
+            TcgDexMirror.Eu1 => "api.eu1.tcgdex.net",
+            TcgDexMirror.Eu2 => "api.eu2.tcgdex.net",
+            TcgDexMirror.Eu3 => "api.eu3.tcgdex.net",
+            TcgDexMirror.Na1 => "api.na1.tcgdex.net",
+            TcgDexMirror.Na2 => "api.na2.tcgdex.net",
+            TcgDexMirror.As1 => "api.as1.tcgdex.net",
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(mirror), mirror, "Not a defined TCGdex mirror."),
+        };
+
+        BaseAddress = new Uri($"https://{host}/v2/");
+        GraphQlEndpoint = new Uri($"https://{host}/v2/graphql");
+        return this;
+    }
+
+    /// <summary>
     /// The largest response body the client will buffer, in bytes. Defaults to
     /// 32 MiB. Set to zero to remove the limit.
     /// </summary>

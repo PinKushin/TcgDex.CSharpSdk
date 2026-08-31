@@ -15,6 +15,18 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-31
+
+### Added
+
+- **Target a regional server node.** `TcgDexOptions.UseMirror(TcgDexMirror)`
+  points both the REST and GraphQL endpoints at one of TCGdex's regional nodes
+  (`Eu1`/`Eu2`/`Eu3`/`Na1`/`Na2`/`As1`) — for lower latency, or to fail over when
+  the default host is unreachable. `BaseAddress` stays the escape hatch for a
+  node not in the enum or a local server. The nodes serve the same catalogue;
+  only pricing can differ briefly between them, since each syncs on its own
+  schedule. See [docs/getting-started.md](docs/getting-started.md).
+
 ## [0.2.1] - 2026-08-22
 
 ### Fixed
@@ -173,7 +185,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.1.0...v0.1.1
