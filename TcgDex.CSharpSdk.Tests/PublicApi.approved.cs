@@ -105,6 +105,15 @@ namespace TcgDex
         public static System.Collections.Generic.IReadOnlyList<string> All { get; }
         public static bool IsSupported(string? language) { }
     }
+    public enum TcgDexMirror
+    {
+        Eu1 = 0,
+        Eu2 = 1,
+        Eu3 = 2,
+        Na1 = 3,
+        Na2 = 4,
+        As1 = 5,
+    }
     public sealed class TcgDexOptions
     {
         public TcgDexOptions() { }
@@ -115,6 +124,7 @@ namespace TcgDex
         public int MaxDeserializedCacheEntries { get; set; }
         public long MaxResponseBytes { get; set; }
         public System.TimeSpan Timeout { get; set; }
+        public TcgDex.TcgDexOptions UseMirror(TcgDex.TcgDexMirror mirror) { }
         public void Validate() { }
     }
 }

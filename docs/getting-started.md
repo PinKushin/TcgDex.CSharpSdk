@@ -165,6 +165,38 @@ Two things to know, both properties of the API rather than the SDK:
   `zh-cn` and `pt-br`. Take ids from the list endpoint of the language you are
   working in.
 
+## Choosing a server
+
+Requests go to `api.tcgdex.net` by default. TCGdex also runs regional nodes, and
+you can point the client at one — for lower latency, or to fail over when the
+default host is unreachable:
+
+```csharp
+builder.Services.AddTcgDex(options => options.UseMirror(TcgDexMirror.Eu2));
+```
+
+`UseMirror` sets both the REST and GraphQL endpoints to that node:
+
+| `TcgDexMirror` | Region |
+|---|---|
+| `Eu1` | Global |
+| `Eu2` | France |
+| `Eu3` | Germany |
+| `Na1` | Canada |
+| `Na2` | North & South America |
+| `As1` | Asia & Oceania |
+
+For a node not listed here, or a local test server, set `options.BaseAddress`
+(and `options.GraphQlEndpoint`) directly — `UseMirror` is only a shortcut over
+those.
+
+**One caveat.** The nodes serve the same catalogue, so this is a latency and
+availability choice, not a data one — *except* for pricing. Each node syncs
+pricing on its own schedule, so prices can differ briefly between nodes after a
+restart. Card data and asset URLs are consistent (asset URLs are fixed at build
+time). The live list of nodes and their health is at
+[status.tcgdex.dev](https://status.tcgdex.dev).
+
 ## Handling errors
 
 One rule:
