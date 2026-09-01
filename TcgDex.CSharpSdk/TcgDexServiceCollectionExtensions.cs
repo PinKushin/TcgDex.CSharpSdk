@@ -169,7 +169,9 @@ public static class TcgDexServiceCollectionExtensions
             RegisterClient(services)
                 .AddHttpMessageHandler(provider => new TcgDexCachingHandler(
                     provider.GetRequiredService<ITcgDexResponseCache>(),
-                    provider.GetRequiredService<TcgDexCacheOptions>())),
+                    provider.GetRequiredService<TcgDexCacheOptions>(),
+                    timeProvider: null,
+                    maxResponseBytes: options.MaxResponseBytes)),
             options);
     }
 }

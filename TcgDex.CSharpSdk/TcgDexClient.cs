@@ -259,7 +259,9 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         {
             handler = new TcgDexCachingHandler(
                 new MemoryTcgDexResponseCache(cacheOptions.MaxEntries),
-                cacheOptions)
+                cacheOptions,
+                timeProvider: null,
+                maxResponseBytes: resolved.MaxResponseBytes)
             {
                 InnerHandler = handler,
             };
