@@ -275,7 +275,14 @@ public sealed class ClientLifetimeTests
         // every hit the moment a failover happened. Nothing else asserts this —
         // both orderings serve correct responses, and the difference shows up
         // only as a cache that quietly stopped working.
-        TcgDexOptions options = new();
+        // Distinct, non-default values so a swapped or dropped argument is
+        // visible rather than coinciding with what the default would have been.
+        TcgDexOptions options = new()
+        {
+            FailoverAttemptTimeout = TimeSpan.FromSeconds(3),
+            FailoverCooldown = TimeSpan.FromMinutes(7),
+        };
+
         options.UseFailover(TcgDexMirror.Eu2);
 
         using TcgDexClient client = TcgDexClient.Create(options, configureCache: _ => { });
@@ -285,8 +292,28 @@ public sealed class ClientLifetimeTests
         outer.ShouldBeOfType<TcgDex.Caching.TcgDexCachingHandler>();
 
         object inner = ((DelegatingHandler)outer).InnerHandler.ShouldNotBeNull();
-        inner.ShouldBeOfType<TcgDexFailoverHandler>();
+        TcgDexFailoverHandler failover = inner.ShouldBeOfType<TcgDexFailoverHandler>();
+
+        // The type alone is a proxy for the configuration, and the two are
+        // decoupled: the constructor takes two adjacent, interchangeable
+        // TimeSpans. Swapping them compiles, keeps every other test green, and
+        // turns a five-minute cooldown into ten seconds — a dead endpoint
+        // re-probed thirty times more often, on the day the API is down.
+        Read<TimeSpan>(failover, "_attemptTimeout").ShouldBe(TimeSpan.FromSeconds(3));
+        Read<TimeSpan>(failover, "_cooldown").ShouldBe(TimeSpan.FromMinutes(7));
+
+        Read<IReadOnlyList<Uri>>(failover, "_endpoints")
+            .Select(endpoint => endpoint.ToString())
+            .ShouldBe(["https://api.eu2.tcgdex.net/v2/"]);
     }
+
+    /// <summary>Reads a private field, for asserting on configuration that has no public surface.</summary>
+    private static T Read<T>(object target, string field)
+        => (T)target.GetType()
+            .GetField(field, BindingFlags.NonPublic | BindingFlags.Instance)
+            .ShouldNotBeNull()
+            .GetValue(target)
+            .ShouldNotBeNull();
 
     [Test]
     public void Create_WithoutFailover_AddsNoFailoverHandler()

@@ -246,9 +246,27 @@ reaching a live one; with it, one request discovers the outage and the rest go
 straight to the endpoint that works. **When everything is healthy, failover
 sends no extra requests at all** — it only acts on a failure.
 
-At most three endpoints are tried per request, and only `GET` is retried.
-Requests with a body — the opt-in GraphQL path — go to a single endpoint rather
-than being replayed on an assumption about whether repeating them is safe.
+At most three endpoints are tried per request.
+
+### What gets retried
+
+**`GET`, and `POST` to the GraphQL endpoint. Nothing else.**
+
+Resending is only safe for a request that changes nothing. A `GET` satisfies
+that by definition. GraphQL is a `POST` with a body, and rather than assume any
+request with a body is safe to repeat, the SDK replays exactly the set it
+authored itself: TCGdex's GraphQL schema exposes queries and no mutations, and
+the body was built by the SDK's own transport. The body and its content headers
+are carried across to the new endpoint, so the retried query is the query you
+asked for.
+
+A `POST` to any other address — or any other verb aimed at the GraphQL endpoint
+— passes straight through to a single endpoint. The SDK will not decide on your
+behalf that a request it did not write is safe to repeat.
+
+This is narrower than it needs to be today, deliberately: GraphQL is currently
+the only `POST` the API has, so the rule costs nothing now and still refuses to
+replay a mutation endpoint if one ever appears.
 
 **The pricing caveat from the previous section applies more here.** Nodes sync
 pricing on their own schedules, so after a failover two consecutive calls can

@@ -121,11 +121,16 @@ public sealed class LocalMirrorFailoverTests
     [Test]
     public async Task WithoutFailover_AnUnreachableHostStillThrows()
     {
-        // The control. Every assertion above is about failover being configured;
-        // this one confirms the same unreachable host is still a failure without
-        // it, so the tests above are measuring the feature rather than some
-        // incidental resilience in the transport.
-        using LocalMirror mirror = new(200, """["Common","Rare"]""");
+        // Every assertion above is about failover being configured; this confirms
+        // the same unreachable host is still a failure without it, so those tests
+        // measure the feature rather than some incidental resilience in the
+        // transport.
+        //
+        // No mirror is started here. An earlier version ran one and asserted it
+        // received nothing — but its address was never given to the client, so no
+        // code path could have reached it and the assertion held by construction.
+        // A zero that no defect could turn into a one is not evidence. The
+        // must-not-reach case is covered below, where the mirror IS configured.
         Uri unreachable = new($"http://127.0.0.1:{ClosedPort()}/v2/");
 
         using TcgDexClient client = TcgDexClient.Create(new TcgDexOptions
@@ -135,7 +140,30 @@ public sealed class LocalMirrorFailoverTests
 
         await Should.ThrowAsync<TcgDexApiException>(
             () => client.Catalog.RaritiesAsync(CancellationToken.None));
+    }
 
+    [Test]
+    public async Task AMissingResource_DoesNotReachTheMirror()
+    {
+        // The 404 rule over a real socket, with the mirror genuinely configured
+        // as a fallback — so zero requests to it is a fact about the code rather
+        // than about the test's wiring. This is the amplification case: were 404
+        // treated as a node failure, every missing card would be re-asked of
+        // every configured endpoint.
+        using LocalMirror primary = new(404, """{"status":404,"title":"Not Found"}""");
+        using LocalMirror mirror = new(200, ServedBy("mirror"));
+
+        TcgDexOptions options = new() { BaseAddress = primary.BaseAddress };
+        options.UseFailover(mirror.BaseAddress);
+
+        using TcgDexClient client = TcgDexClient.Create(options);
+
+        // A 404 on a catalogue endpoint is an error rather than a null, but what
+        // matters here is where the request did and did not go.
+        await Should.ThrowAsync<TcgDexApiException>(
+            () => client.Catalog.RaritiesAsync(CancellationToken.None));
+
+        primary.Requests.ShouldBe(1);
         mirror.Requests.ShouldBe(0);
     }
 

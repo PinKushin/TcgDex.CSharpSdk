@@ -49,17 +49,32 @@ public sealed class FailoverHandlerTests
                 "application/json"),
         };
 
+    private static readonly Uri GraphQl = new("https://api.tcgdex.net/v2/graphql");
+
     private static TcgDexFailoverHandler Handler(
         HttpMessageHandler inner,
         IReadOnlyList<Uri>? endpoints = null,
         TimeSpan? attemptTimeout = null,
         TimeSpan? cooldown = null,
         TimeProvider? time = null)
+        // Deduplicated the same way the real construction sites do, so the
+        // cooldown state is sized against the endpoints actually used.
+        => Build(inner, TcgDexFailoverHandler.Deduplicate(endpoints ?? [Secondary], Primary),
+            attemptTimeout, cooldown, time);
+
+    private static TcgDexFailoverHandler Build(
+        HttpMessageHandler inner,
+        IReadOnlyList<Uri> endpoints,
+        TimeSpan? attemptTimeout,
+        TimeSpan? cooldown,
+        TimeProvider? time)
         => new(
             Primary,
-            endpoints ?? [Secondary],
+            GraphQl,
+            endpoints,
             attemptTimeout ?? TimeSpan.FromSeconds(10),
             cooldown ?? TimeSpan.FromMinutes(5),
+            new FailoverCooldowns(endpoints.Count + 1),
             time)
         {
             InnerHandler = inner,
@@ -163,16 +178,54 @@ public sealed class FailoverHandlerTests
     }
 
     [Test]
-    public async Task ARequestWithContent_IsNotRetried()
+    public async Task AGraphQlPost_IsRetried_WithItsBody()
     {
-        // GraphQL posts a body. Replaying one would assume it is safe to repeat,
-        // which is an assumption this handler does not make: only GET rotates.
+        // Admitted by address, not by method: TCGdex's GraphQL schema has queries
+        // and no mutations, and this SDK built the body — so replaying it is
+        // knowledge rather than an assumption.
+        RecordingHandler inner = new RecordingHandler()
+            .RespondWith(request => From(request, HttpStatusCode.BadGateway))
+            .RespondWith(request => From(request, HttpStatusCode.OK));
+
+        using HttpClient client = new(Handler(inner));
+        using StringContent body = new(
+            """{"query":"{ card(id:\"swsh3-136\"){ name } }"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        using HttpRequestMessage post = new(HttpMethod.Post, GraphQl) { Content = body };
+
+        using HttpResponseMessage response = await client.SendAsync(post, CancellationToken.None);
+
+        (await response.Content.ReadAsStringAsync()).ShouldContain("api.eu2.tcgdex.net");
+
+        inner.Requests.Count.ShouldBe(2);
+        inner.Requests[1].RequestUri!.ToString()
+            .ShouldBe("https://api.eu2.tcgdex.net/v2/graphql");
+
+        // The body has to survive the rewrite, or the retry reaches the right
+        // address with an empty query — which the server answers with an error
+        // that looks nothing like a failover problem.
+        inner.RequestBodies[1].ShouldBe(inner.RequestBodies[0]);
+        inner.RequestBodies[1].ShouldContain("swsh3-136");
+
+        // And its content headers, or the server rejects the media type.
+        inner.Requests[1].Content.ShouldNotBeNull()
+            .Headers.ContentType.ShouldNotBeNull()
+            .MediaType.ShouldBe("application/json");
+    }
+
+    [Test]
+    public async Task APostAnywhereElse_IsNotRetried()
+    {
+        // The control that keeps the rule narrow. Replaying a request the SDK did
+        // not author would be deciding on a caller's behalf that it is safe to
+        // repeat — which is exactly what this handler refuses to do.
         RecordingHandler inner = new RecordingHandler()
             .RespondWith(request => From(request, HttpStatusCode.BadGateway));
 
         using HttpClient client = new(Handler(inner));
         using StringContent body = new("{}", System.Text.Encoding.UTF8, "application/json");
-        using HttpRequestMessage post = new(HttpMethod.Post, new Uri(Primary, "graphql"))
+        using HttpRequestMessage post = new(HttpMethod.Post, new Uri(Primary, "en/cards"))
         {
             Content = body,
         };
@@ -184,6 +237,113 @@ public sealed class FailoverHandlerTests
     }
 
     // ---- Transport failures ----
+
+    [Test]
+    public void CooldownStateSizedForTheWrongNumberOfEndpoints_Throws()
+    {
+        // The state is created by the caller so it can be shared across handler
+        // instances, which means the caller can also size it wrongly. An
+        // undersized array would throw IndexOutOfRange on the first failure of a
+        // later endpoint — at the moment of an outage, from inside a handler.
+        // Failing at construction turns that into an immediate, readable error.
+        using RecordingHandler inner = new();
+
+        Should.Throw<ArgumentException>(() => new TcgDexFailoverHandler(
+            Primary,
+            GraphQl,
+            [Secondary, Tertiary],
+            TimeSpan.FromSeconds(10),
+            TimeSpan.FromMinutes(5),
+            new FailoverCooldowns(2))
+        {
+            InnerHandler = inner,
+        });
+    }
+
+    [Test]
+    public async Task ARequestOutsideTheBaseAddress_IsNotRetried()
+    {
+        // Removing the IsBaseOf guard does not merely disable rewriting: for a
+        // URI outside the base, MakeRelativeUri returns the target absolute, so
+        // the rebuilt address is the SAME foreign host — and it would be sent
+        // three times. The DI path hands consumers an IHttpClientBuilder for this
+        // client, so a request to another host is reachable.
+        RecordingHandler inner = new RecordingHandler()
+            .RespondWith(request => From(request, HttpStatusCode.BadGateway));
+
+        using HttpClient client = new(Handler(inner));
+
+        using HttpResponseMessage response = await client.GetAsync(
+            new Uri("https://other.example/something"), CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
+        inner.Requests.Count.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task APutToTheGraphQlEndpoint_IsNotRetried()
+    {
+        // Separates the two halves of the replay rule. The GraphQL endpoint is
+        // admitted for POST specifically; without the method check, any verb
+        // aimed at that address would be replayed.
+        RecordingHandler inner = new RecordingHandler()
+            .RespondWith(request => From(request, HttpStatusCode.BadGateway));
+
+        using HttpClient client = new(Handler(inner));
+        using StringContent body = new("{}", System.Text.Encoding.UTF8, "application/json");
+        using HttpRequestMessage put = new(HttpMethod.Put, GraphQl) { Content = body };
+
+        using HttpResponseMessage response = await client.SendAsync(put, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
+        inner.Requests.Count.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task AnEndpointEqualToThePrimary_IsNotTriedTwice()
+    {
+        // `UseMirror(Eu2).UseFailover()` is the natural way to write this, since
+        // the two are documented side by side — and it would otherwise send a
+        // failed request straight back to the node that just failed.
+        RecordingHandler inner = new RecordingHandler()
+            .RespondWith(request => From(request, HttpStatusCode.BadGateway))
+            .RespondWith(request => From(request, HttpStatusCode.OK));
+
+        using HttpClient client = new(Handler(inner, [Primary, Secondary]));
+
+        using HttpResponseMessage response = await client.GetAsync(Card, CancellationToken.None);
+
+        (await response.Content.ReadAsStringAsync()).ShouldContain("api.eu2.tcgdex.net");
+
+        // Two requests, not three: the duplicate primary was dropped.
+        inner.Requests.Count.ShouldBe(2);
+        inner.Requests[0].RequestUri!.Host.ShouldBe("api.tcgdex.net");
+        inner.Requests[1].RequestUri!.Host.ShouldBe("api.eu2.tcgdex.net");
+    }
+
+    [Test]
+    public async Task ASupersededResponse_IsDisposed()
+    {
+        // Status and body are faithful to "which node answered" and completely
+        // blind to a leaked connection. Dropping the Dispose on the response
+        // being replaced holds a socket per failed attempt — during the outage
+        // when sockets are scarcest — with every other assertion still green.
+        // Mutation testing found this exact gap in the cache, which is why
+        // TrackedResponse exists.
+        TrackedResponse superseded = new(HttpStatusCode.BadGateway);
+
+        RecordingHandler inner = new RecordingHandler()
+            .RespondWith(_ => superseded)
+            .RespondWith(request => From(request, HttpStatusCode.OK));
+
+        using HttpClient client = new(Handler(inner));
+
+        using (await client.GetAsync(Card, CancellationToken.None))
+        {
+        }
+
+        superseded.WasDisposed.ShouldBeTrue();
+    }
 
     [Test]
     public async Task AConnectionFailure_IsRetried()
@@ -202,19 +362,34 @@ public sealed class FailoverHandlerTests
     [Test]
     public async Task AHungEndpoint_IsAbandonedAtTheAttemptTimeout()
     {
-        // The reason a per-attempt budget exists. The caller's token carries no
-        // deadline at all here, so the ONLY thing that can end the first attempt
-        // is the attempt timeout — which is what distinguishes this from a test
-        // that would pass just as well if the total request budget had fired.
+        // The reason a per-attempt budget exists — and the assertion that
+        // distinguishes a PER-ATTEMPT budget from a single one covering the whole
+        // request. Rotation alone does not: with one shared budget, attempt one
+        // is still cancelled and attempt two still runs, so a test asserting only
+        // "the fallback answered" passes against the very defect it names.
+        //
+        // What separates them is the token attempt two receives. A fresh budget
+        // arrives uncancelled; a shared one arrives already cancelled, and would
+        // die instantly against a real transport.
         HangsOnceHandler inner = new();
 
         using HttpClient client = new(
-            Handler(inner, attemptTimeout: TimeSpan.FromMilliseconds(100)));
+            Handler(inner, attemptTimeout: TimeSpan.FromMilliseconds(100)))
+        {
+            // Set explicitly so the total budget is a controlled variable. Left
+            // alone it is HttpClient's own 100 seconds — which would eventually
+            // catch a missing attempt budget, but only after burning 100 seconds
+            // per case, the exact shape of the incident in docs/learnings.md.
+            Timeout = TimeSpan.FromSeconds(30),
+        };
 
         using HttpResponseMessage response = await client.GetAsync(Card, CancellationToken.None);
 
         (await response.Content.ReadAsStringAsync()).ShouldContain("api.eu2.tcgdex.net");
         inner.Seen.Count.ShouldBe(2);
+
+        inner.CancelledOnEntry[0].ShouldBeFalse();
+        inner.CancelledOnEntry[1].ShouldBeFalse("the retry must get its own budget, not the expired one");
     }
 
     [Test]
@@ -310,6 +485,7 @@ public sealed class FailoverHandlerTests
         RecordingHandler inner = new RecordingHandler()
             .RespondWith(request => From(request, HttpStatusCode.BadGateway))
             .RespondWith(request => From(request, HttpStatusCode.OK))
+            .RespondWith(request => From(request, HttpStatusCode.OK))
             .RespondWith(request => From(request, HttpStatusCode.OK));
 
         using HttpClient client = new(
@@ -319,14 +495,28 @@ public sealed class FailoverHandlerTests
         {
         }
 
-        time.Advance(TimeSpan.FromMinutes(6));
-
-        using (HttpResponseMessage third = await client.GetAsync(Card, CancellationToken.None))
+        // Before advancing, the primary must still be skipped. Without this the
+        // test passes even if the cooldown were never recorded at all — it would
+        // be pinning only "no cooldown longer than six minutes", and leaning on a
+        // neighbouring test to prove one exists.
+        using (HttpResponseMessage duringCooldown =
+            await client.GetAsync(Card, CancellationToken.None))
         {
-            (await third.Content.ReadAsStringAsync()).ShouldContain("api.tcgdex.net");
+            (await duringCooldown.Content.ReadAsStringAsync())
+                .ShouldContain("api.eu2.tcgdex.net");
         }
 
-        inner.Requests[2].RequestUri!.Host.ShouldBe("api.tcgdex.net");
+        time.Advance(TimeSpan.FromMinutes(6));
+
+        using (HttpResponseMessage afterCooldown =
+            await client.GetAsync(Card, CancellationToken.None))
+        {
+            (await afterCooldown.Content.ReadAsStringAsync()).ShouldContain("api.tcgdex.net");
+        }
+
+        inner.Requests.Count.ShouldBe(4);
+        inner.Requests[2].RequestUri!.Host.ShouldBe("api.eu2.tcgdex.net");
+        inner.Requests[3].RequestUri!.Host.ShouldBe("api.tcgdex.net");
     }
 
     [Test]
@@ -420,6 +610,73 @@ public sealed class FailoverHandlerTests
             .ShouldBe("https://api.eu2.tcgdex.net/v2/en/cards?name=eq:Furret&hp=gt:100");
     }
 
+    [Test]
+    public async Task ConcurrentRequests_AllGetACorrectAnswer()
+    {
+        // The cooldown state is a long[] shared by every request on the client,
+        // read and written with Interlocked. This asserts the property that
+        // actually matters under concurrency: every caller gets a correct answer
+        // and nothing throws from a torn read of that array.
+        //
+        // It deliberately does NOT assert a request count. Threads racing
+        // through the window before the primary is marked failed will each spend
+        // one attempt on it, and how many do so depends on scheduling. That race
+        // is benign and bounded — each of those requests was going to contact the
+        // primary anyway, so the worst case equals the traffic that would have
+        // been sent with no failover configured at all. Asserting an exact count
+        // would be asserting the thread scheduler.
+        const int Callers = 50;
+
+        AlwaysHandler inner = new();
+
+        using HttpClient client = new(Handler(inner));
+
+        HttpResponseMessage[] responses = await Task.WhenAll(
+            Enumerable.Range(0, Callers)
+                .Select(_ => client.GetAsync(Card, CancellationToken.None)));
+
+        try
+        {
+            foreach (HttpResponseMessage response in responses)
+            {
+                response.StatusCode.ShouldBe(HttpStatusCode.OK);
+                (await response.Content.ReadAsStringAsync()).ShouldContain("api.eu2.tcgdex.net");
+            }
+        }
+        finally
+        {
+            foreach (HttpResponseMessage response in responses)
+            {
+                response.Dispose();
+            }
+        }
+
+        // Every caller was served, and only ever by the fallback.
+        inner.Served.Count.ShouldBe(Callers);
+    }
+
+    /// <summary>
+    /// Fails anything addressed to the primary and serves everything else. Has
+    /// no response queue, so it can answer any number of concurrent requests.
+    /// </summary>
+    private sealed class AlwaysHandler : HttpMessageHandler
+    {
+        internal System.Collections.Concurrent.ConcurrentBag<Uri> Served { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.Host == "api.tcgdex.net")
+            {
+                return Task.FromResult(From(request, HttpStatusCode.BadGateway));
+            }
+
+            Served.Add(request.RequestUri);
+            return Task.FromResult(From(request, HttpStatusCode.OK));
+        }
+    }
+
     /// <summary>
     /// Fails every request with the same transport error, except optionally the
     /// nth, which succeeds.
@@ -453,11 +710,19 @@ public sealed class FailoverHandlerTests
     {
         internal List<Uri> Seen { get; } = [];
 
+        /// <summary>
+        /// Whether each attempt arrived with an already-cancelled token — the
+        /// only observable difference between a per-attempt budget and one
+        /// budget shared by the whole request.
+        /// </summary>
+        internal List<bool> CancelledOnEntry { get; } = [];
+
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             Seen.Add(request.RequestUri!);
+            CancelledOnEntry.Add(cancellationToken.IsCancellationRequested);
 
             if (Seen.Count == 1)
             {

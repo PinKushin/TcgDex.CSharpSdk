@@ -91,13 +91,31 @@ public static class TcgDexServiceCollectionExtensions
     private static IHttpClientBuilder AttachFailover(
         IHttpClientBuilder builder,
         TcgDexOptions options)
-        => options.FailoverEndpoints.Count == 0
-            ? builder
-            : builder.AddHttpMessageHandler(() => new TcgDexFailoverHandler(
-                options.BaseAddress,
-                options.FailoverEndpoints,
-                options.FailoverAttemptTimeout,
-                options.FailoverCooldown));
+    {
+        if (options.FailoverEndpoints.Count == 0)
+        {
+            return builder;
+        }
+
+        // Created ONCE and captured, not built inside the factory.
+        // IHttpClientFactory rebuilds the handler chain every HandlerLifetime —
+        // two minutes by default — so a handler that made its own cooldown state
+        // would forget every failure on that schedule, quietly capping a
+        // five-minute cooldown at two and re-probing dead endpoints far more
+        // often than configured.
+        IReadOnlyList<Uri> endpoints =
+            TcgDexFailoverHandler.Deduplicate(options.FailoverEndpoints, options.BaseAddress);
+
+        FailoverCooldowns cooldowns = new(endpoints.Count + 1);
+
+        return builder.AddHttpMessageHandler(() => new TcgDexFailoverHandler(
+            options.BaseAddress,
+            options.GraphQlEndpoint,
+            endpoints,
+            options.FailoverAttemptTimeout,
+            options.FailoverCooldown,
+            cooldowns));
+    }
 
     /// <summary>
     /// Registers <see cref="ITcgDexClient"/> with response caching enabled.

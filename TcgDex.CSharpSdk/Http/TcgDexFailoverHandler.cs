@@ -15,10 +15,13 @@ using System.Net;
 /// happens on the wire.
 /// </para>
 /// <para>
-/// <b>Only GET is retried.</b> Resending is safe because the API is read-only
-/// and a GET carries no body to replay; a request with content — the opt-in
-/// GraphQL path — passes straight through to a single endpoint rather than
-/// being replayed on an assumption about whether it is safe to repeat.
+/// <b>GET, and POST to the GraphQL endpoint. Nothing else.</b> Resending is only
+/// safe for a request that changes nothing, and rather than assume that of any
+/// request with a body, this replays exactly the set the SDK authored itself:
+/// TCGdex's GraphQL schema exposes queries and no mutations, and
+/// <c>GraphQlTransport</c> is what built the body. A POST to any other address
+/// passes straight through to a single endpoint — the SDK will not decide on a
+/// caller's behalf that their request is safe to repeat.
 /// </para>
 /// <para>
 /// Rotation is deliberately narrow. A node that refuses a connection, hangs past
@@ -45,34 +48,60 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
     private const int MaxAttempts = 3;
 
     private readonly Uri _primary;
+    private readonly Uri _graphQlEndpoint;
     private readonly IReadOnlyList<Uri> _endpoints;
     private readonly TimeSpan _attemptTimeout;
     private readonly TimeSpan _cooldown;
     private readonly TimeProvider _timeProvider;
 
     /// <summary>
-    /// When each endpoint may be tried again, in UTC ticks. Index 0 is the
-    /// primary; the rest follow <see cref="_endpoints"/>.
+    /// Which endpoints are cooling off. Supplied rather than owned, so it
+    /// survives the handler being rebuilt — see <see cref="FailoverCooldowns"/>.
     /// </summary>
-    private readonly long[] _availableAt;
+    private readonly FailoverCooldowns _cooldowns;
 
     internal TcgDexFailoverHandler(
         Uri primary,
+        Uri graphQlEndpoint,
         IReadOnlyList<Uri> endpoints,
         TimeSpan attemptTimeout,
         TimeSpan cooldown,
+        FailoverCooldowns cooldowns,
         TimeProvider? timeProvider = null)
     {
         Guard.NotNull(primary);
+        Guard.NotNull(graphQlEndpoint);
         Guard.NotNull(endpoints);
+        Guard.NotNull(cooldowns);
+
+        // The primary is candidate 0, so listing it again as a fallback would
+        // send a failed request straight back to the node that just failed.
+        // Writing `UseMirror(Eu2).UseFailover()` is the natural way to hit this,
+        // since the two are documented side by side.
+        _endpoints = [.. endpoints.Where(endpoint => endpoint != primary)];
+
+        if (cooldowns.Count != _endpoints.Count + 1)
+        {
+            throw new ArgumentException(
+                $"Cooldown state tracks {cooldowns.Count} endpoints but " +
+                $"{_endpoints.Count + 1} are configured.",
+                nameof(cooldowns));
+        }
 
         _primary = primary;
-        _endpoints = endpoints;
+        _graphQlEndpoint = graphQlEndpoint;
         _attemptTimeout = attemptTimeout;
         _cooldown = cooldown;
+        _cooldowns = cooldowns;
         _timeProvider = timeProvider ?? TimeProvider.System;
-        _availableAt = new long[endpoints.Count + 1];
     }
+
+    /// <summary>
+    /// The endpoints this handler will actually use, after removing any that
+    /// duplicate the primary.
+    /// </summary>
+    internal static IReadOnlyList<Uri> Deduplicate(IReadOnlyList<Uri> endpoints, Uri primary)
+        => [.. endpoints.Where(endpoint => endpoint != primary)];
 
     /// <summary>The endpoint at a candidate index; 0 is the primary.</summary>
     private Uri Candidate(int index) => index == 0 ? _primary : _endpoints[index - 1];
@@ -85,15 +114,24 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
 
         // Anything this handler cannot safely replay goes straight through, so
         // the pipeline behaves exactly as it would without failover configured.
-        if (request.Method != HttpMethod.Get
-            || request.Content is not null
-            || request.RequestUri is null
+        if (request.RequestUri is null
+            || !IsReplayable(request)
             || !_primary.IsBaseOf(request.RequestUri))
         {
             return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
         Uri requested = request.RequestUri;
+
+        // Read once, before anything is sent. A retry needs the body again, and
+        // the content of a request that has already been dispatched cannot be
+        // relied on to still be readable.
+        byte[]? body = request.Content is null
+            ? null
+            : await request.Content
+                .ReadAsByteArrayAsync(cancellationToken)
+                .ConfigureAwait(false);
+
         List<int> order = CandidateOrder();
 
         HttpResponseMessage? lastResponse = null;
@@ -117,7 +155,7 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
             // response being returned.
             HttpRequestMessage? copy = candidate == 0
                 ? null
-                : Clone(request, Rewrite(requested, Candidate(candidate)));
+                : Clone(request, Rewrite(requested, Candidate(candidate)), body);
 
             using CancellationTokenSource? budget = CreateAttemptBudget(cancellationToken);
             CancellationToken deadline = budget?.Token ?? cancellationToken;
@@ -178,12 +216,12 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
     /// </remarks>
     private List<int> CandidateOrder()
     {
-        long now = _timeProvider.GetUtcNow().UtcTicks;
+        DateTimeOffset now = _timeProvider.GetUtcNow();
         List<int> order = [];
 
         for (int i = 0; i <= _endpoints.Count && order.Count < MaxAttempts; i++)
         {
-            if (Interlocked.Read(ref _availableAt[i]) <= now)
+            if (_cooldowns.IsAvailable(i, now))
             {
                 order.Add(i);
             }
@@ -198,16 +236,7 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
     }
 
     private void MarkFailed(int candidate)
-    {
-        if (_cooldown <= TimeSpan.Zero)
-        {
-            return;
-        }
-
-        Interlocked.Exchange(
-            ref _availableAt[candidate],
-            _timeProvider.GetUtcNow().Add(_cooldown).UtcTicks);
-    }
+        => _cooldowns.MarkFailed(candidate, _timeProvider.GetUtcNow(), _cooldown);
 
     private CancellationTokenSource? CreateAttemptBudget(CancellationToken cancellationToken)
     {
@@ -230,11 +259,39 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
         => new(endpoint, _primary.MakeRelativeUri(requested));
 
     /// <summary>
-    /// A resendable copy. No content is carried: this handler only retries GET.
+    /// Whether this request is one the SDK may send a second time.
     /// </summary>
-    private static HttpRequestMessage Clone(HttpRequestMessage source, Uri uri)
+    /// <remarks>
+    /// A GET changes nothing by definition. The GraphQL endpoint is admitted by
+    /// address rather than by method because the safety comes from knowing what
+    /// is in the body: TCGdex's schema has queries and no mutations, and the
+    /// body was built by this SDK. A POST anywhere else is a request the SDK did
+    /// not author and cannot vouch for.
+    /// </remarks>
+    private bool IsReplayable(HttpRequestMessage request)
+        => request.Method == HttpMethod.Get
+            || (request.Method == HttpMethod.Post && request.RequestUri == _graphQlEndpoint);
+
+    /// <summary>
+    /// A resendable copy, carrying the body when there is one.
+    /// </summary>
+    private static HttpRequestMessage Clone(HttpRequestMessage source, Uri uri, byte[]? body)
     {
         HttpRequestMessage clone = new(source.Method, uri) { Version = source.Version };
+
+        if (body is not null)
+        {
+            // Rebuilt from the bytes read up front rather than by reusing the
+            // original HttpContent, which a completed send may have disposed.
+            ByteArrayContent content = new(body);
+
+            foreach (KeyValuePair<string, IEnumerable<string>> header in source.Content!.Headers)
+            {
+                content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+
+            clone.Content = content;
+        }
 
         // Conditional headers matter here — the cache above this handler may have
         // attached an If-None-Match, and dropping it would turn a revalidation

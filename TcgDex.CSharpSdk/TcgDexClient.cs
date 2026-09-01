@@ -240,11 +240,16 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         // only ever sees the canonical address.
         if (resolved.FailoverEndpoints.Count > 0)
         {
+            IReadOnlyList<Uri> failoverEndpoints = TcgDexFailoverHandler.Deduplicate(
+                resolved.FailoverEndpoints, resolved.BaseAddress);
+
             handler = new TcgDexFailoverHandler(
                 resolved.BaseAddress,
-                resolved.FailoverEndpoints,
+                resolved.GraphQlEndpoint,
+                failoverEndpoints,
                 resolved.FailoverAttemptTimeout,
-                resolved.FailoverCooldown)
+                resolved.FailoverCooldown,
+                new FailoverCooldowns(failoverEndpoints.Count + 1))
             {
                 InnerHandler = handler,
             };

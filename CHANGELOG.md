@@ -32,8 +32,17 @@ something an application can observe — those live in the commit history.
   Deliberately narrow about what counts as a failure. A `404` never rotates — a
   missing card is a normal result, and rotating would send every absent card to
   every configured node — and neither does `429`, because spreading a rate limit
-  across endpoints is evasion rather than resilience. Only `GET` is retried, at
-  most three endpoints per request.
+  across endpoints is evasion rather than resilience. At most three endpoints are
+  tried per request.
+
+  **`GET`, and `POST` to the GraphQL endpoint — nothing else.** Rather than
+  assume any request with a body is safe to repeat, the SDK replays exactly the
+  set it authored: TCGdex's GraphQL schema has queries and no mutations, and the
+  body was built by the SDK's own transport. The body and its content headers
+  travel with the retry. A `POST` anywhere else, or another verb aimed at the
+  GraphQL endpoint, is passed through untouched — narrower than today's API
+  needs, so that a mutation endpoint appearing later is not replayed by
+  accident.
 
   Two knobs, both with a reason: `FailoverAttemptTimeout` (default 10s) is what
   lets failover survive a server that accepts the connection and then hangs,
