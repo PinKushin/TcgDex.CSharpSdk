@@ -1273,3 +1273,61 @@ polymorphic `damage` field, the object-array `boosters`, the missing `image` on
 payloads are irregular in ways invented test data never is.
 
 See `docs/api-info.md` §9 for what each fixture card is for.
+
+---
+
+## A test can be hermetic only while the code is correct, and mutation is where that shows
+
+`ClientLifetimeTests.Create_DisposesItsOwnHttpClient` proved that `TcgDexClient.Create`
+disposes the `HttpClient` it owns by disposing the client, then awaiting a
+request and expecting `ObjectDisposedException`. Every unit test in this suite
+drives a stubbed handler; this one did not, because `Create` builds its own
+transport — a real `SocketsHttpHandler` pointed at `api.tcgdex.net`.
+
+That is offline **only when the disposal works**. The request never leaves the
+process because the client is already disposed — so the test's isolation
+depended on the correctness of the very thing it was testing. Circular, and
+invisible while the code is right.
+
+Mutation testing breaks the code on purpose, so it is exactly where the
+circularity resolves. Every mutant that defeated the disposal turned that
+awaited request into a genuine call to the live API. On 2026-08-29 and 08-30,
+with TCGdex down, each one waited out the 30-second request timeout:
+
+| date | mutation run |
+|---|---|
+| 08-28, API healthy | 14 min |
+| **08-29, API down** | **2 h 13 m** |
+| **08-30, API down** | **2 h 38 m** |
+| 08-31, API healthy | 20 min |
+
+The runs happen on a measurement box shared with other projects, serialised by
+an `flock` that **refuses rather than queues**, so an overrunning job does not
+delay its neighbour — it deletes it. Two days of another project's measurements
+simply never ran, leaving no error anywhere, only an absent directory.
+
+**The diagnosis nearly went to the wrong place.** The slow runs were all at one
+commit and the fast ones at its successor, which reads as a regression and an
+accidental fix. It was neither: the later commit is a strict superset of the
+earlier one, adding a feature and removing nothing, so a per-mutant cost present
+in one and absent in the other cannot live in the diff. What actually changed
+between those runs was the weather at someone else's API. *When a timing change
+correlates with a commit boundary, check whether the diff can even contain the
+cause before believing it.*
+
+The fix asserts the same thing with no transport — reach the owned `HttpClient`
+and confirm `CancelPendingRequests()` throws `ObjectDisposedException`, which
+hits the identical disposed-check without issuing a request. Confirmed by
+manipulation: with `Dispose` deliberately defeated the test now fails in **58 ms**
+instead of hanging, so it still kills the mutant and no longer depends on a
+network.
+
+One thing limited the damage, and it was a deliberate design choice made for an
+unrelated reason: **the SDK ships no retry policy**, so each affected mutant made
+a single serial call rather than a storm of them against an API that was already
+down.
+
+**Rule:** a unit test must not reach the network on *any* path — including one
+taken only when the code is broken. "It cannot make that call because the guard
+stops it" is not hermeticity when the guard is what a mutant removes. Assert the
+observable state directly.
