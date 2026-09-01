@@ -131,16 +131,47 @@ internal sealed class BoundedLru<TKey, TValue>
         // apart: replacing an existing value is not growth, and counting it as
         // growth would evict live entries from a store sitting under its bound.
         // The indexer cannot report which happened.
-        if (_entries.TryAdd(key, entry))
+        //
+        // The loop is what makes that true under concurrency. Falling back to a
+        // plain indexer assignment in an else branch — the obvious shape — LOSES
+        // COUNT PERMANENTLY when a removal lands between the failed TryAdd and
+        // that assignment:
+        //
+        //   1. this thread     Set(k)   -> TryAdd false, k is present
+        //   2. another thread  Remove(k) -> succeeds, count N-1
+        //   3. this thread     _entries[k] = entry
+        //
+        // The indexer ADDS when the key is absent, so step 3 puts k back
+        // uncounted: the dictionary holds N while the counter says N-1. Both
+        // racers are on the hot path — the cache removes on every non-success
+        // response and on absolute-lifetime expiry, while another in-flight
+        // request stores the same key.
+        //
+        // It cannot self-correct either. Evict only runs when the counter
+        // EXCEEDS the bound, and this drift is precisely what stops it getting
+        // there, so every occurrence raises the effective bound by one and it
+        // never comes back down. MaxEntries then stops bounding memory in the
+        // long-running process it exists for.
+        //
+        // TryUpdate replaces only if the key is still there; if it is not, the
+        // next turn of the loop goes back through the counted TryAdd branch.
+        while (true)
         {
-            if (Interlocked.Increment(ref _approximateCount) > _maxEntries)
+            if (_entries.TryAdd(key, entry))
             {
-                Evict();
+                if (Interlocked.Increment(ref _approximateCount) > _maxEntries)
+                {
+                    Evict();
+                }
+
+                return;
             }
-        }
-        else
-        {
-            _entries[key] = entry;
+
+            if (_entries.TryGetValue(key, out Entry? existing)
+                && _entries.TryUpdate(key, entry, existing))
+            {
+                return;
+            }
         }
     }
 
