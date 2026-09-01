@@ -58,7 +58,7 @@ Other scripts: `scripts/Update-Fixtures.ps1` (re-record fixtures from the live A
   Stryker, every mutant that defeated the disposal dialled the live API; on a night the API was
   down, each one hit the 30-second timeout and the run went from ~20 minutes to 2h38m, silently
   starving a neighbouring job on the shared measurement box. Assert the observable state directly.
-  (`MEASUREMENT-BOX-LOG.md`, 2026-08-31.)
+  (`docs/learnings.md` — "A test can be hermetic only while the code is correct".)
 
 - **The query builder must never call `Expression.Compile()`.** Runtime codegen is not AOT-safe and
   would break Unity and Native AOT consumers. Expression trees are walked and translated to query
