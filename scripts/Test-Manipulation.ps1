@@ -16,6 +16,15 @@
     in a finally block, and is verified by comparing content afterwards. It
     cannot be forgotten, and it says so if it ever fails.
 
+    ONE THING IT CANNOT PROTECT AGAINST, learned the hard way: killing the script
+    from outside — a harness timeout, Ctrl-Break, closing the terminal — skips the
+    finally and leaves the sabotage in the working tree. That happened on
+    2026-09-01 when a manipulated build hung and the run was killed externally.
+    If a run of this script does not print "restored", check the file before
+    doing anything else. Prefer giving the run a generous timeout over killing
+    it, and choose a -Test filter that cannot hang: a test whose only way to end
+    is the very code being sabotaged will hang rather than fail.
+
     It reports a VERDICT rather than test output, because "the test failed" and
     "the test is sensitive to this defect" are different statements and only the
     second one is the answer:

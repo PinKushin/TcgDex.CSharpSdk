@@ -262,17 +262,7 @@ internal sealed class TcgDexTransport
     /// visible at the use site rather than hidden inside a sentinel.
     /// </remarks>
     private CancellationTokenSource? CreateBudget(CancellationToken cancellationToken)
-    {
-        if (_timeout == System.Threading.Timeout.InfiniteTimeSpan)
-        {
-            return null;
-        }
-
-        CancellationTokenSource source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        source.CancelAfter(_timeout);
-
-        return source;
-    }
+        => RequestBudget.Create(_timeout, cancellationToken);
 
     /// <param name="uri">The resource being fetched.</param>
     /// <param name="activity">The span to record a failure on, if any.</param>

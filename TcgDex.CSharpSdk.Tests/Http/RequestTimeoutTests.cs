@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using TcgDex;
+using TcgDex.Querying;
 
 /// <summary>
 /// The ceiling on how long one request may take.
@@ -153,6 +154,45 @@ public sealed class RequestTimeoutTests
 
         TcgDexApiException error = Should.Throw<TcgDexApiException>(
             () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
+
+        error.Message.ShouldContain("timed out", Case.Insensitive);
+    }
+
+    [Test]
+    [CancelAfter(15000)]
+    public async Task AHangingGraphQlRequest_AlsoObservesTheConfiguredTimeout()
+    {
+        // The GraphQL path applied no budget at all, so the only ceiling was
+        // HttpClient's own 100-second default — the value this option exists to
+        // replace — and with a caller-supplied client set to InfiniteTimeSpan
+        // there was no ceiling whatsoever. It then reported the expiry as "the
+        // GraphQL request timed out", naming a limit the SDK had not set.
+        //
+        // HttpClient.Timeout is set to infinite here, and that is what makes the
+        // test decisive rather than merely green. Left at its 100-second default
+        // it is a second ceiling, so the request expires either way and the
+        // assertion cannot tell the SDK's budget from HttpClient's — an earlier
+        // version did exactly that, and the manipulation harness reported it
+        // INSENSITIVE against a build with the budget removed.
+        //
+        // With no other limit in play, the SDK's 200 ms budget is the only thing
+        // that can end this call. A regression cannot finish inside the
+        // 15-second guard, so it fails loudly instead of hanging the suite.
+        using HttpClient http = new(new HangingHandler()) { Timeout = Timeout.InfiniteTimeSpan };
+        using TcgDexClient client = new(
+            http,
+            new TcgDexOptions { Timeout = TimeSpan.FromMilliseconds(200) });
+
+        // NUnit's own token, not None. With CancellationToken.None a missing
+        // budget leaves nothing able to end the call, so the test HANGS instead
+        // of failing — and a hanging test is worse than no test, as this file's
+        // own remarks say. Handing NUnit's token to the call means the 15-second
+        // guard actually reaches the request: the wrong exception type comes
+        // back and the test fails loudly.
+        TcgDexApiException error = await Should.ThrowAsync<TcgDexApiException>(
+            () => client.Cards.SearchDetailedAsync(
+                new CardFilter { Name = "Furret" },
+                cancellationToken: TestContext.CurrentContext.CancellationToken));
 
         error.Message.ShouldContain("timed out", Case.Insensitive);
     }
