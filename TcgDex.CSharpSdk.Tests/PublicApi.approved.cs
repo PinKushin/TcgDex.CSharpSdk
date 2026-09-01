@@ -36,7 +36,7 @@ namespace TcgDex.Caching
     }
     public sealed class TcgDexCachingHandler : System.Net.Http.DelegatingHandler
     {
-        public TcgDexCachingHandler(TcgDex.Caching.ITcgDexResponseCache cache, TcgDex.Caching.TcgDexCacheOptions? options = null, System.TimeProvider? timeProvider = null) { }
+        public TcgDexCachingHandler(TcgDex.Caching.ITcgDexResponseCache cache, TcgDex.Caching.TcgDexCacheOptions? options = null, System.TimeProvider? timeProvider = null, long maxResponseBytes = 33554432) { }
         public long FreshHits { get; }
         public long Misses { get; }
         public long Revalidations { get; }

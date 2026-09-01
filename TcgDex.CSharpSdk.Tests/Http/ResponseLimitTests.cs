@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TcgDex;
 using TcgDex.Models;
+using TcgDex.Caching;
 using TcgDex.Querying;
 
 /// <summary>
@@ -58,6 +59,83 @@ public sealed class ResponseLimitTests
         // span-based Concat that CA1845 prefers does not exist on net472, which
         // this suite also targets.
         return card.Remove(card.Length - 1) + ",\"_padding\":\"" + padding + "\"}";
+    }
+
+    [Test]
+    public async Task Caching_ResponseOverTheLimit_Throws()
+    {
+        // The caching handler sits ABOVE the transport and drains the body
+        // itself, so BoundedContent never saw this stream and MaxResponseBytes
+        // did not apply — the real ceiling was HttpContent's 2 GB. Worse on the
+        // Create() path, where AutomaticDecompression is enabled and the
+        // expansion happens in the handler BELOW this one: a megabyte of hostile
+        // gzip became roughly a gigabyte here, and was then stored, because the
+        // cache bounds entries rather than bytes.
+        // THE TRANSPORT'S LIMIT IS DISABLED HERE, and that is the whole design of
+        // this test. Wired to the same value as production, the transport rejects
+        // the body a moment later and the assertion passes either way — an
+        // earlier version of this test did exactly that, and passed with the
+        // caching limit multiplied by a million. Setting MaxResponseBytes to zero
+        // leaves the caching handler's ceiling as the only thing that can reject
+        // this body.
+        //
+        // The defect it pins is real even when the transport does reject: this
+        // handler drains the body FIRST, so the memory is already spent by the
+        // time anything downstream complains. On the Create() path decompression
+        // happens below this handler, so a megabyte of hostile gzip became
+        // roughly a gigabyte here — and was then stored, because the cache bounds
+        // entries rather than bytes.
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWith(HttpStatusCode.OK, OversizedCard(64 * 1024));
+
+        using TcgDexCachingHandler caching = new(
+            new MemoryTcgDexResponseCache(),
+            new TcgDexCacheOptions(),
+            timeProvider: null,
+            maxResponseBytes: 32768)
+        {
+            InnerHandler = handler,
+        };
+
+        using HttpClient http = new(caching);
+        TcgDexClient client = new(http, new TcgDexOptions { MaxResponseBytes = 0 });
+
+        TcgDexApiException exception = await Should.ThrowAsync<TcgDexApiException>(
+            () => client.Cards.GetAsync("swsh3-136", CancellationToken.None));
+
+        exception.Message.ShouldContain("32768");
+    }
+
+    [Test]
+    public async Task Caching_ResponseUnderTheLimit_IsStillCached()
+    {
+        // The control. A limit that rejected everything would satisfy the test
+        // above while breaking the cache entirely, and the second call proves
+        // the body actually reached the store rather than merely not throwing.
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWith(HttpStatusCode.OK, ValidCard());
+
+        using TcgDexCachingHandler caching = new(
+            new MemoryTcgDexResponseCache(),
+            new TcgDexCacheOptions(),
+            timeProvider: null,
+            maxResponseBytes: 32768)
+        {
+            InnerHandler = handler,
+        };
+
+        using HttpClient http = new(caching);
+        TcgDexClient client = new(http, new TcgDexOptions { MaxResponseBytes = 32768 });
+
+        (await client.Cards.GetAsync("swsh3-136", CancellationToken.None))
+            .ShouldNotBeNull().Name.ShouldBe("Furret");
+
+        // Served from the cache: only one response was queued, so a second
+        // network request would fail the handler's own empty-queue check.
+        (await client.Cards.GetAsync("swsh3-136", CancellationToken.None))
+            .ShouldNotBeNull().Name.ShouldBe("Furret");
+
+        handler.Requests.Count.ShouldBe(1);
     }
 
     [Test]
@@ -340,5 +418,54 @@ public sealed class ResponseLimitTests
                 cancellationToken: CancellationToken.None)).Result;
 
         exception.Message.ShouldContain("32768");
+    }
+
+    [Test]
+    public async Task GraphQl_StopsReadingAtTheLimit_RatherThanBufferingFirst()
+    {
+        // The test above cannot see this defect: it throws either way. What it
+        // could not distinguish is WHEN the memory is spent.
+        //
+        // PostAsync defaults to HttpCompletionOption.ResponseContentRead, which
+        // buffers the ENTIRE body inside HttpClient before returning — so the
+        // bounded read that follows was rejecting a body whose memory had already
+        // been allocated, and the real ceiling was HttpContent's 2 GB rather than
+        // MaxResponseBytes. Counting how much of the stream was consumed is what
+        // separates the two.
+        CountingStream stream = new(System.Text.Encoding.UTF8.GetBytes(OversizedCard(256 * 1024)));
+
+        RecordingHandler handler = new RecordingHandler().RespondWith(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(stream) });
+
+        await Should.ThrowAsync<TcgDexApiException>(
+            () => CreateClient(handler, 32768).Cards.SearchDetailedAsync(
+                new CardFilter { Name = "Furret" },
+                cancellationToken: CancellationToken.None));
+
+        // Reading stops near the ceiling instead of draining the whole body.
+        // Generous by a wide margin — the point is the order of magnitude, not a
+        // byte count: buffering first reads all ~256 KB.
+        stream.BytesRead.ShouldBeLessThan(128 * 1024);
+    }
+
+    /// <summary>Records how much of the body was actually consumed.</summary>
+    private sealed class CountingStream(byte[] bytes) : MemoryStream(bytes)
+    {
+        internal int BytesRead { get; private set; }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int read = base.Read(buffer, offset, count);
+            BytesRead += read;
+            return read;
+        }
+
+        public override Task<int> ReadAsync(
+            byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            int read = base.Read(buffer, offset, count);
+            BytesRead += read;
+            return Task.FromResult(read);
+        }
     }
 }

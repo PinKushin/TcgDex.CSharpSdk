@@ -175,8 +175,17 @@ internal sealed class GraphQlTransport(
                 new GraphQlRequest(query),
                 GraphQlJsonContext.Default.GraphQlRequest);
 
+            using HttpRequestMessage httpRequest =
+                new(HttpMethod.Post, _options.GraphQlEndpoint) { Content = content };
+
+            // ResponseHeadersRead, not PostAsync. PostAsync defaults to
+            // ResponseContentRead, which buffers the ENTIRE body inside
+            // HttpClient before returning — so the BoundedContent read below was
+            // rejecting a body whose memory had already been spent, and the real
+            // ceiling was HttpContent's 2 GB rather than MaxResponseBytes. The
+            // REST transport reads headers first for exactly this reason.
             using HttpResponseMessage httpResponse = await _httpClient
-                .PostAsync(_options.GraphQlEndpoint, content, cancellationToken)
+                .SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                 .ConfigureAwait(false);
 
             ArraySegment<byte> body = await BoundedContent
