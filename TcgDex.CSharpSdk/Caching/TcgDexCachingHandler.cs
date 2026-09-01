@@ -41,6 +41,7 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
     private readonly ITcgDexResponseCache _cache;
     private readonly TcgDexCacheOptions _options;
     private readonly TimeProvider _timeProvider;
+    private readonly long _maxResponseBytes;
 
     /// <summary>
     /// Tracks requests currently in flight so concurrent callers asking for the
@@ -53,17 +54,29 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
     /// <param name="cache">Where responses are stored.</param>
     /// <param name="options">Freshness policy. Defaults are used when omitted.</param>
     /// <param name="timeProvider">Clock used for freshness; defaults to the system clock.</param>
+    /// <param name="maxResponseBytes">
+    /// The largest body this handler will buffer, matching
+    /// <see cref="TcgDexOptions.MaxResponseBytes"/>. Zero removes the limit.
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="cache"/> is null.</exception>
+    /// <remarks>
+    /// <paramref name="maxResponseBytes"/> defaults to the same 32 MiB as
+    /// <see cref="TcgDexOptions"/> rather than to unbounded, so a handler
+    /// constructed by hand is bounded too. Both of the SDK's own construction
+    /// paths pass the configured value through.
+    /// </remarks>
     public TcgDexCachingHandler(
         ITcgDexResponseCache cache,
         TcgDexCacheOptions? options = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        long maxResponseBytes = 32L * 1024 * 1024)
     {
         Guard.NotNull(cache);
 
         _cache = cache;
         _options = options ?? new TcgDexCacheOptions();
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _maxResponseBytes = maxResponseBytes;
     }
 
     /// <summary>Number of responses served without any network request.</summary>
@@ -233,17 +246,48 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
 
         Interlocked.Increment(ref _misses);
 
-        byte[] body = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        CachedResponse stored;
 
-        CachedResponse stored = new()
+        try
         {
-            Body = body,
-            ETag = response.Headers.ETag?.ToString(),
-            ContentType = response.Content.Headers.ContentType?.ToString(),
-            StoredAt = _timeProvider.GetUtcNow(),
-        };
+            // Bounded, like every other body read in the SDK. This handler sits
+            // ABOVE the transport and drains the body itself, so BoundedContent
+            // never saw this stream and MaxResponseBytes did not apply here —
+            // the ceiling was HttpContent's own 2 GB. Decompression happens in
+            // the handler BELOW this one, so with AutomaticDecompression enabled
+            // a megabyte of hostile gzip expanded to roughly a gigabyte inside
+            // this call, and was then stored, since the cache bounds entries
+            // rather than bytes.
+            ArraySegment<byte> body = await BoundedContent
+                .ReadAsBytesAsync(
+                    response.Content,
+                    _maxResponseBytes,
+                    // Non-null: SendAsync returns early for a null RequestUri
+                    // before any fetch path is entered, and `key` above is built
+                    // from this same property.
+                    request.RequestUri!,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
-        response.Dispose();
+            stored = new CachedResponse
+            {
+                // Copied: the segment may sit in a larger pooled buffer, and this
+                // is retained in the cache long after the read returns.
+                Body = body.Count == body.Array!.Length
+                    ? body.Array
+                    : [.. body],
+                ETag = response.Headers.ETag?.ToString(),
+                ContentType = response.Content.Headers.ContentType?.ToString(),
+                StoredAt = _timeProvider.GetUtcNow(),
+            };
+        }
+        finally
+        {
+            // In a finally so an oversized body, a dropped connection or a
+            // cancelled token releases the connection instead of holding it out
+            // of the pool until finalisation.
+            response.Dispose();
+        }
 
         await _cache.SetAsync(key, stored, timeToLive, cancellationToken).ConfigureAwait(false);
 
