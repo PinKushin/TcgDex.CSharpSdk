@@ -171,6 +171,18 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
     /// held indefinitely and never observe DNS changes. That is the failure a
     /// naive singleton runs into, and it is invisible until a host moves.
     /// </para>
+    /// <para>
+    /// <b>That applies on net8.0 and later, and on .NET Framework.</b> It does
+    /// not apply to net6.0 or net7.0, which resolve the
+    /// <c>netstandard2.0</c> assembly: the mechanism available there is
+    /// <c>ServicePoint.ConnectionLeaseTimeout</c>, which modern .NET ignores,
+    /// and nothing that asset can reach sets a pooled lifetime on those
+    /// runtimes. Connections are still recycled by the OS and by the server, so
+    /// this is a weaker guarantee rather than none — but if you are on net6.0 or
+    /// net7.0 and depend on prompt DNS re-resolution, supply your own
+    /// <see cref="HttpClient"/> over a <c>SocketsHttpHandler</c> you configure,
+    /// or move to net8.0.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code>
@@ -212,13 +224,30 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         // SocketsHttpHandler is .NET Core 2.1+, so on .NET Framework the same
         // guarantee comes from the mechanism that platform actually has:
         // ConnectionLeaseTimeout closes a connection after the interval and
-        // forces the next request to re-resolve DNS. Set on the ServicePoint
-        // for the base address, which is the only host this client talks to.
-        // On other runtimes that reach this code path the call is a harmless
-        // no-op.
-        System.Net.ServicePointManager
-            .FindServicePoint(resolved.BaseAddress)
-            .ConnectionLeaseTimeout = (int)ConnectionRecycleInterval.TotalMilliseconds;
+        // forces the next request to re-resolve DNS.
+        //
+        // ON MODERN .NET THIS DOES NOTHING, and calling it "a harmless no-op" —
+        // as this comment previously did — is the wrong reading. net6.0 and
+        // net7.0 resolve THIS asset, because a net8.0 assembly cannot be
+        // consumed by an older runtime, and on those runtimes HttpClient ignores
+        // ServicePointManager entirely (SYSLIB0014). HttpClientHandler there
+        // defaults to an unlimited pooled-connection lifetime, so a long-lived
+        // client pins its connections and never re-resolves DNS. That is the
+        // exact failure Create's documentation promises to prevent, so the
+        // documentation now says where the guarantee applies rather than
+        // claiming it everywhere. Nothing reachable from netstandard2.0 can set
+        // a pooled lifetime on those runtimes.
+        //
+        // Every configured host, not just the base address: after a failover the
+        // client talks to a mirror, and leaving that one unrecycled would drop
+        // the guarantee for the endpoint it is depending on precisely because
+        // the primary is down.
+        foreach (Uri endpoint in new[] { resolved.BaseAddress }.Concat(resolved.FailoverEndpoints))
+        {
+            System.Net.ServicePointManager
+                .FindServicePoint(endpoint)
+                .ConnectionLeaseTimeout = (int)ConnectionRecycleInterval.TotalMilliseconds;
+        }
 
         // DecompressionMethods.All is .NET 5+, and Brotli is not available
         // here — these two are what netstandard2.0 can offer.
