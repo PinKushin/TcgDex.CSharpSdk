@@ -180,7 +180,13 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         if (!ReferenceEquals(pending, tcs.Task))
         {
             // Someone else is already fetching this URL.
-            CachedResponse? shared = await pending.ConfigureAwait(false);
+            //
+            // Awaited through THIS caller's token, not bare. Waiting on the
+            // shared task alone made a waiter's own cancellation and its own
+            // Timeout unenforceable: it blocked for as long as the leader's
+            // fetch took, which with Timeout.InfiniteTimeSpan is forever.
+            CachedResponse? shared = await WaitForLeaderAsync(pending, cancellationToken)
+                .ConfigureAwait(false);
 
             return shared is null ? FetchResult.None : FetchResult.FromCache(shared);
         }
@@ -192,17 +198,63 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             tcs.SetResult(result.Cached);
             return result;
         }
-        catch (Exception exception)
+        catch
         {
-            // Faulting the shared task propagates the failure to every waiter
-            // rather than leaving them hanging on a task nobody completes.
-            tcs.SetException(exception);
+            // The leader's failure is NOT propagated to the waiters, and that is
+            // deliberate. Faulting the shared task handed every waiter the
+            // leader's exception, which unwound through the transport's filter —
+            // a filter that tests the WAITER's token. So a caller who had waited
+            // five milliseconds and cancelled nothing was told "the request
+            // timed out after 00:00:30", because a different caller on another
+            // thread had cancelled or expired. One caller's instruction to stop
+            // became a service fault reported to strangers.
+            //
+            // Completing with null instead lets each waiter fall through to its
+            // own fetch, where any failure is genuinely its own and its own token
+            // decides how it is reported.
+            tcs.SetResult(null);
             throw;
         }
         finally
         {
             _inFlight.TryRemove(key, out _);
         }
+    }
+
+    /// <summary>
+    /// Waits for the leader's fetch, but no longer than this caller is willing
+    /// to wait.
+    /// </summary>
+    /// <remarks>
+    /// Awaiting the shared task directly ties a waiter's fate to a request it
+    /// did not make: its own <see cref="TcgDexOptions.Timeout"/> and its own
+    /// cancellation both stop applying, because neither is attached to the task
+    /// it is blocked on.
+    /// </remarks>
+    private static async Task<CachedResponse?> WaitForLeaderAsync(
+        Task<CachedResponse?> pending,
+        CancellationToken cancellationToken)
+    {
+#if NET6_0_OR_GREATER
+        return await pending.WaitAsync(cancellationToken).ConfigureAwait(false);
+#else
+        // Task.WaitAsync is net6.0+. The same guarantee here is a race between
+        // the leader's task and one that completes on cancellation — the leader
+        // is left running either way, since another waiter may still want it.
+        TaskCompletionSource<bool> cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        using (cancellationToken.Register(
+            static state => ((TaskCompletionSource<bool>)state).TrySetResult(true),
+            cancelled))
+        {
+            if (await Task.WhenAny(pending, cancelled.Task).ConfigureAwait(false) != pending)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+
+        return await pending.ConfigureAwait(false);
+#endif
     }
 
     private async Task<FetchResult> FetchAsync(
