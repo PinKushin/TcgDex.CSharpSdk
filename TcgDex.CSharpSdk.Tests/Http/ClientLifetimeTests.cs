@@ -216,20 +216,28 @@ public sealed class ClientLifetimeTests
     [Test]
     public void Create_DisposesItsOwnHttpClient()
     {
-        // Observable indirectly: after disposal the owned client is gone, so a
-        // request throws rather than silently succeeding.
+        // Create owns the HttpClient it builds (ownsHttpClient: true), so its
+        // Dispose must dispose it. Proven by reaching that HttpClient and
+        // confirming a disposed-sensitive call throws after disposal.
         //
-        // The .Result is not incidental. Should.ThrowAsync returns a Task, and
-        // the earlier version of this test discarded it — so the assertion
-        // never ran and the test passed whatever the client did with its
-        // HttpClient. Mutation testing found it by flipping ownsHttpClient to
-        // false with nothing noticing.
+        // NOT proven by making a request and expecting ObjectDisposedException.
+        // Create builds a real handler on the live API, so any mutant that
+        // defeats the disposal turned the awaited request into a genuine call to
+        // api.tcgdex.net. On a night the API was slow or down that made every such
+        // mutant a 30-second timeout and the whole mutation run take hours, which
+        // silently starved a neighbouring job on the shared measurement box. A
+        // unit test must never depend on the network, least of all under mutation,
+        // where the guard hiding the network path is exactly what gets broken.
+        // CancelPendingRequests hits the same disposed-check with no transport.
         TcgDexClient client = TcgDexClient.Create();
+
+        HttpClient owned = ((HttpClient?)typeof(TcgDexClient)
+            .GetField("_ownedHttpClient", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(client)).ShouldNotBeNull();
+
         client.Dispose();
 
-        Should.ThrowAsync<ObjectDisposedException>(
-            async () => await client.Cards.GetAsync("swsh3-136", CancellationToken.None))
-            .Result.ShouldNotBeNull();
+        Should.Throw<ObjectDisposedException>(() => owned.CancelPendingRequests());
     }
 
     [Test]
