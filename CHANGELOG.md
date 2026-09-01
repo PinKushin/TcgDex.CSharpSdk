@@ -15,8 +15,6 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-09-01
-
 ### Added
 
 - **Fall back to another server when one is unreachable.**
@@ -225,8 +223,7 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.3.0...v0.4.0
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.1.1...v0.2.0
