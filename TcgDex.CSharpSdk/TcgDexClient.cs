@@ -234,6 +234,27 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         };
 #endif
 
+        // Wrapped before the cache below, which leaves failover INNERMOST. The
+        // cache keys on the request URI, so a host rewritten above it would key
+        // the same resource separately for every endpoint; down here the cache
+        // only ever sees the canonical address.
+        if (resolved.FailoverEndpoints.Count > 0)
+        {
+            IReadOnlyList<Uri> failoverEndpoints = TcgDexFailoverHandler.Deduplicate(
+                resolved.FailoverEndpoints, resolved.BaseAddress);
+
+            handler = new TcgDexFailoverHandler(
+                resolved.BaseAddress,
+                resolved.GraphQlEndpoint,
+                failoverEndpoints,
+                resolved.FailoverAttemptTimeout,
+                resolved.FailoverCooldown,
+                new FailoverCooldowns(failoverEndpoints.Count + 1))
+            {
+                InnerHandler = handler,
+            };
+        }
+
         if (cacheOptions is not null)
         {
             handler = new TcgDexCachingHandler(

@@ -119,11 +119,17 @@ namespace TcgDex
         public TcgDexOptions() { }
         public System.Uri BaseAddress { get; set; }
         public bool DeserializePricing { get; set; }
+        public System.TimeSpan FailoverAttemptTimeout { get; set; }
+        public System.TimeSpan FailoverCooldown { get; set; }
+        public System.Collections.Generic.IReadOnlyList<System.Uri> FailoverEndpoints { get; }
         public System.Uri GraphQlEndpoint { get; set; }
         public string Language { get; set; }
         public int MaxDeserializedCacheEntries { get; set; }
         public long MaxResponseBytes { get; set; }
         public System.TimeSpan Timeout { get; set; }
+        public TcgDex.TcgDexOptions UseFailover() { }
+        public TcgDex.TcgDexOptions UseFailover(params System.Uri[] endpoints) { }
+        public TcgDex.TcgDexOptions UseFailover(params TcgDex.TcgDexMirror[] mirrors) { }
         public TcgDex.TcgDexOptions UseMirror(TcgDex.TcgDexMirror mirror) { }
         public void Validate() { }
     }

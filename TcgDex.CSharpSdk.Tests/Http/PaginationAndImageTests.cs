@@ -158,11 +158,11 @@ public sealed class PaginationAndImageTests
     }
 
     [Test]
-    public void StreamAsync_WithNullQuery_Throws()
+    public async Task StreamAsync_WithNullQuery_Throws()
     {
         RecordingHandler handler = new();
 
-        Should.ThrowAsync<ArgumentNullException>(async () =>
+        await Should.ThrowAsync<ArgumentNullException>(async () =>
         {
             await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(null!, 10, CancellationToken.None))
             {
@@ -172,11 +172,11 @@ public sealed class PaginationAndImageTests
 
     [TestCase(0)]
     [TestCase(-1)]
-    public void StreamAsync_WithInvalidPageSize_Throws(int pageSize)
+    public async Task StreamAsync_WithInvalidPageSize_Throws(int pageSize)
     {
         RecordingHandler handler = new();
 
-        Should.ThrowAsync<ArgumentOutOfRangeException>(async () =>
+        await Should.ThrowAsync<ArgumentOutOfRangeException>(async () =>
         {
             await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), pageSize, CancellationToken.None))
             {
@@ -185,14 +185,14 @@ public sealed class PaginationAndImageTests
     }
 
     [Test]
-    public void StreamAsync_WhenCancelled_StopsEnumerating()
+    public async Task StreamAsync_WhenCancelled_StopsEnumerating()
     {
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Page(5, 0));
 
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        Should.ThrowAsync<OperationCanceledException>(async () =>
+        await Should.ThrowAsync<OperationCanceledException>(async () =>
         {
             await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 5, cts.Token))
             {

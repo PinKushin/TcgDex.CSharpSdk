@@ -81,6 +81,17 @@ internal sealed class TcgDexTransport
         // client says so immediately instead of once per call.
         WarnIfInsecure(options.BaseAddress);
         WarnIfInsecure(options.GraphQlEndpoint);
+
+        // Failover endpoints too, and this is not optional politeness: once a
+        // cooldown rules the primary out, EVERY request goes to one of these, so
+        // a plaintext mirror silently becomes the whole conversation. The public
+        // documentation on UseFailover promises this warning, which is reason
+        // enough on its own — a documented guard that does not exist is worse
+        // than one that was never claimed.
+        foreach (Uri endpoint in options.FailoverEndpoints)
+        {
+            WarnIfInsecure(endpoint);
+        }
     }
 
     private void WarnIfInsecure(Uri uri)
