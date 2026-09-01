@@ -222,12 +222,12 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     }
 
     [Test]
-    public void CancelledRequest_ThrowsOperationCanceled()
+    public async Task CancelledRequest_ThrowsOperationCanceled()
     {
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        Should.ThrowAsync<OperationCanceledException>(
+        await Should.ThrowAsync<OperationCanceledException>(
             async () => await Client.Cards.GetAsync("swsh3-136", cts.Token));
     }
 }

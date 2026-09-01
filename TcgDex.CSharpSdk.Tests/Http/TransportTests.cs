@@ -167,7 +167,7 @@ public sealed class TransportTests
     // ----- cancellation -----
 
     [Test]
-    public void GetAsync_WhenCancelled_ThrowsOperationCanceled()
+    public async Task GetAsync_WhenCancelled_ThrowsOperationCanceled()
     {
         RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
@@ -175,7 +175,7 @@ public sealed class TransportTests
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        Should.ThrowAsync<OperationCanceledException>(
+        await Should.ThrowAsync<OperationCanceledException>(
             async () => await CreateTransport(handler).GetAsync<Card>("cards/swsh3-136", cts.Token));
     }
 
