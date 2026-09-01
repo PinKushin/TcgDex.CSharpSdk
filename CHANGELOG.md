@@ -15,6 +15,42 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The response size limit now applies on the caching and GraphQL paths.**
+  `MaxResponseBytes` reached neither: the caching handler drained bodies itself
+  with an unbounded read, and the GraphQL path buffered the whole body inside
+  `HttpClient` before the bounded read could reject it. The real ceiling was
+  `HttpContent`'s 2 GB. It matters most with caching enabled through
+  `TcgDexClient.Create`, which turns on automatic decompression — decompression
+  happens below both, so a megabyte of hostile gzip could expand to roughly a
+  gigabyte, and on the caching path was then stored. `TcgDexCachingHandler`'s
+  constructor takes an optional `maxResponseBytes`, defaulting to the same
+  32 MiB as `TcgDexOptions`.
+
+- **A coalesced waiter is no longer told that someone else's request timed
+  out.** When several callers ask for the same URL at once, one fetches and the
+  rest wait. A leader that cancelled or hit its own timeout had that failure
+  propagated into every waiter, where the transport — filtering on the *waiter's*
+  token — reported it as `TcgDexApiException`: "the request timed out after
+  00:00:30", to a caller that had waited milliseconds and cancelled nothing.
+  Waiters now fall through to their own fetch. A waiter can also stop waiting:
+  its own cancellation and its own `Timeout` previously did not apply while it
+  was blocked on another caller's request.
+
+- **The GraphQL path applies `TcgDexOptions.Timeout`.** It built no budget at
+  all, so the ceiling was `HttpClient`'s 100-second default — the value that
+  option exists to replace — and with a caller-supplied `HttpClient` set to
+  `InfiniteTimeSpan` there was no ceiling at all. The cancellation contract there
+  also now covers `OperationCanceledException` rather than only
+  `TaskCanceledException`, so a handler you add through `AddTcgDex` cannot escape
+  the single error type.
+
+- **Connection recycling reaches every configured endpoint.** On
+  `netstandard2.0` it is set per host, and only the base address had it — so
+  after a failover the mirror the client had come to depend on was left
+  unrecycled.
+
 ### Added
 
 - **Fall back to another server when one is unreachable.**
