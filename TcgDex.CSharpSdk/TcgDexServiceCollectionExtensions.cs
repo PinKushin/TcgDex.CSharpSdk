@@ -33,6 +33,18 @@ public static class TcgDexServiceCollectionExtensions
     {
         Guard.NotNull(services);
 
+        TcgDexOptions options = RegisterOptions(services, configure);
+
+        return AttachFailover(RegisterClient(services), options);
+    }
+
+    /// <summary>
+    /// Builds, validates and registers the options.
+    /// </summary>
+    private static TcgDexOptions RegisterOptions(
+        IServiceCollection services,
+        Action<TcgDexOptions>? configure)
+    {
         TcgDexOptions options = new();
         configure?.Invoke(options);
 
@@ -49,17 +61,43 @@ public static class TcgDexServiceCollectionExtensions
             configured.GraphQlEndpoint = options.GraphQlEndpoint;
         });
 
+        return options;
+    }
+
+    /// <summary>
+    /// Registers the typed client itself, with no handlers attached.
+    /// </summary>
+    private static IHttpClientBuilder RegisterClient(IServiceCollection services)
         // Constructed explicitly rather than by the typed-client activator, so
         // TcgDexClient can keep a single constructor and stay ergonomic to
         // `new` up outside a container.
-        return services.AddHttpClient<ITcgDexClient, TcgDexClient>(
+        => services.AddHttpClient<ITcgDexClient, TcgDexClient>(
             (httpClient, provider) => new TcgDexClient(
                 httpClient,
                 provider.GetRequiredService<TcgDexOptions>(),
                 // Resolved rather than required: logging is a convenience, and a
                 // container without it should still produce a working client.
                 provider.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()));
-    }
+
+    /// <summary>
+    /// Adds the failover handler, when endpoints are configured.
+    /// </summary>
+    /// <remarks>
+    /// <b>Added last on purpose.</b> Handlers run in the order they are added,
+    /// so this leaves failover innermost — below the response cache, which keys
+    /// on the request URI. Above the cache, a rewritten host would key the same
+    /// resource separately per endpoint and cache it once for each.
+    /// </remarks>
+    private static IHttpClientBuilder AttachFailover(
+        IHttpClientBuilder builder,
+        TcgDexOptions options)
+        => options.FailoverEndpoints.Count == 0
+            ? builder
+            : builder.AddHttpMessageHandler(() => new TcgDexFailoverHandler(
+                options.BaseAddress,
+                options.FailoverEndpoints,
+                options.FailoverAttemptTimeout,
+                options.FailoverCooldown));
 
     /// <summary>
     /// Registers <see cref="ITcgDexClient"/> with response caching enabled.
@@ -104,10 +142,16 @@ public static class TcgDexServiceCollectionExtensions
         services.TryAddSingleton<ITcgDexResponseCache>(
             _ => new MemoryTcgDexResponseCache(cacheOptions.MaxEntries));
 
-        return services
-            .AddTcgDex(configure)
-            .AddHttpMessageHandler(provider => new TcgDexCachingHandler(
-                provider.GetRequiredService<ITcgDexResponseCache>(),
-                provider.GetRequiredService<TcgDexCacheOptions>()));
+        TcgDexOptions options = RegisterOptions(services, configure);
+
+        // Caching is added before failover so it ends up OUTSIDE it: the cache
+        // then only ever sees the canonical address, and a failover swaps the
+        // host below it without fragmenting the keys.
+        return AttachFailover(
+            RegisterClient(services)
+                .AddHttpMessageHandler(provider => new TcgDexCachingHandler(
+                    provider.GetRequiredService<ITcgDexResponseCache>(),
+                    provider.GetRequiredService<TcgDexCacheOptions>())),
+            options);
     }
 }

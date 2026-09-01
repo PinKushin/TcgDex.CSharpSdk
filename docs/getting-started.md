@@ -197,6 +197,80 @@ restart. Card data and asset URLs are consistent (asset URLs are fixed at build
 time). The live list of nodes and their health is at
 [status.tcgdex.dev](https://status.tcgdex.dev).
 
+## Falling back to another server
+
+Off by default. When enabled, a request that a server cannot serve is retried
+against the next endpoint you listed:
+
+```csharp
+builder.Services.AddTcgDex(options => options.UseFailover());
+```
+
+That uses the official nodes. Name specific ones, or supply your own:
+
+```csharp
+options.UseFailover(TcgDexMirror.Eu2, TcgDexMirror.Na1);
+options.UseFailover(new Uri("https://tcgdex.example.dev/v2/"));   // unofficial or self-hosted
+```
+
+**It only rotates when a server failed to answer** — a refused connection, a
+`502`/`503`/`504`, or an attempt that ran past `FailoverAttemptTimeout`.
+Everything else is an answer and stops there:
+
+| Response | Rotates? | Why |
+|---|---|---|
+| Connection refused, DNS failure | yes | the node is not there |
+| `502` / `503` / `504` | yes | the documented TCGdex crash shape |
+| Attempt exceeded `FailoverAttemptTimeout` | yes | the node accepted and then hung |
+| **`404`** | **no** | a missing card is a normal result; rotating would send every absent card to every node |
+| **`429`** | **no** | that is a rate limit — spreading it across nodes is evasion, not resilience |
+| `500`, other `4xx` | no | the next node will answer the same way |
+
+Two settings shape it:
+
+```csharp
+options.FailoverAttemptTimeout = TimeSpan.FromSeconds(10);  // per attempt
+options.FailoverCooldown = TimeSpan.FromMinutes(5);         // skip a failed endpoint for this long
+```
+
+`FailoverAttemptTimeout` is what makes failover survive a *hang*. `Timeout` is
+one budget for the whole request, so without a per-attempt ceiling a server that
+accepts your connection and then stops responding would consume all 30 seconds
+and leave nothing for a second endpoint. Three attempts at the 10-second default
+fit inside the 30-second `Timeout` exactly — failover divides your ceiling, it
+never extends it.
+
+`FailoverCooldown` is what keeps this from adding load to an API that is already
+struggling. Without it every request pays the dead endpoint's failure before
+reaching a live one; with it, one request discovers the outage and the rest go
+straight to the endpoint that works. **When everything is healthy, failover
+sends no extra requests at all** — it only acts on a failure.
+
+At most three endpoints are tried per request, and only `GET` is retried.
+Requests with a body — the opt-in GraphQL path — go to a single endpoint rather
+than being replayed on an assumption about whether repeating them is safe.
+
+**The pricing caveat from the previous section applies more here.** Nodes sync
+pricing on their own schedules, so after a failover two consecutive calls can
+report different prices for the same card. Card data and asset URLs are
+consistent; pricing is the one field that is not.
+
+**On unofficial endpoints.** TCGdex intends to add failover server-side, at
+which point rotating between *official* nodes stops being the SDK's job — a
+client-side implementation simply stops firing, because there are no failures
+left for it to see. Two things it still covers: a server-side implementation can
+only rotate among nodes TCGdex runs, so an unofficial mirror or one of your own
+is reachable this way and no other; and if the primary hostname itself is
+unreachable, nothing server-side can help, because reaching the server is the
+part that failed.
+
+Endpoints are configured, never discovered — the SDK will not fetch a server
+list at runtime, because a compromised list could redirect every client's
+traffic. A third-party mirror sees your requests and serves whatever it likes;
+the data is public and read-only so there is little to leak, but a bad mirror can
+return wrong card data. A non-HTTPS endpoint is logged as a warning, exactly as a
+non-HTTPS `BaseAddress` is.
+
 ## Handling errors
 
 One rule:

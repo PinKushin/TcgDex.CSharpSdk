@@ -240,6 +240,65 @@ public sealed class ClientLifetimeTests
         Should.Throw<ObjectDisposedException>(() => owned.CancelPendingRequests());
     }
 
+    /// <summary>
+    /// The outermost handler of a client's owned <see cref="HttpClient"/>.
+    /// </summary>
+    /// <remarks>
+    /// Two field names, because this is BCL private state: modern .NET calls it
+    /// <c>_handler</c>, .NET Framework calls it <c>handler</c>. Looking up both
+    /// is the cost of asserting on it at all — and net472 is not hypothetical
+    /// here, it is the target that actually executes the netstandard2.0 asset.
+    /// </remarks>
+    private static object OutermostHandler(TcgDexClient client)
+    {
+        FieldInfo handlerField = (typeof(HttpMessageInvoker)
+                .GetField("_handler", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? typeof(HttpMessageInvoker)
+                .GetField("handler", BindingFlags.NonPublic | BindingFlags.Instance))
+            .ShouldNotBeNull();
+
+        object httpClient = typeof(TcgDexClient)
+            .GetField("_ownedHttpClient", BindingFlags.NonPublic | BindingFlags.Instance)
+            .ShouldNotBeNull()
+            .GetValue(client)
+            .ShouldNotBeNull();
+
+        return handlerField.GetValue(httpClient).ShouldNotBeNull();
+    }
+
+    [Test]
+    public void Create_WithFailover_PutsTheCacheOutsideIt()
+    {
+        // The ordering is a real design decision, not an accident of the code's
+        // shape. The cache keys on the request URI, so a host rewritten ABOVE it
+        // would key the same resource separately for every endpoint and discard
+        // every hit the moment a failover happened. Nothing else asserts this —
+        // both orderings serve correct responses, and the difference shows up
+        // only as a cache that quietly stopped working.
+        TcgDexOptions options = new();
+        options.UseFailover(TcgDexMirror.Eu2);
+
+        using TcgDexClient client = TcgDexClient.Create(options, configureCache: _ => { });
+
+        // Outermost first: the cache, then failover beneath it.
+        object outer = OutermostHandler(client);
+        outer.ShouldBeOfType<TcgDex.Caching.TcgDexCachingHandler>();
+
+        object inner = ((DelegatingHandler)outer).InnerHandler.ShouldNotBeNull();
+        inner.ShouldBeOfType<TcgDexFailoverHandler>();
+    }
+
+    [Test]
+    public void Create_WithoutFailover_AddsNoFailoverHandler()
+    {
+        // The control. Without it the test above would pass against a build that
+        // attached the handler unconditionally — which would put every consumer
+        // who never asked for failover behind an extra handler.
+        using TcgDexClient client = TcgDexClient.Create(new TcgDexOptions());
+
+        OutermostHandler(client).ShouldNotBeOfType<TcgDexFailoverHandler>();
+    }
+
     [Test]
     public void ClientImplementsIDisposable_SoUsingWorks()
     {

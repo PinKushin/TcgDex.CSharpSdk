@@ -15,6 +15,37 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-01
+
+### Added
+
+- **Fall back to another server when one is unreachable.**
+  `TcgDexOptions.UseFailover()` retries a request against the next endpoint when
+  the current one refuses the connection, returns `502`/`503`/`504`, or hangs
+  past `FailoverAttemptTimeout`. Off by default, and when enabled it sends **no
+  extra requests while the service is healthy** — it acts only on a failure.
+
+  Takes official nodes (`UseFailover()`, or named ones) or arbitrary API roots,
+  so an **unofficial mirror or a server of your own** can be a fallback:
+  `UseFailover(new Uri("https://tcgdex.example.dev/v2/"))`.
+
+  Deliberately narrow about what counts as a failure. A `404` never rotates — a
+  missing card is a normal result, and rotating would send every absent card to
+  every configured node — and neither does `429`, because spreading a rate limit
+  across endpoints is evasion rather than resilience. Only `GET` is retried, at
+  most three endpoints per request.
+
+  Two knobs, both with a reason: `FailoverAttemptTimeout` (default 10s) is what
+  lets failover survive a server that accepts the connection and then hangs,
+  since `Timeout` is a single budget for the whole request and would otherwise be
+  spent on the first endpoint; `FailoverCooldown` (default 5 minutes) stops every
+  subsequent request paying the dead endpoint's failure again, which is what
+  keeps this from adding load to an API that is already struggling.
+
+  Note that nodes sync pricing independently, so after a failover two calls can
+  report different prices for the same card. See
+  [docs/getting-started.md](docs/getting-started.md).
+
 ## [0.3.0] - 2026-08-31
 
 ### Added
@@ -185,7 +216,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.1.1...v0.2.0

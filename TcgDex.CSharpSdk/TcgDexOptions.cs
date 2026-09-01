@@ -51,22 +51,182 @@ public sealed class TcgDexOptions
     /// </exception>
     public TcgDexOptions UseMirror(TcgDexMirror mirror)
     {
-        string host = mirror switch
-        {
-            TcgDexMirror.Eu1 => "api.eu1.tcgdex.net",
-            TcgDexMirror.Eu2 => "api.eu2.tcgdex.net",
-            TcgDexMirror.Eu3 => "api.eu3.tcgdex.net",
-            TcgDexMirror.Na1 => "api.na1.tcgdex.net",
-            TcgDexMirror.Na2 => "api.na2.tcgdex.net",
-            TcgDexMirror.As1 => "api.as1.tcgdex.net",
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(mirror), mirror, "Not a defined TCGdex mirror."),
-        };
+        string host = HostFor(mirror);
 
         BaseAddress = new Uri($"https://{host}/v2/");
         GraphQlEndpoint = new Uri($"https://{host}/v2/graphql");
         return this;
     }
+
+    /// <summary>
+    /// Endpoints tried, in order, when <see cref="BaseAddress"/> cannot be
+    /// reached. Empty by default, which disables failover entirely.
+    /// </summary>
+    /// <remarks>
+    /// Each is an API root in the same form as <see cref="BaseAddress"/> —
+    /// including the trailing slash. Set through <see cref="UseFailover()"/>
+    /// and its overloads.
+    /// </remarks>
+    public IReadOnlyList<Uri> FailoverEndpoints { get; private set; } = [];
+
+    /// <summary>
+    /// How long a single attempt may take before the next endpoint is tried.
+    /// Defaults to 10 seconds.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Without this, failover cannot survive the failure it most needs to.</b>
+    /// <see cref="Timeout"/> is one budget for the whole request, so a node that
+    /// accepts the connection and then hangs would consume all 30 seconds and
+    /// leave nothing for a second endpoint — and hanging, rather than refusing,
+    /// is what a struggling server usually does. A per-attempt ceiling is what
+    /// makes a hung node recoverable instead of merely slow.
+    /// </para>
+    /// <para>
+    /// Three attempts at the 10-second default fit inside the 30-second
+    /// <see cref="Timeout"/> exactly, so failover never extends the total budget
+    /// a caller asked for; it only divides it.
+    /// <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> is accepted and
+    /// means "no per-attempt limit", which leaves failover working for refused
+    /// connections and gateway errors but not for hangs.
+    /// </para>
+    /// </remarks>
+    public TimeSpan FailoverAttemptTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// How long an endpoint that failed is skipped before being tried again.
+    /// Defaults to 5 minutes. Zero re-tries it on every request.
+    /// </summary>
+    /// <remarks>
+    /// This is what keeps failover from multiplying load on an API that is
+    /// already having a bad day. Without it every single request pays the dead
+    /// endpoint's failure before reaching a live one; with it, one request
+    /// discovers the outage and the rest go straight to the endpoint that works.
+    /// </remarks>
+    public TimeSpan FailoverCooldown { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Falls back to every official TCGdex node.
+    /// </summary>
+    /// <returns>This <see cref="TcgDexOptions"/>.</returns>
+    /// <remarks>
+    /// The order is written out rather than read from the enum: it is a
+    /// deliberate choice that should not change silently because a member was
+    /// inserted, and <c>Enum.GetValues(Type)</c> is not AOT-safe while its
+    /// generic replacement does not exist on <c>netstandard2.0</c>.
+    /// </remarks>
+    public TcgDexOptions UseFailover()
+        => UseFailover(
+            TcgDexMirror.Eu1,
+            TcgDexMirror.Eu2,
+            TcgDexMirror.Eu3,
+            TcgDexMirror.Na1,
+            TcgDexMirror.Na2,
+            TcgDexMirror.As1);
+
+    /// <summary>
+    /// Falls back to the given official nodes, in the order supplied.
+    /// </summary>
+    /// <param name="mirrors">The nodes to fall back to.</param>
+    /// <returns>This <see cref="TcgDexOptions"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="mirrors"/> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="mirrors"/> is empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// One of <paramref name="mirrors"/> is not a defined <see cref="TcgDexMirror"/>.
+    /// </exception>
+    public TcgDexOptions UseFailover(params TcgDexMirror[] mirrors)
+    {
+        Guard.NotNull(mirrors);
+
+        return UseFailover(Array.ConvertAll(
+            mirrors, mirror => new Uri($"https://{HostFor(mirror)}/v2/")));
+    }
+
+    /// <summary>
+    /// Falls back to the given API roots, in the order supplied — including
+    /// unofficial mirrors and self-hosted servers.
+    /// </summary>
+    /// <param name="endpoints">
+    /// API roots in the same form as <see cref="BaseAddress"/>, trailing slash
+    /// included.
+    /// </param>
+    /// <returns>This <see cref="TcgDexOptions"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="endpoints"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="endpoints"/> is empty, or contains a null or relative URI.
+    /// </exception>
+    /// <remarks>
+    /// <para>
+    /// This overload is the durable half of the feature. TCGdex intends to add
+    /// failover server-side, at which point rotation between <i>official</i>
+    /// nodes stops being the SDK's job — but a server-side implementation can
+    /// only ever rotate among nodes TCGdex runs, so an unofficial mirror or a
+    /// server of your own stays reachable this way and no other.
+    /// </para>
+    /// <para>
+    /// <b>Endpoints are configured, never discovered.</b> The official node list
+    /// was read from the status page by a human and compiled in; fetching a list
+    /// at runtime would mean a compromised page could redirect every client's
+    /// traffic.
+    /// </para>
+    /// <para>
+    /// A third-party mirror sees your requests and serves whatever it likes. The
+    /// data is public and read-only so there is little to leak, but a bad mirror
+    /// can return wrong card data — which is why this takes an explicit list
+    /// rather than finding servers for you. A non-HTTPS endpoint is logged as a
+    /// warning, exactly as a non-HTTPS <see cref="BaseAddress"/> is.
+    /// </para>
+    /// </remarks>
+    public TcgDexOptions UseFailover(params Uri[] endpoints)
+    {
+        Guard.NotNull(endpoints);
+
+        if (endpoints.Length == 0)
+        {
+            throw new ArgumentException(
+                "At least one failover endpoint is required. Leave FailoverEndpoints " +
+                "empty to disable failover instead.",
+                nameof(endpoints));
+        }
+
+        foreach (Uri endpoint in endpoints)
+        {
+            if (endpoint is null)
+            {
+                throw new ArgumentException(
+                    "A failover endpoint cannot be null.", nameof(endpoints));
+            }
+
+            if (!endpoint.IsAbsoluteUri)
+            {
+                throw new ArgumentException(
+                    $"A failover endpoint must be an absolute URI, but was '{endpoint}'.",
+                    nameof(endpoints));
+            }
+        }
+
+        FailoverEndpoints = (Uri[])endpoints.Clone();
+        return this;
+    }
+
+    /// <summary>
+    /// The host serving a given node.
+    /// </summary>
+    /// <remarks>
+    /// Shared by <see cref="UseMirror"/> and the failover overloads so the node
+    /// list exists once rather than in two switches that must be kept in step.
+    /// </remarks>
+    private static string HostFor(TcgDexMirror mirror) => mirror switch
+    {
+        TcgDexMirror.Eu1 => "api.eu1.tcgdex.net",
+        TcgDexMirror.Eu2 => "api.eu2.tcgdex.net",
+        TcgDexMirror.Eu3 => "api.eu3.tcgdex.net",
+        TcgDexMirror.Na1 => "api.na1.tcgdex.net",
+        TcgDexMirror.Na2 => "api.na2.tcgdex.net",
+        TcgDexMirror.As1 => "api.as1.tcgdex.net",
+        _ => throw new ArgumentOutOfRangeException(
+            nameof(mirror), mirror, "Not a defined TCGdex mirror."),
+    };
 
     /// <summary>
     /// The largest response body the client will buffer, in bytes. Defaults to
@@ -251,6 +411,30 @@ public sealed class TcgDexOptions
                 $"MaxDeserializedCacheEntries cannot be negative, but was " +
                 $"{MaxDeserializedCacheEntries}. Use zero to disable the cache.",
                 nameof(MaxDeserializedCacheEntries));
+        }
+
+        // Same convention as Timeout above: InfiniteTimeSpan is admitted before
+        // the non-positive check rather than falling foul of it. Infinite here
+        // means "no per-attempt limit", which is a legitimate choice — it leaves
+        // failover working for refused connections and gateway errors, and only
+        // gives up the ability to recover from a node that hangs.
+        if (FailoverAttemptTimeout != System.Threading.Timeout.InfiniteTimeSpan
+            && FailoverAttemptTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentException(
+                $"FailoverAttemptTimeout must be positive, but was {FailoverAttemptTimeout}. " +
+                "Use Timeout.InfiniteTimeSpan to remove the per-attempt limit.",
+                nameof(FailoverAttemptTimeout));
+        }
+
+        // Zero is meaningful — it re-tries a failed endpoint on every request —
+        // so only a negative value is rejected.
+        if (FailoverCooldown < TimeSpan.Zero)
+        {
+            throw new ArgumentException(
+                $"FailoverCooldown cannot be negative, but was {FailoverCooldown}. " +
+                "Use zero to re-try a failed endpoint on every request.",
+                nameof(FailoverCooldown));
         }
 
         if (!TcgDexLanguages.IsSupported(Language))
