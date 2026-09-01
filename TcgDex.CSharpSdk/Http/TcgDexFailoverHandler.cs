@@ -165,7 +165,7 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
             // disposing it does dispose that content — safe because the request
             // body has already been written by the time a response is returned,
             // and the response reads from the connection rather than from it.
-            HttpRequestMessage? copy = candidate == 0
+            using HttpRequestMessage? copy = candidate == 0
                 ? null
                 : Clone(request, Rewrite(requested, Candidate(candidate)), body);
 
@@ -202,10 +202,6 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
                 // the instruction to stop.
                 MarkFailed(candidate);
                 lastError = ex;
-            }
-            finally
-            {
-                copy?.Dispose();
             }
         }
 
