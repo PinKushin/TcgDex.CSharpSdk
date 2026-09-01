@@ -33,9 +33,23 @@ assembly cannot be consumed by an older runtime:
 - **Cancelling mid-body is best-effort.** The cancellable `HttpContent` read
   overloads do not exist there, so a token cancelled while the response body is
   streaming is observed at the next boundary rather than immediately.
-- **Connection recycling uses a different mechanism.** `SocketsHttpHandler`
-  on modern .NET, `ServicePoint.ConnectionLeaseTimeout` on .NET Framework. Same
-  guarantee — a long-lived client does not pin stale DNS — reached two ways.
+- **Connection recycling is weaker, and on `net6.0`/`net7.0` it is absent.**
+  `TcgDexClient.Create` sets `PooledConnectionLifetime` on `net8.0` and later,
+  and `ServicePoint.ConnectionLeaseTimeout` on .NET Framework — same guarantee,
+  two mechanisms. **`net6.0` and `net7.0` get neither**: they resolve this
+  assembly, whose only available mechanism is the `ServicePoint` one, and modern
+  .NET ignores it. A long-lived client there can hold connections and miss a DNS
+  change until the OS or the server closes them.
+
+  It matters when a host moves, which for a public API is rare but not never. If
+  you are on `net6.0` or `net7.0` and need prompt re-resolution, supply your own
+  `HttpClient` over a handler you configure:
+
+  ```csharp
+  using SocketsHttpHandler handler = new() { PooledConnectionLifetime = TimeSpan.FromMinutes(2) };
+  using HttpClient http = new(handler);
+  TcgDexClient tcgdex = new(http, new TcgDexOptions());
+  ```
 
 Unity has additional packaging considerations; see [Unity](unity.md).
 

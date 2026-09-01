@@ -326,6 +326,33 @@ public sealed class ClientLifetimeTests
         OutermostHandler(client).ShouldNotBeOfType<TcgDexFailoverHandler>();
     }
 
+#if NETFRAMEWORK
+
+    [Test]
+    public void Create_WithFailover_RecyclesConnectionsToEveryEndpoint()
+    {
+        // netstandard2.0 has no SocketsHttpHandler, so recycling comes from
+        // ServicePoint.ConnectionLeaseTimeout — which is set per host. Setting it
+        // for the base address alone left every mirror unrecycled, and a mirror
+        // is exactly what the client depends on after a failover, so the
+        // guarantee went missing on the endpoint that had just become load
+        // bearing.
+        //
+        // Only net472 reaches this: it is the one target that executes the
+        // netstandard2.0 asset rather than merely compiling it.
+        Uri mirror = new("https://api.eu3.tcgdex.net/v2/");
+
+        TcgDexOptions options = new();
+        options.UseFailover(mirror);
+
+        using TcgDexClient client = TcgDexClient.Create(options);
+
+        System.Net.ServicePointManager.FindServicePoint(mirror)
+            .ConnectionLeaseTimeout.ShouldBe((int)TimeSpan.FromMinutes(2).TotalMilliseconds);
+    }
+
+#endif
+
     [Test]
     public void ClientImplementsIDisposable_SoUsingWorks()
     {
