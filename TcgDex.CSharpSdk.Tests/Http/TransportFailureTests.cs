@@ -180,7 +180,7 @@ public sealed class TransportFailureTests
     // ----- cancellation -----
 
     [Test]
-    public void Rest_WhenCallerCancels_ThrowsOperationCanceledNotApiException()
+    public async Task Rest_WhenCallerCancels_ThrowsOperationCanceledNotApiException()
     {
         // The caller's own cancellation is theirs to observe, and must not be
         // rewritten into an API failure.
@@ -190,19 +190,19 @@ public sealed class TransportFailureTests
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        Should.ThrowAsync<OperationCanceledException>(async () =>
+        await Should.ThrowAsync<OperationCanceledException>(async () =>
             await CreateClient(handler).Cards.GetAsync("swsh3-136", cts.Token));
     }
 
     [Test]
-    public void GraphQl_WhenCallerCancels_ThrowsOperationCanceled()
+    public async Task GraphQl_WhenCallerCancels_ThrowsOperationCanceled()
     {
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, """{"data":{"cards":[]}}""");
 
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        Should.ThrowAsync<OperationCanceledException>(async () =>
+        await Should.ThrowAsync<OperationCanceledException>(async () =>
             await CreateClient(handler).Cards.SearchDetailedAsync(
                 new CardFilter { Name = "Furret" }, cancellationToken: cts.Token));
     }
@@ -214,31 +214,31 @@ public sealed class TransportFailureTests
         => Should.Throw<ArgumentNullException>(() => new TcgDexClient(null!, new TcgDexOptions()));
 
     [Test]
-    public void Cards_ListAsync_WithNullQuery_Throws()
+    public async Task Cards_ListAsync_WithNullQuery_Throws()
     {
         RecordingHandler handler = new();
 
-        Should.ThrowAsync<ArgumentNullException>(async () =>
+        await Should.ThrowAsync<ArgumentNullException>(async () =>
             await CreateClient(handler).Cards.ListAsync(null!, CancellationToken.None));
     }
 
     [Test]
-    public void Cards_SearchDetailedAsync_WithNullFilter_Throws()
+    public async Task Cards_SearchDetailedAsync_WithNullFilter_Throws()
     {
         RecordingHandler handler = new();
 
-        Should.ThrowAsync<ArgumentNullException>(async () =>
+        await Should.ThrowAsync<ArgumentNullException>(async () =>
             await CreateClient(handler).Cards.SearchDetailedAsync(null!, cancellationToken: CancellationToken.None));
     }
 
     [TestCase("")]
     [TestCase("   ")]
     [TestCase(null)]
-    public void Cards_GetAsync_WithBlankId_Throws(string? id)
+    public async Task Cards_GetAsync_WithBlankId_Throws(string? id)
     {
         RecordingHandler handler = new();
 
-        Should.ThrowAsync<ArgumentException>(async () =>
+        await Should.ThrowAsync<ArgumentException>(async () =>
             await CreateClient(handler).Cards.GetAsync(id!, CancellationToken.None));
     }
 }
