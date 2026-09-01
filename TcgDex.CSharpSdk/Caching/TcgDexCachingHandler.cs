@@ -246,48 +246,44 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
 
         Interlocked.Increment(ref _misses);
 
-        CachedResponse stored;
+        // Ownership passes here. Every path that hands `response` back to the
+        // caller has already returned above, so from this point it is ours — and
+        // a using declaration releases it on the exception paths too, which the
+        // straight-line Dispose() this replaced did not: an oversized body, a
+        // dropped connection or a cancelled token used to leave the connection
+        // out of the pool until finalisation.
+        using HttpResponseMessage owned = response;
 
-        try
-        {
-            // Bounded, like every other body read in the SDK. This handler sits
-            // ABOVE the transport and drains the body itself, so BoundedContent
-            // never saw this stream and MaxResponseBytes did not apply here —
-            // the ceiling was HttpContent's own 2 GB. Decompression happens in
-            // the handler BELOW this one, so with AutomaticDecompression enabled
-            // a megabyte of hostile gzip expanded to roughly a gigabyte inside
-            // this call, and was then stored, since the cache bounds entries
-            // rather than bytes.
-            ArraySegment<byte> body = await BoundedContent
-                .ReadAsBytesAsync(
-                    response.Content,
-                    _maxResponseBytes,
-                    // Non-null: SendAsync returns early for a null RequestUri
-                    // before any fetch path is entered, and `key` above is built
-                    // from this same property.
-                    request.RequestUri!,
-                    cancellationToken)
-                .ConfigureAwait(false);
+        // Bounded, like every other body read in the SDK. This handler sits
+        // ABOVE the transport and drains the body itself, so BoundedContent
+        // never saw this stream and MaxResponseBytes did not apply here —
+        // the ceiling was HttpContent's own 2 GB. Decompression happens in
+        // the handler BELOW this one, so with AutomaticDecompression enabled
+        // a megabyte of hostile gzip expanded to roughly a gigabyte inside
+        // this call, and was then stored, since the cache bounds entries
+        // rather than bytes.
+        ArraySegment<byte> body = await BoundedContent
+            .ReadAsBytesAsync(
+                response.Content,
+                _maxResponseBytes,
+                // Non-null: SendAsync returns early for a null RequestUri
+                // before any fetch path is entered, and `key` above is built
+                // from this same property.
+                request.RequestUri!,
+                cancellationToken)
+            .ConfigureAwait(false);
 
-            stored = new CachedResponse
-            {
-                // Copied: the segment may sit in a larger pooled buffer, and this
-                // is retained in the cache long after the read returns.
-                Body = body.Count == body.Array!.Length
-                    ? body.Array
-                    : [.. body],
-                ETag = response.Headers.ETag?.ToString(),
-                ContentType = response.Content.Headers.ContentType?.ToString(),
-                StoredAt = _timeProvider.GetUtcNow(),
-            };
-        }
-        finally
+        CachedResponse stored = new()
         {
-            // In a finally so an oversized body, a dropped connection or a
-            // cancelled token releases the connection instead of holding it out
-            // of the pool until finalisation.
-            response.Dispose();
-        }
+            // Copied: the segment may sit in a larger pooled buffer, and this
+            // is retained in the cache long after the read returns.
+            Body = body.Count == body.Array!.Length
+                ? body.Array
+                : [.. body],
+            ETag = response.Headers.ETag?.ToString(),
+            ContentType = response.Content.Headers.ContentType?.ToString(),
+            StoredAt = _timeProvider.GetUtcNow(),
+        };
 
         await _cache.SetAsync(key, stored, timeToLive, cancellationToken).ConfigureAwait(false);
 
