@@ -137,6 +137,15 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
         HttpResponseMessage? lastResponse = null;
         Exception? lastError = null;
 
+        // The loop is wrapped so a gateway response already in hand is released
+        // when something escapes rather than being returned. Caller cancellation
+        // and the outer request budget both leave through here — they are
+        // deliberately NOT caught below, because neither is an endpoint's fault —
+        // and an undisposed 502 holds its connection out of the pool until
+        // finalisation. That is invisible to every assertion about status codes,
+        // and it happens during an outage, when connections are scarcest.
+        try
+        {
         for (int position = 0; position < order.Count; position++)
         {
             int candidate = order[position];
@@ -150,9 +159,12 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
             //
             // Candidate 0 is only ever reached at position 0, so reusing the
             // caller's request there cannot resend an already-sent message. The
-            // caller owns that one; only a copy made here is disposed here, and a
-            // copy carries no content, so disposing it cannot disturb the
-            // response being returned.
+            // caller owns that one; only a copy made here is disposed here.
+            //
+            // A copy now carries ByteArrayContent on the GraphQL path, so
+            // disposing it does dispose that content — safe because the request
+            // body has already been written by the time a response is returned,
+            // and the response reads from the connection rather than from it.
             HttpRequestMessage? copy = candidate == 0
                 ? null
                 : Clone(request, Rewrite(requested, Candidate(candidate)), body);
@@ -195,6 +207,13 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
             {
                 copy?.Dispose();
             }
+        }
+
+        }
+        catch
+        {
+            lastResponse?.Dispose();
+            throw;
         }
 
         if (lastResponse is not null)
@@ -295,14 +314,41 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
 
         // Conditional headers matter here — the cache above this handler may have
         // attached an If-None-Match, and dropping it would turn a revalidation
-        // into a full fetch.
+        // into a full fetch. So headers are carried across…
+        //
+        // …except the ones that authenticate the caller. A consumer may pass in
+        // an HttpClient they share with the rest of their application, which this
+        // SDK explicitly supports, and HttpClient.DefaultRequestHeaders are merged
+        // into every request before the handler chain runs. Copying the lot would
+        // send that client's Authorization or Cookie to whatever host is in the
+        // failover list — including an unofficial mirror the consumer added.
+        //
+        // The runtime already strips these when a redirect crosses origins; a
+        // failover crosses origins by definition, so it has to do the same rather
+        // than hand-roll its way around that protection. TCGdex itself is keyless,
+        // so nothing of the SDK's own is at stake — the credential being protected
+        // is the consumer's, for some other service entirely.
         foreach (KeyValuePair<string, IEnumerable<string>> header in source.Headers)
         {
+            if (IsCredential(header.Key))
+            {
+                continue;
+            }
+
             clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
 
         return clone;
     }
+
+    /// <summary>
+    /// Whether a header authenticates the caller and must not follow a request
+    /// to a different host.
+    /// </summary>
+    private static bool IsCredential(string name)
+        => name.Equals("Authorization", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Proxy-Authorization", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Cookie", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Whether a status means the node could not serve the request, as opposed

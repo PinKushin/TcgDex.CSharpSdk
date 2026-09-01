@@ -122,6 +122,38 @@ public sealed class TcgDexOptionsFailoverTests
     }
 
     [Test]
+    public void UseFailover_WithoutATrailingSlash_Throws()
+    {
+        // Not cosmetic. The request path is rebuilt relative to the endpoint, so
+        // without the slash the last segment is REPLACED — 'https://m/v2' plus
+        // 'en/cards/x' resolves to 'https://m/en/cards/x' and the API root is
+        // gone. The mirror answers 404, which is an answer rather than a node
+        // failure, so it is returned: the caller is told the card does not
+        // exist, and only while the primary is down.
+        TcgDexOptions options = new();
+
+        Should.Throw<ArgumentException>(
+            () => options.UseFailover(new Uri("https://mirror.example/v2")));
+    }
+
+    [Test]
+    public void UseFailover_DropsDuplicateEndpoints()
+    {
+        // Duplicates get independent cooldown slots, so the same dead host would
+        // be contacted twice per request and cooling one slot would leave the
+        // other live.
+        TcgDexOptions options = new();
+
+        options.UseFailover(TcgDexMirror.Eu2, TcgDexMirror.Eu2, TcgDexMirror.Na1);
+
+        options.FailoverEndpoints.Select(endpoint => endpoint.ToString()).ShouldBe(
+        [
+            "https://api.eu2.tcgdex.net/v2/",
+            "https://api.na1.tcgdex.net/v2/",
+        ]);
+    }
+
+    [Test]
     public void UseFailover_WithARelativeEndpoint_Throws()
     {
         TcgDexOptions options = new();

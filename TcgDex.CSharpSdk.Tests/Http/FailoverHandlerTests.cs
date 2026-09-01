@@ -202,6 +202,11 @@ public sealed class FailoverHandlerTests
         inner.Requests[1].RequestUri!.ToString()
             .ShouldBe("https://api.eu2.tcgdex.net/v2/graphql");
 
+        // The method too. HttpRequestMessage permits a GET with content, so a
+        // clone built as `new(HttpMethod.Get, uri)` would satisfy the URI, the
+        // body and the content type while silently degrading the query to a GET.
+        inner.Requests[1].Method.ShouldBe(HttpMethod.Post);
+
         // The body has to survive the rewrite, or the retry reaches the right
         // address with an empty query — which the server answers with an error
         // that looks nothing like a failover problem.
@@ -212,6 +217,91 @@ public sealed class FailoverHandlerTests
         inner.Requests[1].Content.ShouldNotBeNull()
             .Headers.ContentType.ShouldNotBeNull()
             .MediaType.ShouldBe("application/json");
+    }
+
+    [Test]
+    public async Task TheRetry_DoesNotCarryTheCallersCredentials()
+    {
+        // A consumer may pass in an HttpClient they share with the rest of their
+        // application — the SDK documents that as supported — and
+        // DefaultRequestHeaders are merged into every request before the handler
+        // chain runs. Copying the whole collection would send that client's
+        // Authorization to whatever host is in the failover list, including an
+        // unofficial mirror. The runtime strips these across a redirect origin
+        // change; a failover changes origin by definition.
+        RecordingHandler inner = new RecordingHandler()
+            .RespondWith(request => From(request, HttpStatusCode.BadGateway))
+            .RespondWith(request => From(request, HttpStatusCode.OK));
+
+        using HttpClient client = new(Handler(inner));
+        client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", "Bearer secret");
+        client.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", "session=secret");
+        client.DefaultRequestHeaders.TryAddWithoutValidation("X-Trace", "keep-me");
+
+        using HttpResponseMessage response = await client.GetAsync(Card, CancellationToken.None);
+
+        // The primary is the host the caller aimed at, so it keeps them.
+        inner.Requests[0].Headers.Contains("Authorization").ShouldBeTrue();
+
+        // The fallback is a different host and must not.
+        inner.Requests[1].Headers.Contains("Authorization").ShouldBeFalse();
+        inner.Requests[1].Headers.Contains("Cookie").ShouldBeFalse();
+
+        // Control: ordinary headers still travel, or the retry would lose the
+        // If-None-Match the cache above depends on.
+        inner.Requests[1].Headers.GetValues("X-Trace").ShouldBe(["keep-me"]);
+    }
+
+    [Test]
+    public async Task AConnectionFailure_CoolsTheEndpointOff()
+    {
+        // Every other cooldown test drives failure through a 502, which reaches
+        // MarkFailed on the status path only. Deleting MarkFailed from the
+        // HttpRequestException catch left the whole suite green — and a refused
+        // connection is the MOST common outage shape, so every later request
+        // would pay a full connect failure before rotating.
+        FakeTimeProvider time = new();
+        AlwaysHandler inner = new(refuseConnection: true);
+
+        using HttpClient client = new(Handler(inner, time: time));
+
+        using (await client.GetAsync(Card, CancellationToken.None))
+        {
+        }
+
+        using (await client.GetAsync(Card, CancellationToken.None))
+        {
+        }
+
+        // Three, not four: the second request skipped the endpoint that refused.
+        inner.Seen.Count.ShouldBe(3);
+        inner.Seen[2].Host.ShouldBe("api.eu2.tcgdex.net");
+    }
+
+    [Test]
+    public async Task AHungEndpoint_CoolsTheEndpointOff()
+    {
+        // The same gap on the per-attempt-timeout path. Without the cooldown a
+        // hung node costs the full attempt budget on every request, forever.
+        FakeTimeProvider time = new();
+        HangsOnceHandler inner = new();
+
+        using HttpClient client = new(
+            Handler(inner, attemptTimeout: TimeSpan.FromMilliseconds(100), time: time))
+        {
+            Timeout = TimeSpan.FromSeconds(30),
+        };
+
+        using (await client.GetAsync(Card, CancellationToken.None))
+        {
+        }
+
+        using (await client.GetAsync(Card, CancellationToken.None))
+        {
+        }
+
+        inner.Seen.Count.ShouldBe(3);
+        inner.Seen[2].Host.ShouldBe("api.eu2.tcgdex.net");
     }
 
     [Test]
@@ -659,17 +749,31 @@ public sealed class FailoverHandlerTests
     /// Fails anything addressed to the primary and serves everything else. Has
     /// no response queue, so it can answer any number of concurrent requests.
     /// </summary>
-    private sealed class AlwaysHandler : HttpMessageHandler
+    private sealed class AlwaysHandler(bool refuseConnection = false) : HttpMessageHandler
     {
         internal System.Collections.Concurrent.ConcurrentBag<Uri> Served { get; } = [];
+
+        /// <summary>Every request seen, in order, primary attempts included.</summary>
+        internal List<Uri> Seen { get; } = [];
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            lock (Seen)
+            {
+                Seen.Add(request.RequestUri!);
+            }
+
             if (request.RequestUri!.Host == "api.tcgdex.net")
             {
-                return Task.FromResult(From(request, HttpStatusCode.BadGateway));
+                // By HOST rather than by attempt number, so the primary keeps
+                // failing across several requests while the fallback keeps
+                // working — which is what a cooldown test needs.
+                return refuseConnection
+                    ? Task.FromException<HttpResponseMessage>(
+                        new HttpRequestException("refused"))
+                    : Task.FromResult(From(request, HttpStatusCode.BadGateway));
             }
 
             Served.Add(request.RequestUri);

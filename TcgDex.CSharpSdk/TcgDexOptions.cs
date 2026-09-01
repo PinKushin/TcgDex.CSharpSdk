@@ -203,9 +203,35 @@ public sealed class TcgDexOptions
                     $"A failover endpoint must be an absolute URI, but was '{endpoint}'.",
                     nameof(endpoints));
             }
+
+            // A missing trailing slash is not a cosmetic problem here. The
+            // request path is rebuilt relative to this endpoint, and without the
+            // slash the last segment is treated as a file name and REPLACED:
+            // 'https://mirror/v2' + 'en/cards/x' resolves to
+            // 'https://mirror/en/cards/x', silently dropping '/v2'. The mirror
+            // then answers 404 — which is an answer, not a node failure, so it is
+            // returned rather than rotated past, and the caller is told the card
+            // does not exist. That is a wrong answer produced only during an
+            // outage, which is the worst possible time to be misled.
+            // Indexed rather than EndsWith: the char overload CA1865 asks for
+            // does not exist on netstandard2.0, and the string overload is what
+            // it rejects. AbsolutePath of an absolute URI is never empty.
+            string path = endpoint.AbsolutePath;
+
+            if (path[path.Length - 1] != '/')
+            {
+                throw new ArgumentException(
+                    $"A failover endpoint must end with '/', but was '{endpoint}'. " +
+                    "Without it the last path segment is replaced rather than " +
+                    "appended to, so requests would silently lose the API root.",
+                    nameof(endpoints));
+            }
         }
 
-        FailoverEndpoints = (Uri[])endpoints.Clone();
+        // Distinct, and the primary is not a fallback for itself. Duplicates get
+        // independent cooldown slots, so the same dead host would be contacted
+        // twice per request and cooling one slot would not cool the other.
+        FailoverEndpoints = [.. endpoints.Distinct()];
         return this;
     }
 

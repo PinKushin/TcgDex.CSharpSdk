@@ -60,13 +60,67 @@ public sealed class ServiceCollectionFailoverTests
     }
 
     [Test]
-    public void AddTcgDex_WithFailover_AddsTheHandler()
+    public void AddTcgDex_WithFailover_PassesTheConfigurationThrough()
     {
+        // Asserting the handler's TYPE is the proxy the Create-path test was
+        // strengthened to stop relying on, and this is the path most consumers
+        // use. AttachFailover passes two adjacent, interchangeable TimeSpans;
+        // swapping them compiles and turns a five-minute cooldown into ten
+        // seconds — a dead endpoint re-probed thirty times more often, on the
+        // day the API is down.
         ServiceCollection services = new();
-        services.AddTcgDex(options => options.UseFailover(TcgDexMirror.Eu2));
+        services.AddTcgDex(options =>
+        {
+            options.FailoverAttemptTimeout = TimeSpan.FromSeconds(4);
+            options.FailoverCooldown = TimeSpan.FromMinutes(9);
+            options.UseFailover(TcgDexMirror.Eu2);
+        });
 
-        Chain(Pipeline(services)).ShouldContain(typeof(TcgDexFailoverHandler));
+        ServiceProvider provider = services.BuildServiceProvider();
+
+        TcgDexFailoverHandler handler = BuildHandler(
+            provider,
+            provider.GetRequiredService<IOptionsMonitor<HttpClientFactoryOptions>>()
+                .Get(nameof(ITcgDexClient)));
+
+        Read<TimeSpan>(handler, "_attemptTimeout").ShouldBe(TimeSpan.FromSeconds(4));
+        Read<TimeSpan>(handler, "_cooldown").ShouldBe(TimeSpan.FromMinutes(9));
+        Read<IReadOnlyList<Uri>>(handler, "_endpoints")
+            .Select(endpoint => endpoint.ToString())
+            .ShouldBe(["https://api.eu2.tcgdex.net/v2/"]);
     }
+
+    [Test]
+    public void AddTcgDex_WithAMirrorAlsoListedAsFallback_DropsTheDuplicate()
+    {
+        // `UseMirror(Eu2).UseFailover()` is the natural way to write this, since
+        // the two are documented side by side. Deduplication lives in the wiring,
+        // so proving the static helper works does not prove either call site
+        // uses it.
+        ServiceCollection services = new();
+        services.AddTcgDex(options =>
+        {
+            options.UseMirror(TcgDexMirror.Eu2);
+            options.UseFailover();
+        });
+
+        ServiceProvider provider = services.BuildServiceProvider();
+
+        TcgDexFailoverHandler handler = BuildHandler(
+            provider,
+            provider.GetRequiredService<IOptionsMonitor<HttpClientFactoryOptions>>()
+                .Get(nameof(ITcgDexClient)));
+
+        Read<IReadOnlyList<Uri>>(handler, "_endpoints")
+            .ShouldNotContain(new Uri("https://api.eu2.tcgdex.net/v2/"));
+    }
+
+    private static T Read<T>(object target, string field)
+        => (T)target.GetType()
+            .GetField(field, BindingFlags.NonPublic | BindingFlags.Instance)
+            .ShouldNotBeNull()
+            .GetValue(target)
+            .ShouldNotBeNull();
 
     [Test]
     public void AddTcgDexWithCaching_PutsTheCacheOutsideFailover()
