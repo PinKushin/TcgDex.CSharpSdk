@@ -51,6 +51,18 @@ something an application can observe — those live in the commit history.
   after a failover the mirror the client had come to depend on was left
   unrecycled.
 
+  **A documentation correction comes with it, and it may affect you.**
+  `TcgDexClient.Create` was documented as recycling connections so a long-lived
+  client never pins stale DNS. That holds on `net8.0` and later, and on .NET
+  Framework — but **not on `net6.0` or `net7.0`**, which resolve the
+  `netstandard2.0` assembly. The only mechanism available there is
+  `ServicePoint.ConnectionLeaseTimeout`, which modern .NET ignores
+  (`SYSLIB0014`), and nothing that assembly can reach sets a pooled lifetime on
+  those runtimes. No behaviour changed; the guarantee was never delivered there
+  and is now stated accurately, with the workaround — supply your own
+  `HttpClient` over a `SocketsHttpHandler` you configure. See
+  [docs/getting-started.md](docs/getting-started.md).
+
 ### Added
 
 - **Fall back to another server when one is unreachable.**
