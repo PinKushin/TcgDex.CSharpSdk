@@ -49,12 +49,18 @@ Avior described the backend topology that makes the second statement true:
 > na1 and na2 are now both behind a single load balancer that automatically
 > handle disconnection from the other servers that should be better for you
 
-Note what that does and does not say. The *servers* behind those names are
-healthy and now have automatic failover between them; the *public prefixed
-hostnames* still do not route, which is a separate fact and the one the enum
-depended on. Re-measured after the load balancer went in: `api.na1` still
-answered `404`, `api.na2` still failed TLS, and `api.tcgdex.net` served
-normally.
+The owner's reading of that, and the right one — the assistant had first taken
+it to mean the `na1`/`na2` *names* now sat behind a load balancer:
+
+> i think he meant it as the servers that ran for NA had a load balancer now and
+> the NA enpoints were not there
+
+So the NA *machines* were pooled behind one balancer, and the NA *endpoints*
+were retired — not kept and re-pointed. That matches what was measured after the
+balancer went in: `api.na1` still answered `404`, `api.na2` still failed TLS,
+and `api.tcgdex.net` served normally. The hardware is healthy and now fails over
+by itself; the prefixed names are simply gone, which is the fact the enum
+depended on.
 
 The timing was expected rather than a surprise. From the same conversation:
 
