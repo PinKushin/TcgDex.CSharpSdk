@@ -267,87 +267,49 @@ public sealed class ClientLifetimeTests
     }
 
     [Test]
-    public void Create_WithFailover_PutsTheCacheOutsideIt()
+    public void Create_WithCaching_PutsTheCacheOutermost()
     {
-        // The ordering is a real design decision, not an accident of the code's
-        // shape. The cache keys on the request URI, so a host rewritten ABOVE it
-        // would key the same resource separately for every endpoint and discard
-        // every hit the moment a failover happened. Nothing else asserts this —
-        // both orderings serve correct responses, and the difference shows up
-        // only as a cache that quietly stopped working.
-        // Distinct, non-default values so a swapped or dropped argument is
-        // visible rather than coinciding with what the default would have been.
-        TcgDexOptions options = new()
-        {
-            FailoverAttemptTimeout = TimeSpan.FromSeconds(3),
-            FailoverCooldown = TimeSpan.FromMinutes(7),
-        };
+        // Both orderings serve correct responses, so nothing else would notice a
+        // cache that had been buried beneath another handler — it shows up only
+        // as a cache that quietly stopped working.
+        using TcgDexClient client = TcgDexClient.Create(
+            new TcgDexOptions(), configureCache: _ => { });
 
-        options.UseFailover(TcgDexMirror.Eu2);
-
-        using TcgDexClient client = TcgDexClient.Create(options, configureCache: _ => { });
-
-        // Outermost first: the cache, then failover beneath it.
-        object outer = OutermostHandler(client);
-        outer.ShouldBeOfType<TcgDex.Caching.TcgDexCachingHandler>();
-
-        object inner = ((DelegatingHandler)outer).InnerHandler.ShouldNotBeNull();
-        TcgDexFailoverHandler failover = inner.ShouldBeOfType<TcgDexFailoverHandler>();
-
-        // The type alone is a proxy for the configuration, and the two are
-        // decoupled: the constructor takes two adjacent, interchangeable
-        // TimeSpans. Swapping them compiles, keeps every other test green, and
-        // turns a five-minute cooldown into ten seconds — a dead endpoint
-        // re-probed thirty times more often, on the day the API is down.
-        Read<TimeSpan>(failover, "_attemptTimeout").ShouldBe(TimeSpan.FromSeconds(3));
-        Read<TimeSpan>(failover, "_cooldown").ShouldBe(TimeSpan.FromMinutes(7));
-
-        Read<IReadOnlyList<Uri>>(failover, "_endpoints")
-            .Select(endpoint => endpoint.ToString())
-            .ShouldBe(["https://api.eu2.tcgdex.net/v2/"]);
+        OutermostHandler(client).ShouldBeOfType<TcgDex.Caching.TcgDexCachingHandler>();
     }
 
-    /// <summary>Reads a private field, for asserting on configuration that has no public surface.</summary>
-    private static T Read<T>(object target, string field)
-        => (T)target.GetType()
-            .GetField(field, BindingFlags.NonPublic | BindingFlags.Instance)
-            .ShouldNotBeNull()
-            .GetValue(target)
-            .ShouldNotBeNull();
-
     [Test]
-    public void Create_WithoutFailover_AddsNoFailoverHandler()
+    public void Create_WithoutCaching_AddsNoCacheHandler()
     {
         // The control. Without it the test above would pass against a build that
-        // attached the handler unconditionally — which would put every consumer
-        // who never asked for failover behind an extra handler.
+        // attached the cache unconditionally, putting every consumer who never
+        // asked for caching behind an extra handler.
         using TcgDexClient client = TcgDexClient.Create(new TcgDexOptions());
 
-        OutermostHandler(client).ShouldNotBeOfType<TcgDexFailoverHandler>();
+        OutermostHandler(client).ShouldNotBeOfType<TcgDex.Caching.TcgDexCachingHandler>();
     }
 
 #if NETFRAMEWORK
 
     [Test]
-    public void Create_WithFailover_RecyclesConnectionsToEveryEndpoint()
+    public void Create_RecyclesConnectionsToTheConfiguredBaseAddress()
     {
         // netstandard2.0 has no SocketsHttpHandler, so recycling comes from
-        // ServicePoint.ConnectionLeaseTimeout — which is set per host. Setting it
-        // for the base address alone left every mirror unrecycled, and a mirror
-        // is exactly what the client depends on after a failover, so the
-        // guarantee went missing on the endpoint that had just become load
-        // bearing.
+        // ServicePoint.ConnectionLeaseTimeout — which is set per host, and
+        // therefore has to name the host the client will actually talk to. A
+        // custom base address is used rather than the default so that this
+        // asserts the CONFIGURED value was read, not that some hard-coded host
+        // happened to be registered.
         //
         // Only net472 reaches this: it is the one target that executes the
         // netstandard2.0 asset rather than merely compiling it.
-        Uri mirror = new("https://api.eu3.tcgdex.net/v2/");
+        Uri custom = new("https://tcgdex.example.dev/v2/");
 
-        TcgDexOptions options = new();
-        options.UseFailover(mirror);
+        TcgDexOptions options = new() { BaseAddress = custom };
 
         using TcgDexClient client = TcgDexClient.Create(options);
 
-        System.Net.ServicePointManager.FindServicePoint(mirror)
+        System.Net.ServicePointManager.FindServicePoint(custom)
             .ConnectionLeaseTimeout.ShouldBe((int)TimeSpan.FromMinutes(2).TotalMilliseconds);
     }
 

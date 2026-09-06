@@ -181,141 +181,37 @@ Two things to know, both properties of the API rather than the SDK:
 
 ## Choosing a server
 
-Requests go to `api.tcgdex.net` by default. TCGdex also runs regional nodes, and
-you can point the client at one — for lower latency, or to fail over when the
-default host is unreachable:
+Requests go to `api.tcgdex.net`, and for the official API that is the address to
+use. TCGdex deployed new infrastructure in September 2026 and retired the
+per-node hostnames (`api.eu1.…`, `api.na1.…` and the rest); the main route now
+routes around a node that is down, so there is nothing left to choose between.
+
+To point the SDK somewhere else — an unofficial mirror, a self-hosted instance,
+or a local test server — set both endpoints:
 
 ```csharp
-builder.Services.AddTcgDex(options => options.UseMirror(TcgDexMirror.Eu2));
+builder.Services.AddTcgDex(options =>
+{
+    options.BaseAddress = new Uri("https://tcgdex.example.dev/v2/");
+    options.GraphQlEndpoint = new Uri("https://tcgdex.example.dev/v2/graphql");
+});
 ```
 
-`UseMirror` sets both the REST and GraphQL endpoints to that node:
+**Set both.** They are separate because GraphQL lives outside the language
+segment, so changing `BaseAddress` alone leaves GraphQL queries going to the
+official host — a split that produces correct-looking results from two different
+servers.
 
-| `TcgDexMirror` | Region |
-|---|---|
-| `Eu1` | Global |
-| `Eu2` | France |
-| `Eu3` | Germany |
-| `Na1` | Canada |
-| `Na2` | North & South America |
-| `As1` | Asia & Oceania |
+**The trailing slash on `BaseAddress` is required**, and validation rejects an
+address without one. Paths resolve relative to it, so `https://mine/v2` +
+`en/cards/x` gives `https://mine/en/cards/x` — the API root silently dropped. The
+symptom is every lookup returning "not found", which points nowhere near the
+cause.
 
-For a node not listed here, or a local test server, set `options.BaseAddress`
-(and `options.GraphQlEndpoint`) directly — `UseMirror` is only a shortcut over
-those.
-
-**One caveat.** The nodes serve the same catalogue, so this is a latency and
-availability choice, not a data one — *except* for pricing. Each node syncs
-pricing on its own schedule, so prices can differ briefly between nodes after a
-restart. Card data and asset URLs are consistent (asset URLs are fixed at build
-time). The live list of nodes and their health is at
+A third-party server sees your requests and serves whatever it likes. The data is
+public and read-only so there is little to leak, but a bad server can return wrong
+card data. A non-HTTPS address is logged as a warning. Server health is at
 [status.tcgdex.dev](https://status.tcgdex.dev).
-
-## Falling back to another server
-
-Off by default. When enabled, a request that a server cannot serve is retried
-against the next endpoint you listed:
-
-```csharp
-builder.Services.AddTcgDex(options => options.UseFailover());
-```
-
-That uses the official nodes. Name specific ones, or supply your own:
-
-```csharp
-options.UseFailover(TcgDexMirror.Eu2, TcgDexMirror.Na1);
-options.UseFailover(new Uri("https://tcgdex.example.dev/v2/"));   // unofficial or self-hosted
-```
-
-**It only rotates when a server failed to answer** — a refused connection, a
-`502`/`503`/`504`, or an attempt that ran past `FailoverAttemptTimeout`.
-Everything else is an answer and stops there:
-
-| Response | Rotates? | Why |
-|---|---|---|
-| Connection refused, DNS failure | yes | the node is not there |
-| `502` / `503` / `504` | yes | the documented TCGdex crash shape |
-| Attempt exceeded `FailoverAttemptTimeout` | yes | the node accepted and then hung |
-| `404` **from the API** | **no** | a missing card is a normal result; rotating would send every absent card to every node |
-| `404` **from anything else** | yes | not an answer about the card — a proxy with no route for that host |
-| **`429`** | **no** | that is a rate limit — spreading it across nodes is evasion, not resilience |
-| `500`, other `4xx` | no | the next node will answer the same way |
-
-The two `404` rows are told apart by media type: the API answers
-`application/json` (and its error body is already an RFC 9457 problem document,
-so `application/problem+json` counts too), while a reverse proxy that has no
-route for the host answers `text/plain` or `text/html`.
-
-This distinction is not hypothetical. On 2026-09-06, during TCGdex's migration
-to a new architecture, `api.na1.tcgdex.net` still resolved and its certificate
-still covered the name, but the new front end had no route for it and answered
-`404 page not found` as `text/plain`. Trusted, that reports a card which exists
-as missing — and nothing shows an incident, because the servers behind the
-unrouted name are healthy. The same applies to a self-hosted endpoint behind a
-proxy, or a custom endpoint whose path is wrong.
-
-Two settings shape it:
-
-```csharp
-options.FailoverAttemptTimeout = TimeSpan.FromSeconds(10);  // per attempt
-options.FailoverCooldown = TimeSpan.FromMinutes(5);         // skip a failed endpoint for this long
-```
-
-`FailoverAttemptTimeout` is what makes failover survive a *hang*. `Timeout` is
-one budget for the whole request, so without a per-attempt ceiling a server that
-accepts your connection and then stops responding would consume all 30 seconds
-and leave nothing for a second endpoint. Three attempts at the 10-second default
-fit inside the 30-second `Timeout` exactly — failover divides your ceiling, it
-never extends it.
-
-`FailoverCooldown` is what keeps this from adding load to an API that is already
-struggling. Without it every request pays the dead endpoint's failure before
-reaching a live one; with it, one request discovers the outage and the rest go
-straight to the endpoint that works. **When everything is healthy, failover
-sends no extra requests at all** — it only acts on a failure.
-
-At most three endpoints are tried per request.
-
-### What gets retried
-
-**`GET`, and `POST` to the GraphQL endpoint. Nothing else.**
-
-Resending is only safe for a request that changes nothing. A `GET` satisfies
-that by definition. GraphQL is a `POST` with a body, and rather than assume any
-request with a body is safe to repeat, the SDK replays exactly the set it
-authored itself: TCGdex's GraphQL schema exposes queries and no mutations, and
-the body was built by the SDK's own transport. The body and its content headers
-are carried across to the new endpoint, so the retried query is the query you
-asked for.
-
-A `POST` to any other address — or any other verb aimed at the GraphQL endpoint
-— passes straight through to a single endpoint. The SDK will not decide on your
-behalf that a request it did not write is safe to repeat.
-
-This is narrower than it needs to be today, deliberately: GraphQL is currently
-the only `POST` the API has, so the rule costs nothing now and still refuses to
-replay a mutation endpoint if one ever appears.
-
-**The pricing caveat from the previous section applies more here.** Nodes sync
-pricing on their own schedules, so after a failover two consecutive calls can
-report different prices for the same card. Card data and asset URLs are
-consistent; pricing is the one field that is not.
-
-**On unofficial endpoints.** TCGdex intends to add failover server-side, at
-which point rotating between *official* nodes stops being the SDK's job — a
-client-side implementation simply stops firing, because there are no failures
-left for it to see. Two things it still covers: a server-side implementation can
-only rotate among nodes TCGdex runs, so an unofficial mirror or one of your own
-is reachable this way and no other; and if the primary hostname itself is
-unreachable, nothing server-side can help, because reaching the server is the
-part that failed.
-
-Endpoints are configured, never discovered — the SDK will not fetch a server
-list at runtime, because a compromised list could redirect every client's
-traffic. A third-party mirror sees your requests and serves whatever it likes;
-the data is public and read-only so there is little to leak, but a bad mirror can
-return wrong card data. A non-HTTPS endpoint is logged as a warning, exactly as a
-non-HTTPS `BaseAddress` is.
 
 ## Handling errors
 

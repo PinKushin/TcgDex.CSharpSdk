@@ -28,6 +28,8 @@
       href: architecture.md
     - name: Learnings
       href: learnings.md
+    - name: Decisions
+      href: DECISIONS.md
 
 - name: Project
   items:
