@@ -41,13 +41,44 @@ public sealed class FailoverHandlerTests
 
     /// <summary>A body naming the host, so a test can tell which node answered.</summary>
     private static HttpResponseMessage From(HttpRequestMessage request, HttpStatusCode status)
+        => From(request, status, "application/json");
+
+    /// <inheritdoc cref="From(HttpRequestMessage, HttpStatusCode)"/>
+    private static HttpResponseMessage From(
+        HttpRequestMessage request,
+        HttpStatusCode status,
+        string mediaType)
         => new(status)
         {
             Content = new StringContent(
                 $"{{\"servedBy\":\"{request.RequestUri!.Host}\"}}",
                 System.Text.Encoding.UTF8,
-                "application/json"),
+                mediaType),
         };
+
+    /// <summary>
+    /// What a reverse proxy with no route for the requested host answers.
+    /// </summary>
+    /// <remarks>
+    /// Measured against <c>api.na1.tcgdex.net</c> on 2026-09-06, during TCGdex's
+    /// migration to a new architecture: Traefik answers <c>404</c> with exactly
+    /// this 19-byte <c>text/plain</c> body and no <c>X-Powered-By</c>, because it
+    /// has no router for that host. The API's own <c>404</c> is a JSON problem
+    /// document, so the media type separates them.
+    /// </remarks>
+    private static HttpResponseMessage Unrouted(string? mediaType, string body)
+    {
+        StringContent content = new(body);
+
+        // Assigned rather than passed to the constructor, which has no overload
+        // that omits the header — and an absent Content-Type is one of the cases
+        // under test.
+        content.Headers.ContentType = mediaType is null
+            ? null
+            : new System.Net.Http.Headers.MediaTypeHeaderValue(mediaType);
+
+        return new HttpResponseMessage(HttpStatusCode.NotFound) { Content = content };
+    }
 
     private static readonly Uri GraphQl = new("https://api.tcgdex.net/v2/graphql");
 
@@ -121,16 +152,145 @@ public sealed class FailoverHandlerTests
         (await response.Content.ReadAsStringAsync()).ShouldContain("api.eu2.tcgdex.net");
     }
 
-    // ---- Controls: statuses that are answers, and must terminate ----
+    // ---- A 404 that did not come from the API is a node that is not serving ----
 
     [Test]
-    public async Task ANotFound_IsNotRetried()
+    public async Task AnUnroutedFallback_DoesNotEndTheRotation()
+    {
+        // The failure this rejection exists for, end to end. The primary is down,
+        // the rotation reaches a host whose vhost is no longer routed, and that
+        // host's proxy answers 404. Trusting it would hand the caller "this card
+        // does not exist" for a card that does — a wrong answer produced only
+        // while the primary is down, and one no status page reports, because the
+        // servers behind the unrouted name are perfectly healthy.
+        RecordingHandler inner = new RecordingHandler()
+            .RespondWith(request => From(request, HttpStatusCode.BadGateway))
+            .RespondWith(_ => Unrouted("text/plain", "404 page not found\n"))
+            .RespondWith(request => From(request, HttpStatusCode.OK));
+
+        using HttpClient client = new(Handler(inner, [Tertiary, Secondary]));
+
+        using HttpResponseMessage response = await client.GetAsync(Card, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("api.eu2.tcgdex.net");
+
+        inner.Requests.Count.ShouldBe(3);
+        inner.Requests[0].RequestUri!.Host.ShouldBe("api.tcgdex.net");
+        inner.Requests[1].RequestUri!.Host.ShouldBe("api.na1.tcgdex.net");
+        inner.Requests[2].RequestUri!.Host.ShouldBe("api.eu2.tcgdex.net");
+    }
+
+    [TestCase("text/plain", "404 page not found\n")]
+    [TestCase("text/html", "<html><head><title>404 Not Found</title></head></html>")]
+    public async Task ANotFoundThatDidNotComeFromTheApi_IsRetried(string mediaType, string body)
+    {
+        // text/plain is Traefik's, text/html is nginx's. Neither can be the API,
+        // which answers every 404 with a JSON problem document.
+        RecordingHandler inner = new RecordingHandler()
+            .RespondWith(_ => Unrouted(mediaType, body))
+            .RespondWith(request => From(request, HttpStatusCode.OK));
+
+        using HttpClient client = new(Handler(inner, [Secondary, Tertiary]));
+
+        using HttpResponseMessage response = await client.GetAsync(Card, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("api.eu2.tcgdex.net");
+        inner.Requests.Count.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task ANotFoundWithNoMediaTypeAtAll_IsRetried()
+    {
+        // Absent is not the API either: every response it sends is typed. Rotating
+        // costs one attempt out of a budget of three; trusting it costs a wrong
+        // answer, so the untyped case belongs on the rotating side.
+        RecordingHandler inner = new RecordingHandler()
+            .RespondWith(_ => Unrouted(null, string.Empty))
+            .RespondWith(request => From(request, HttpStatusCode.OK));
+
+        using HttpClient client = new(Handler(inner, [Secondary, Tertiary]));
+
+        using HttpResponseMessage response = await client.GetAsync(Card, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("api.eu2.tcgdex.net");
+        inner.Requests.Count.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task ANotFoundWithNoContentAtAll_IsRetried()
+    {
+        // Not a hypothetical, and not the same test as the one above it. On
+        // net8.0 and net10.0 a null Content is lazily replaced with empty
+        // content, so this arrives as "no media type" — but on net472, running
+        // the netstandard2.0 asset, Content really is null. Measured by deleting
+        // the null-conditional operator in IsFromTheApi: the two modern
+        // frameworks stayed green and net472 threw NullReferenceException.
+        //
+        // So this case is the untyped one on two frameworks and the null one on
+        // the third, and only the third framework can fail it.
+        RecordingHandler inner = new RecordingHandler()
+            .RespondWith(_ => new HttpResponseMessage(HttpStatusCode.NotFound) { Content = null })
+            .RespondWith(request => From(request, HttpStatusCode.OK));
+
+        using HttpClient client = new(Handler(inner, [Secondary, Tertiary]));
+
+        using HttpResponseMessage response = await client.GetAsync(Card, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("api.eu2.tcgdex.net");
+        inner.Requests.Count.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task AnUnroutedEndpoint_CoolsOffLikeAnyOtherFailure()
+    {
+        // What keeps this from amplifying load: an unrouted host is marked failed
+        // exactly as a refused connection is, so one request discovers it and the
+        // rest skip it. Without this, every absent-card lookup during an outage
+        // would pay the unrouted node's 404 before reaching a live one.
+        FakeTimeProvider time = new();
+        RecordingHandler inner = new RecordingHandler()
+            .RespondWith(_ => Unrouted("text/plain", "404 page not found\n"))
+            .RespondWith(request => From(request, HttpStatusCode.OK))
+            .RespondWith(request => From(request, HttpStatusCode.OK));
+
+        using HttpClient client = new(Handler(inner, time: time));
+
+        using (await client.GetAsync(Card, CancellationToken.None))
+        {
+        }
+
+        using (HttpResponseMessage second = await client.GetAsync(Card, CancellationToken.None))
+        {
+            (await second.Content.ReadAsStringAsync()).ShouldContain("api.eu2.tcgdex.net");
+        }
+
+        // Three: two on the first call, one on the second. A fourth would mean the
+        // unrouted primary was probed again.
+        inner.Requests.Count.ShouldBe(3);
+        inner.Requests[1].RequestUri!.Host.ShouldBe("api.eu2.tcgdex.net");
+        inner.Requests[2].RequestUri!.Host.ShouldBe("api.eu2.tcgdex.net");
+    }
+
+    // ---- Controls: statuses that are answers, and must terminate ----
+
+    [TestCase("application/json")]
+    [TestCase("application/problem+json")]
+    public async Task ANotFoundFromTheApi_IsNotRetried(string mediaType)
     {
         // The control that matters most. A missing card is a normal outcome, and
         // rotating on it would send every absent card to every configured node —
         // turning the most common non-success response into an amplifier.
+        //
+        // Both media types are the API's own: it answers "application/json"
+        // today, and RFC 9457 registers "application/problem+json" for the
+        // problem document it already returns. Adopting the registered type must
+        // not start rotating on missing cards.
         RecordingHandler inner = new RecordingHandler()
-            .RespondWith(request => From(request, HttpStatusCode.NotFound));
+            .RespondWith(request => From(request, HttpStatusCode.NotFound, mediaType));
 
         using HttpClient client = new(Handler(inner, [Secondary, Tertiary]));
 

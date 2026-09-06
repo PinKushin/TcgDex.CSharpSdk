@@ -52,7 +52,7 @@
 
 .PARAMETER Test
     NUnit filter for the test that MUST fail, e.g.
-    'FullyQualifiedName~ANotFound_IsNotRetried'.
+    'FullyQualifiedName~ANotFoundFromTheApi_IsNotRetried'.
 
 .PARAMETER Project
     Test project. Defaults to the unit suite.
@@ -64,9 +64,9 @@
 .EXAMPLE
     ./scripts/Test-Manipulation.ps1 `
         -File TcgDex.CSharpSdk/Http/TcgDexFailoverHandler.cs `
-        -Find 'status is HttpStatusCode.BadGateway' `
-        -Replace 'status is HttpStatusCode.NotFound or HttpStatusCode.BadGateway' `
-        -Test 'FullyQualifiedName~ANotFound_IsNotRetried'
+        -Find 'HttpStatusCode.NotFound && !IsFromTheApi(response)' `
+        -Replace 'HttpStatusCode.NotFound && IsFromTheApi(response)' `
+        -Test 'FullyQualifiedName~ANotFoundFromTheApi_IsNotRetried'
 #>
 [CmdletBinding()]
 param(

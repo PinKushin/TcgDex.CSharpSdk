@@ -15,6 +15,28 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Failover no longer reports an existing card as missing when a fallback host
+  has stopped being routed.** A `404` was treated as an answer whoever sent it,
+  but a reverse proxy with no route for a host answers `404` too — and that one
+  says nothing about the card. If the rotation reached such a host, the SDK
+  returned `null` for a card that exists.
+
+  A `404` now ends the rotation only when it came from the API, told apart by
+  media type: `application/json` or `application/problem+json` is an answer,
+  anything else (or nothing at all) is a node that is not serving. A genuine
+  missing card still never rotates, and an unroutable endpoint is put on cooldown
+  like any other failure, so one request discovers it rather than every request
+  paying for it.
+
+  Reachable in 0.4.0 with `UseFailover()`: on 2026-09-06, during TCGdex's
+  migration to a new architecture, `api.na1.tcgdex.net` still resolved and its
+  certificate still covered the name, but the new front end had no route for it
+  and answered `404 page not found` as `text/plain`. Nothing reported an
+  incident, because the servers behind that name were healthy. Also applies to a
+  self-hosted endpoint behind a proxy and to a custom endpoint with a wrong path.
+
 ## [0.4.0] - 2026-09-01
 
 ### Added

@@ -177,7 +177,7 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
                 HttpResponseMessage response =
                     await base.SendAsync(copy ?? request, deadline).ConfigureAwait(false);
 
-                if (!IsNodeFailure(response.StatusCode))
+                if (!IsNodeFailure(response))
                 {
                     lastResponse?.Dispose();
                     return response;
@@ -347,11 +347,63 @@ internal sealed class TcgDexFailoverHandler : DelegatingHandler
             || name.Equals("Cookie", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Whether a status means the node could not serve the request, as opposed
+    /// Whether a response means the node could not serve the request, as opposed
     /// to having answered it.
     /// </summary>
-    private static bool IsNodeFailure(HttpStatusCode status)
-        => status is HttpStatusCode.BadGateway
-                  or HttpStatusCode.ServiceUnavailable
-                  or HttpStatusCode.GatewayTimeout;
+    /// <remarks>
+    /// <para>
+    /// <c>404</c> is normally an answer — a card that does not exist — and
+    /// rotating on it would ask every node about every absent card. But a
+    /// <c>404</c> is also what a reverse proxy returns for a host it has no route
+    /// for, and that one is not an answer about the card at all: it is a node
+    /// that is not serving this API. The two are indistinguishable by status, so
+    /// the media type separates them.
+    /// </para>
+    /// <para>
+    /// Measured against <c>api.na1.tcgdex.net</c> on 2026-09-06, during TCGdex's
+    /// migration to a new architecture: the host still resolves and its
+    /// certificate still covers the name, but Traefik has no router for it and
+    /// answers <c>404 page not found</c> as <c>text/plain</c>. Trusted, that
+    /// reports a card which exists as missing — and no status page shows an
+    /// incident, because the servers behind the unrouted name are healthy.
+    /// </para>
+    /// </remarks>
+    private static bool IsNodeFailure(HttpResponseMessage response)
+        => response.StatusCode is HttpStatusCode.BadGateway
+                               or HttpStatusCode.ServiceUnavailable
+                               or HttpStatusCode.GatewayTimeout
+            || (response.StatusCode == HttpStatusCode.NotFound && !IsFromTheApi(response));
+
+    /// <summary>
+    /// Whether a response carries the API's own media type, and so is an answer
+    /// from TCGdex rather than from something in front of it.
+    /// </summary>
+    /// <remarks>
+    /// The API answers <c>application/json</c> today and its error body is
+    /// already an RFC 9457 problem document, so <c>application/problem+json</c> is
+    /// accepted too — adopting the registered type must not start rotating on
+    /// missing cards. An absent media type counts as foreign: every response the
+    /// API sends is typed.
+    /// <para>
+    /// This reads the header only. Parsing the body to confirm the problem
+    /// document would be stricter, but this handler sits below the response cache
+    /// and buffering here would take the streaming decision away from it. The gap
+    /// that leaves — a proxy that answers <c>404</c> as JSON — is one no proxy
+    /// observed here does.
+    /// </para>
+    /// </remarks>
+    private static bool IsFromTheApi(HttpResponseMessage response)
+    {
+        // Content is null-conditional on purpose, and it is not defensive padding:
+        // on .NET Framework the property really can be null, while on net8.0 and
+        // net10.0 it is lazily replaced with empty content and never is. Measured
+        // by removing the operator — net8.0 and net10.0 stayed green and net472
+        // threw NullReferenceException. Coverage runs on net10.0, so this branch
+        // reads as uncovered there while being live on the netstandard2.0 asset.
+        string? mediaType = response.Content?.Headers.ContentType?.MediaType;
+
+        return mediaType is not null
+            && (mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
+                || mediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase));
+    }
 }
