@@ -15,7 +15,7 @@
     OutputDir, and echoes the Discord post to stdout so the workflow can drop it
     straight into the job summary.
 
-    The Discord post is a SUMMARY, not the section. Three rules make it one, and
+    The Discord post is a SUMMARY, not the section. Four rules make it one, and
     each is here because the naive version produced something unusable on a real
     release:
 
@@ -28,6 +28,11 @@
       a corrupted message rather than an abbreviated one.
     - The post always ends with a link to the release, so what was dropped is
       still reachable. That is what makes trimming honest rather than lossy.
+    - RELATIVE links are rewritten to absolute ones. A target like
+      '(docs/learnings.md)' is correct in a changelog rendered on GitHub and
+      resolves against nothing in a chat message, so 0.5.0's post shipped a dead
+      link. Rewritten against the TAG rather than a branch, so it keeps pointing
+      at the files as that version shipped them.
 
     Keep a Changelog's section order matters here: dropping from the end means
     'Added' survives and 'Fixed' goes first, which is the right way round for an
@@ -160,6 +165,45 @@ $more = "$([char]0x2192) full notes: $moreUrl"   # rightwards arrow
 
 $out.Add('')
 $out.Add($more)
+
+# --- Make relative links absolute. ---
+#
+# A changelog written for GitHub uses repo-relative targets — '(docs/learnings.md)'
+# — which are correct there and resolve against nothing in a chat message. The
+# 0.5.0 post went out carrying exactly that dead link.
+#
+# Rewritten against the TAG, not a branch: the post announces one version, and a
+# link to 'main' would drift to describe something the release did not contain.
+#
+# APPLIED TO THE LIST, NOT TO THE JOINED POST, and that is the whole subtlety.
+# The fit below rebuilds $post by re-joining $out, so rewriting the joined string
+# is discarded the moment a post exceeds the limit — silently, and only on the
+# long releases where a link is most likely to be there at all. Written that way
+# first, it passed a short synthetic changelog and did nothing whatsoever to the
+# real 0.5.0 post, which was 2392 characters before trimming.
+#
+# It also has to happen before the measurement: an absolute URL is far longer
+# than the relative path it replaces, so a post absolutised afterwards could be
+# pushed back over a limit it had just been measured under.
+$blobBase = "$RepositoryUrl/blob/v$Version"
+
+for ($i = 0; $i -lt $out.Count; $i++) {
+    $out[$i] = [regex]::Replace($out[$i], '\[([^\]]+)\]\(([^)\s]+)\)', {
+        param($match)
+
+        $text   = $match.Groups[1].Value
+        $target = $match.Groups[2].Value
+
+        # Already absolute: leave it exactly as written.
+        if ($target -match '^[a-zA-Z][a-zA-Z0-9+.-]*:') { return $match.Value }
+
+        # An in-page anchor has no destination outside the rendered file, so keep
+        # the words and drop the link rather than emitting one that goes nowhere.
+        if ($target.StartsWith('#')) { return $text }
+
+        return "[$text]($blobBase/$($target -replace '^\./', ''))"
+    })
+}
 
 $post = ($out -join "`n").Trim()
 
