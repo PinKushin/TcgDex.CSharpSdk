@@ -15,27 +15,51 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
-### Fixed
+## [0.5.0] - 2026-09-06
 
-- **Failover no longer reports an existing card as missing when a fallback host
-  has stopped being routed.** A `404` was treated as an answer whoever sent it,
-  but a reverse proxy with no route for a host answers `404` too — and that one
-  says nothing about the card. If the rotation reached such a host, the SDK
-  returned `null` for a card that exists.
+**Breaking.** Client-side failover and mirror selection are gone. If you called
+`UseFailover` or `UseMirror`, delete the call — the default configuration is now
+the recommended one. To target a different server, set `BaseAddress` and
+`GraphQlEndpoint`.
 
-  A `404` now ends the rotation only when it came from the API, told apart by
-  media type: `application/json` or `application/problem+json` is an answer,
-  anything else (or nothing at all) is a node that is not serving. A genuine
-  missing card still never rotates, and an unroutable endpoint is put on cooldown
-  like any other failure, so one request discovers it rather than every request
-  paying for it.
+### Removed
 
-  Reachable in 0.4.0 with `UseFailover()`: on 2026-09-06, during TCGdex's
-  migration to a new architecture, `api.na1.tcgdex.net` still resolved and its
-  certificate still covered the name, but the new front end had no route for it
-  and answered `404 page not found` as `text/plain`. Nothing reported an
-  incident, because the servers behind that name were healthy. Also applies to a
-  self-hosted endpoint behind a proxy and to a custom endpoint with a wrong path.
+- **`UseFailover()` and its two overloads, `FailoverEndpoints`,
+  `FailoverAttemptTimeout`, `FailoverCooldown`.** TCGdex deployed new
+  infrastructure in September 2026, and its main route now routes around a node
+  that is down. Rotating between official nodes client-side was always meant to
+  be removed once that existed — it was built on the understanding that it would
+  be — and keeping it would mean a second, slower retry layer duplicating one the
+  service already does better.
+
+- **`UseMirror()` and the `TcgDexMirror` enum.** The same deployment retired the
+  per-node hostnames. `api.na1.tcgdex.net` and `api.na2.tcgdex.net` no longer
+  route at all, so two of the six members could only ever fail; upstream now
+  recommends `api.tcgdex.net` for everyone. Left in place they would be an
+  invitation to use hosts that no longer work.
+
+- This also removes the `404` discrimination added after 0.4.0 but never
+  released, which stopped an unrouted host's `404` being reported as a missing
+  card. That defect is resolved by the feature it lived in no longer existing.
+  The reasoning is kept in [`docs/learnings.md`](docs/learnings.md), because it
+  is about status codes rather than about failover.
+
+### Kept
+
+- **Pointing the SDK at a server of your own.** `BaseAddress` and
+  `GraphQlEndpoint` are unchanged, and remain the supported way to use an
+  unofficial mirror, a self-hosted instance, or a local test server. Set both —
+  GraphQL sits outside the language segment, so changing only `BaseAddress`
+  leaves GraphQL queries going to the official host.
+
+### Added
+
+- **`BaseAddress` is now validated to end with `/`.** Paths resolve relative to
+  it, so `https://mine/v2` + `en/cards/x` gave `https://mine/en/cards/x` — the
+  API root silently dropped, every lookup returning "not found", and nothing
+  pointing at the cause. The check previously existed only for failover
+  endpoints; removing those left the identical hazard on the one address that
+  still matters.
 
 ## [0.4.0] - 2026-09-01
 
@@ -295,7 +319,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.2.0...v0.2.1

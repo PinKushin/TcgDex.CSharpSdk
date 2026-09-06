@@ -135,6 +135,14 @@ Not committed to. Each would need a reason beyond "it would be neat".
   `IHttpClientBuilder`, so `.AddStandardResilienceHandler()` already works.
   Shipping a retry policy nobody asked for is how an SDK ends up hammering a
   free public API.
+- **Rotating between servers.** Shipped in 0.4.0 and removed in 0.5.0: TCGdex
+  deployed new infrastructure whose main route routes around a node that is
+  down, and retired the per-node hostnames the feature was built on. Doing it
+  client-side now would be a second, slower retry layer duplicating one the
+  service does better. Choosing a server is still supported — set `BaseAddress`
+  and `GraphQlEndpoint` for an unofficial mirror, a self-hosted instance, or a
+  local test server. Full reasoning, including the upstream side of it, in
+  [decision 1](DECISIONS.md).
 - **A telemetry vendor dependency.** The SDK writes to `ILogger` and
   `ActivitySource`; choosing the backend belongs to the application. A library
   that reported to its author's account from a consumer's process would be

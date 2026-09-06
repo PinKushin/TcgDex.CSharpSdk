@@ -105,32 +105,16 @@ namespace TcgDex
         public static System.Collections.Generic.IReadOnlyList<string> All { get; }
         public static bool IsSupported(string? language) { }
     }
-    public enum TcgDexMirror
-    {
-        Eu1 = 0,
-        Eu2 = 1,
-        Eu3 = 2,
-        Na1 = 3,
-        Na2 = 4,
-        As1 = 5,
-    }
     public sealed class TcgDexOptions
     {
         public TcgDexOptions() { }
         public System.Uri BaseAddress { get; set; }
         public bool DeserializePricing { get; set; }
-        public System.TimeSpan FailoverAttemptTimeout { get; set; }
-        public System.TimeSpan FailoverCooldown { get; set; }
-        public System.Collections.Generic.IReadOnlyList<System.Uri> FailoverEndpoints { get; }
         public System.Uri GraphQlEndpoint { get; set; }
         public string Language { get; set; }
         public int MaxDeserializedCacheEntries { get; set; }
         public long MaxResponseBytes { get; set; }
         public System.TimeSpan Timeout { get; set; }
-        public TcgDex.TcgDexOptions UseFailover() { }
-        public TcgDex.TcgDexOptions UseFailover(params System.Uri[] endpoints) { }
-        public TcgDex.TcgDexOptions UseFailover(params TcgDex.TcgDexMirror[] mirrors) { }
-        public TcgDex.TcgDexOptions UseMirror(TcgDex.TcgDexMirror mirror) { }
         public void Validate() { }
     }
 }

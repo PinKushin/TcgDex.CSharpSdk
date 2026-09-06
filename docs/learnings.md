@@ -1386,6 +1386,13 @@ and find the field that separates them. The generalisation is worth more than th
 incident: the same fix covers a self-hosted endpoint behind a proxy and a custom
 endpoint configured with the wrong path, neither of which involves TCGdex at all.
 
+**The code described here no longer exists.** Failover was removed in 0.5.0 once
+TCGdex confirmed the main route handles a downed node server-side, and the
+`404` discrimination went with the handler it lived in — see
+[decision 1](DECISIONS.md). The entry is kept because the lesson is about reading
+status codes, not about failover, and the next place it applies will not look
+like this one.
+
 ---
 ## Coverage runs on one framework, so a dead branch there can be live elsewhere
 

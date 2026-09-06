@@ -237,17 +237,9 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         // documentation now says where the guarantee applies rather than
         // claiming it everywhere. Nothing reachable from netstandard2.0 can set
         // a pooled lifetime on those runtimes.
-        //
-        // Every configured host, not just the base address: after a failover the
-        // client talks to a mirror, and leaving that one unrecycled would drop
-        // the guarantee for the endpoint it is depending on precisely because
-        // the primary is down.
-        foreach (Uri endpoint in new[] { resolved.BaseAddress }.Concat(resolved.FailoverEndpoints))
-        {
-            System.Net.ServicePointManager
-                .FindServicePoint(endpoint)
-                .ConnectionLeaseTimeout = (int)ConnectionRecycleInterval.TotalMilliseconds;
-        }
+        System.Net.ServicePointManager
+            .FindServicePoint(resolved.BaseAddress)
+            .ConnectionLeaseTimeout = (int)ConnectionRecycleInterval.TotalMilliseconds;
 
         // DecompressionMethods.All is .NET 5+, and Brotli is not available
         // here — these two are what netstandard2.0 can offer.
@@ -262,27 +254,6 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
             AutomaticDecompression = System.Net.DecompressionMethods.All,
         };
 #endif
-
-        // Wrapped before the cache below, which leaves failover INNERMOST. The
-        // cache keys on the request URI, so a host rewritten above it would key
-        // the same resource separately for every endpoint; down here the cache
-        // only ever sees the canonical address.
-        if (resolved.FailoverEndpoints.Count > 0)
-        {
-            IReadOnlyList<Uri> failoverEndpoints = TcgDexFailoverHandler.Deduplicate(
-                resolved.FailoverEndpoints, resolved.BaseAddress);
-
-            handler = new TcgDexFailoverHandler(
-                resolved.BaseAddress,
-                resolved.GraphQlEndpoint,
-                failoverEndpoints,
-                resolved.FailoverAttemptTimeout,
-                resolved.FailoverCooldown,
-                new FailoverCooldowns(failoverEndpoints.Count + 1))
-            {
-                InnerHandler = handler,
-            };
-        }
 
         if (cacheOptions is not null)
         {
