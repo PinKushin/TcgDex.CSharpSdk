@@ -1331,3 +1331,88 @@ down.
 taken only when the code is broken. "It cannot make that call because the guard
 stops it" is not hermeticity when the guard is what a mutant removes. Assert the
 observable state directly.
+
+---
+## A `404` does not always come from the API
+
+Failover treated `404` as an answer whoever sent it. The reasoning was sound and
+is still in the docs: a missing card is a normal result, and rotating on it would
+ask every configured node about every absent card. What it missed is that `404`
+is also what a reverse proxy returns for a host it has no route for, and that
+`404` is not an answer about the card at all.
+
+Measured on 2026-09-06, during TCGdex's migration to a new architecture:
+
+```
+api.na1.tcgdex.net   404  text/plain   "404 page not found\n"   19 bytes
+api.tcgdex.net       404  application/json   {"type":"https://tcgdex.dev/errors/not-found",...}
+```
+
+The host still resolved, and the certificate on the new front end still listed
+`DNS:api.na1.tcgdex.net` — the name had been migrated far enough to get a
+certificate but not far enough to get a router. `api.na2.tcgdex.net` had not been
+migrated at all and presented `CN=TRAEFIK DEFAULT CERT`, which at least fails
+loudly: a TLS error is an `HttpRequestException`, which already rotates.
+
+The unrouted one was the dangerous case, for three reasons that compound:
+
+- **It is silent.** `HandleFailureAsync` maps `404` to `return null`, so the
+  caller is told the card does not exist.
+- **Nothing reports it.** The status page showed every component green and was
+  correct to — the servers behind the unrouted name were healthy. The components
+  had been renamed by region (`na-east`, `eu-west`) while the SDK still addressed
+  the old per-node hostnames. **A status page answers a question about servers;
+  the SDK asks a question about hostnames, and after a migration those are not
+  the same question.**
+- **It needs an outage to appear.** The primary is reached first and answers, so
+  the fallback's `404` is only ever seen once the primary is already failing —
+  the point at which the wrong answer is least likely to be questioned.
+
+The fix is one line of discrimination, not a new mechanism: a `404` ends the
+rotation only if its media type is the API's (`application/json`, or
+`application/problem+json` for the RFC 9457 body it already sends). Anything
+else, or nothing at all, is a node that is not serving. Cost while healthy is
+zero, because the primary answers and no fallback is reached; cost during an
+outage is one extra attempt out of a budget of three, and the unroutable node is
+put on cooldown so only the first request pays it.
+
+Header only, not the body: this handler sits below the response cache, and
+buffering here would take the streaming decision away from it. That leaves one
+gap — a proxy answering `404` as JSON — which no proxy observed here does.
+
+**Rule:** when a status code can be produced by something other than the service,
+the status code alone is not the measurement. Ask what else could have sent it,
+and find the field that separates them. The generalisation is worth more than the
+incident: the same fix covers a self-hosted endpoint behind a proxy and a custom
+endpoint configured with the wrong path, neither of which involves TCGdex at all.
+
+---
+## Coverage runs on one framework, so a dead branch there can be live elsewhere
+
+Adding a media-type check to the failover handler moved branch coverage from
+96.43% to 96.34%, which is the wrong direction for code whose every case has a
+test. The suspect was `response.Content?.Headers`, added as a habit rather than a
+decision, and the obvious conclusion was that the null branch was unreachable
+padding.
+
+It was not. Removing the operator and running all three frameworks:
+
+```
+net8.0    Passed         net10.0   Passed         net472    NullReferenceException
+```
+
+`HttpResponseMessage.Content` is lazily replaced with empty content on modern
+.NET and genuinely can be null on .NET Framework. The branch is live on the
+`netstandard2.0` asset and dead on the one coverage is measured against, so a
+correct null check is permanently charged as an uncovered branch.
+
+Two things follow. **A coverage number describes the framework it was collected
+on**, which for a multi-targeted library is a subset of what ships — this repo
+already runs the tests on net472 for the same reason
+([`netstandard2.0` is compiled, never executed](#netstandard20-is-compiled-never-executed--so-run-the-tests-on-net472)),
+and the coverage instrument has the identical blind spot without the identical
+remedy. **And a coverage dip is a question, not a verdict.** Answering it here
+cost one edit and one test run, and the answer was the opposite of the guess —
+had the dip been waved through as noise, the operator would eventually have been
+removed by someone tidying an uncovered branch, and the crash would have appeared
+only on .NET Framework.

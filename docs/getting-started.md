@@ -236,9 +236,23 @@ Everything else is an answer and stops there:
 | Connection refused, DNS failure | yes | the node is not there |
 | `502` / `503` / `504` | yes | the documented TCGdex crash shape |
 | Attempt exceeded `FailoverAttemptTimeout` | yes | the node accepted and then hung |
-| **`404`** | **no** | a missing card is a normal result; rotating would send every absent card to every node |
+| `404` **from the API** | **no** | a missing card is a normal result; rotating would send every absent card to every node |
+| `404` **from anything else** | yes | not an answer about the card — a proxy with no route for that host |
 | **`429`** | **no** | that is a rate limit — spreading it across nodes is evasion, not resilience |
 | `500`, other `4xx` | no | the next node will answer the same way |
+
+The two `404` rows are told apart by media type: the API answers
+`application/json` (and its error body is already an RFC 9457 problem document,
+so `application/problem+json` counts too), while a reverse proxy that has no
+route for the host answers `text/plain` or `text/html`.
+
+This distinction is not hypothetical. On 2026-09-06, during TCGdex's migration
+to a new architecture, `api.na1.tcgdex.net` still resolved and its certificate
+still covered the name, but the new front end had no route for it and answered
+`404 page not found` as `text/plain`. Trusted, that reports a card which exists
+as missing — and nothing shows an incident, because the servers behind the
+unrouted name are healthy. The same applies to a self-hosted endpoint behind a
+proxy, or a custom endpoint whose path is wrong.
 
 Two settings shape it:
 
