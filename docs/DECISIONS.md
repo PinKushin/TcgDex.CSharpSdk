@@ -44,6 +44,28 @@ both confirmed by Thomas on 2026-09-06:
 
 > the main route should now route if any of the nodes are down
 
+Avior described the backend topology that makes the second statement true:
+
+> na1 and na2 are now both behind a single load balancer that automatically
+> handle disconnection from the other servers that should be better for you
+
+Note what that does and does not say. The *servers* behind those names are
+healthy and now have automatic failover between them; the *public prefixed
+hostnames* still do not route, which is a separate fact and the one the enum
+depended on. Re-measured after the load balancer went in: `api.na1` still
+answered `404`, `api.na2` still failed TLS, and `api.tcgdex.net` served
+normally.
+
+The timing was expected rather than a surprise. From the same conversation:
+
+> i was ready for this, you told me you guys were going to do the fallback last
+> week, i just didnt expect it to be so fast lol
+
+Ryan's reply — *"Needed doing quickly really"* — and the owner's note that the
+maintainers are volunteers he was not going to rush are worth keeping for the
+next time this SDK covers a gap upstream intends to close: the gap closed a week
+after it was announced, not a quarter later.
+
 Measured the same day, before that confirmation arrived: `api.na1.tcgdex.net`
 resolved and its certificate covered the name, but the new front end had no route
 for it and answered `404 page not found` as `text/plain`.
@@ -74,6 +96,18 @@ And on why no deprecation period was needed:
 `BaseAddress` and `GraphQlEndpoint` stay. The owner's requirement:
 
 > i want to keep the ability to point the sdk to a custom server though
+
+Thomas named the same exception unprompted, which is as close to an upstream
+endorsement of this split as it gets:
+
+> yeah you shouldnt need to manually do it now. unless you wanna define like
+> local apis or somthing
+
+And the shape was stated to the maintainers before it was built, so the SDK's
+behaviour and what upstream was told match:
+
+> im removing the prefix enums completely, and just leaving the api.tcgdex.net
+> endpoint, while letting the host be overridden for custom endpoints
 
 This is the durable half of the original reasoning. A server-side implementation
 can only route among nodes TCGdex runs, so an unofficial mirror or a self-hosted
