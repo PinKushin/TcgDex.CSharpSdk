@@ -87,6 +87,23 @@ enum members could no longer work at all.
 Remove client-side failover entirely, and the mirror enum with it. Keep the
 ability to point the SDK at a custom server.
 
+**All six enum members went, though only two were provably dead.** Measured at
+the time of removal, `api.eu1`/`eu2`/`eu3` and `api.as1` still served; only the
+NA endpoints had been retired, which matches Thomas naming NA specifically and
+Ryan's *"Needed doing quickly really"*. The owner's expectation — an expectation
+from the shape of the rollout, not something upstream stated — was that the same
+treatment reaches the other regions:
+
+> probably did that for every area, and theres probably a server on demand thing
+> going if he's really smart about it and can afford it
+
+The three EU names already resolved to a single address, which is consistent
+with that region being pooled behind one balancer too. Whether anything scales
+on demand is not observable from a client and is not claimed here. Either way the
+decision does not rest on it: upstream recommends `api.tcgdex.net` for everyone,
+so removing only the two confirmed-dead members would mean doing this again when
+the rest follow.
+
 The owner, on why the dead enum members were not simply left in place or marked
 obsolete:
 
