@@ -237,4 +237,4 @@ jobs:
         run: >
           ./scripts/Verify-TestCoverage.ps1
           -ResultsDirectory ./all-test-results
-          -ExpectedTestCount 531
+          -ExpectedTestCount 532

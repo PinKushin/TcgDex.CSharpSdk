@@ -176,6 +176,11 @@ differing by exactly `ThePublicSurface_MatchesTheApprovedBaseline`, a test gated
 Both jobs now pin `--framework net10.0` explicitly. `framework-test` already pinned `net472` for the
 same reason — this closes the gap on the other two.
 
+With both pinned, the two lanes report 519 each and agree run to run. The expected union is **532**:
+519 unit (`net10.0`, same names in `unit-tests.trx` and `macos-tests.trx`) + 11 offline integration
++ 2 that exist only under `net472` in `framework-tests.trx`. Re-derive it that way if a lane changes;
+do not adjust the constant to whatever CI last printed.
+
 The general lesson: an exact-count coverage assertion is only as trustworthy as the determinism of
 what it counts. It surfaced this bug rather than causing it — the flake predates the coverage job and
 had been running unnoticed since nothing compared lane counts before.
