@@ -50,33 +50,14 @@ Other scripts: `scripts/Update-Fixtures.ps1` (re-record fixtures from the live A
 | `TcgDex.CSharpSdk.Fuzz` | SharpFuzz harness. |
 | `TcgDex.CSharpSdk.AotSmokeTest` | Proves the SDK still publishes under Native AOT. |
 
-## Gotchas
+## Non-negotiable constraints
 
-- **A unit test must never reach the network — not even on a path taken only when the code is
-  broken.** `Create_DisposesItsOwnHttpClient` asserted disposal by awaiting a real request and
-  expecting `ObjectDisposedException`, which is hermetic only while the code is correct. Under
-  Stryker, every mutant that defeated the disposal dialled the live API; on a night the API was
-  down, each one hit the 30-second timeout and the run went from ~20 minutes to 2h38m, silently
-  starving a neighbouring job on the shared measurement box. Assert the observable state directly.
-  (`docs/learnings.md` — "A test can be hermetic only while the code is correct".)
+See `docs/DECISIONS.md` (sections 2–8) for the full reasoning behind these rules:
 
-- **The query builder must never call `Expression.Compile()`.** Runtime codegen is not AOT-safe and
-  would break Unity and Native AOT consumers. Expression trees are walked and translated to query
-  parameters, never compiled.
-
-- **The System.Text.Json source generator discards collection initializers.** A property written
-  `= []` deserializes to `null`; collections need a coalescing backing field to stay non-null.
-
-- **The public API surface is pinned** by `TcgDex.CSharpSdk.Tests/PublicApi.approved.cs`
-  (PublicApiGenerator). An intentional change means regenerating that baseline — with **LF** line
-  endings, or the comparison fails on the endings rather than on the surface.
-
-- **The strict analyzers are deliberately not solution-wide.** On test code `AnalysisMode=All` plus
-  Sonar is near-total noise — S2699 fires on every CsCheck property, CA2000 on every undisposed test
-  `HttpClient` — with no real finding behind it.
-
-- **Native AOT publish needs the VS Installer directory on `PATH`**, or the native link step fails
-  with a misleading error.
-
-- **`main` is protected: you cannot push to it.** Work goes through a PR, and auto-merge is off, so
-  a merge is an explicit step after CI is green. Releases are git-tagged and published by workflow.
+- **Unit tests never reach the network.** Not on error paths either. Assert observable state directly.
+- **Query builder never calls `Expression.Compile()`.** AOT-unsafe; breaks Unity and Native AOT.
+- **Collection initializers require coalescing backing fields.** System.Text.Json source generator discards `= []`.
+- **Public API pinned by `PublicApi.approved.cs`.** Regenerate with **LF** line endings only.
+- **Strict analyzers scoped to the library only.** Test code noise is noise; accept it on tests.
+- **Native AOT needs VS Installer on `PATH`.** Or native link step fails with a misleading error.
+- **`main` is protected.** Work through PR; auto-merge is off; releases are git-tagged.
