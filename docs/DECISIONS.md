@@ -164,7 +164,25 @@ deletion instead of an excavation.
 
 ---
 
-## 2. Unit tests are hermetic — never reach the network
+## 2. `dotnet test` on the multi-target Tests project must pin `--framework`
+
+Added a CI job (`verify-test-coverage`) that asserts the union of test names across all lanes
+equals a fixed count. It caught a pre-existing flake: `build-and-test` and `macos-test` ran
+`dotnet test TcgDex.CSharpSdk.Tests.csproj` without `--framework`, against a project multi-targeting
+`net10.0;net8.0;netstandard2.0`. Which TFM's build `dotnet test` picks when none is specified is not
+guaranteed stable — two macOS runs on the identical commit produced 518 and 519 distinct test names,
+differing by exactly `ThePublicSurface_MatchesTheApprovedBaseline`, a test gated by TFM.
+
+Both jobs now pin `--framework net10.0` explicitly. `framework-test` already pinned `net472` for the
+same reason — this closes the gap on the other two.
+
+The general lesson: an exact-count coverage assertion is only as trustworthy as the determinism of
+what it counts. It surfaced this bug rather than causing it — the flake predates the coverage job and
+had been running unnoticed since nothing compared lane counts before.
+
+---
+
+## 3. Unit tests are hermetic — never reach the network
 
 A unit test can be hermetic only while the code is correct. `Create_DisposesItsOwnHttpClient`
 tried to verify disposal by awaiting a real request and expecting `ObjectDisposedException`. Under
@@ -177,14 +195,14 @@ reachable. See [`learnings.md`](learnings.md) for the full measurement.
 
 ---
 
-## 3. Query builder never calls `Expression.Compile()`
+## 4. Query builder never calls `Expression.Compile()`
 
 Runtime code generation is not AOT-safe and breaks Unity and Native AOT consumers. Expression
 trees are walked and translated to query parameters, never compiled to delegates.
 
 ---
 
-## 4. Collection initializers require coalescing backing fields
+## 5. Collection initializers require coalescing backing fields
 
 The System.Text.Json source generator discards collection initializers. A property declared as
 `= []` deserializes to `null` when the field is omitted in the JSON. Use a coalescing backing
@@ -192,7 +210,7 @@ field to guarantee non-null.
 
 ---
 
-## 5. Public API surface is pinned by `PublicApi.approved.cs`
+## 6. Public API surface is pinned by `PublicApi.approved.cs`
 
 `TcgDex.CSharpSdk.Tests/PublicApi.approved.cs` (PublicApiGenerator) pins the public surface.
 An intentional change requires regenerating that baseline. **Regenerate with LF line endings
@@ -200,7 +218,7 @@ only** — the CRLF variant fails the comparison on the line endings, not on the
 
 ---
 
-## 6. Strict analyzers are scoped to the library only
+## 7. Strict analyzers are scoped to the library only
 
 `AnalysisMode=All` + SonarAnalyzer on test code is near-total noise: S2699 on every CsCheck
 property, CA2000 on every undisposed test `HttpClient`. The signal-to-noise ratio is unusable.
@@ -208,7 +226,7 @@ Analyzers are enabled **only on `TcgDex.CSharpSdk`, not on test or benchmark pro
 
 ---
 
-## 7. Native AOT publish needs VS Installer directory on `PATH`
+## 8. Native AOT publish needs VS Installer directory on `PATH`
 
 The native link step fails with a misleading error if the C++ toolchain is not reachable. VS
 Installer puts those tools in a subdirectory that is not on `PATH` by default. Add it before
@@ -217,7 +235,7 @@ similar.
 
 ---
 
-## 8. `main` is protected
+## 9. `main` is protected
 
 Direct pushes to `main` are disabled. All work goes through a pull request. Auto-merge is off, so
 a merge is an explicit step taken after CI is green. Releases are git-tagged and published by
