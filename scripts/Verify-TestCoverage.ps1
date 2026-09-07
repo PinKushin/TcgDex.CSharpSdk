@@ -78,12 +78,16 @@ foreach ($file in $trxFiles) {
   $testNames += $results.TestName
 }
 
-# Check for duplicates across files
-$dupeGroups = $testNames | Group-Object | Where-Object { $_.Count -gt 1 }
-if ($dupeGroups) {
-  Write-Error "Found duplicate tests across lanes:"
-  $dupeGroups | ForEach-Object { Write-Error "  $($_.Name) appears $($_.Count) times" }
-  exit 1
+# Duplicates across files are expected (same tests on multiple platforms).
+# Only flag within-file duplicates as a defect.
+foreach ($fileName in $allTestsByFile.Keys) {
+  $tests = $allTestsByFile[$fileName].TestName
+  $withinFileDupes = $tests | Group-Object | Where-Object { $_.Count -gt 1 }
+  if ($withinFileDupes) {
+    Write-Error "Found duplicate tests within $fileName (a defect):"
+    $withinFileDupes | ForEach-Object { Write-Error "  $($_.Name) appears $($_.Count) times" }
+    exit 1
+  }
 }
 
 # All lanes should have the same count (unit tests are the same on all platforms)
