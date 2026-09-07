@@ -212,3 +212,29 @@ jobs:
       - name: Run the native binary
         shell: pwsh
         run: ./TcgDex.CSharpSdk.AotSmokeTest/bin/Release/net10.0/win-x64/publish/TcgDex.CSharpSdk.AotSmokeTest.exe
+
+  # Verify that test results from every lane cover the full inventory without gaps or duplicates.
+  # This catches: a filter that matched nothing (silent 0 exit), a shard that ran only part of
+  # the suite, or a test disabled in one lane. Runs after all test jobs complete.
+  #
+  # See C3 in CONVENTIONS-HARVEST.md: a dedicated job that asserts the union of every shard,
+  # serial lane, and special lane equals the full test inventory.
+  verify-test-coverage:
+    name: Verify test coverage across all lanes
+    needs: [build-and-test, macos-test, framework-test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download all test results
+        uses: actions/download-artifact@v7
+        with:
+          path: all-test-results
+
+      - name: Verify complete coverage
+        shell: pwsh
+        run: >
+          ./scripts/Verify-TestCoverage.ps1
+          -ResultsDirectory ./all-test-results
+          -ExpectedTestCount 415
