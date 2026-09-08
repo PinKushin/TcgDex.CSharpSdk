@@ -1,6 +1,6 @@
 ---
-name: test-validity-reviewer
-description: Reviews new or changed tests for validity — whether they could actually fail if the code were wrong. Use after writing tests, before opening a PR, or when a suite passes and you want to know whether that means anything. Read-only.
+name: tcgdex-test-validity-reviewer
+description: Reviews new or changed tests in TcgDex.CSharpSdk for validity — whether they could actually fail if the code were wrong. Use after writing tests, before opening a PR, or when a suite passes and you want to know whether that means anything. Read-only.
 tools: Read, Grep, Glob, Bash
 ---
 
