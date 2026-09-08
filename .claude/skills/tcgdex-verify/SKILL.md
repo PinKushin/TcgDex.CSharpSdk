@@ -1,5 +1,5 @@
 ---
-name: verify
+name: tcgdex-verify
 description: Run the full local gate for TcgDex.CSharpSdk — build, unit tests on all three TFMs, the coverage gate, and the docs build. Use before pushing, before opening a PR, or to confirm the repo is green.
 ---
 
