@@ -70,6 +70,7 @@ internal static class TcgDexJsonContracts
             : WithoutPricing;
     }
 
+    /// <summary>Builds the serializer options used when pricing deserialization is turned off.</summary>
     /// <remarks>
     /// <para>
     /// The property loop is a <c>foreach</c> rather than

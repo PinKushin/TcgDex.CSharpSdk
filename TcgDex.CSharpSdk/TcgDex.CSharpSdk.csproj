@@ -22,17 +22,31 @@
   <!-- Strict analyzer posture, scoped to the shipped library. The whole solution
        runs the security-elevated recommended set from Directory.Build.props; the
        code that actually ships to consumers additionally runs every CA category
-       at All plus SonarAnalyzer's full C# ruleset. Test/benchmark/tooling
+       at All plus three third-party analyzer packages. Test/benchmark/tooling
        projects stay on the shared posture on purpose — full-All + Sonar on test
        code is near-all noise here (S2699 fires on every CsCheck property, CA2000
-       on every undisposed test HttpClient) with no real finding behind it. -->
+       on every undisposed test HttpClient) with no real finding behind it, and
+       the same reasoning excludes Roslynator/Meziantou from them too. -->
   <PropertyGroup>
     <AnalysisLevel>latest</AnalysisLevel>
     <AnalysisMode>All</AnalysisMode>
   </PropertyGroup>
 
+  <!-- Three analyzer packages, each covering a category the others don't:
+       Sonar for general code smells and security hotspots, Roslynator for
+       simplification/redundancy (matches PokemonBattleJournal's posture),
+       Meziantou for async correctness and culture-sensitive string bugs. See
+       Directory.Packages.props for the version pins and the full reasoning. -->
   <ItemGroup>
     <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Roslynator.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Meziantou.Analyzer">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

@@ -247,3 +247,48 @@ a merge is an explicit step taken after CI is green. Releases are git-tagged and
 workflow, not by hand.
 
 This arrangement ensures every commit to the main branch has been reviewed and CI-validated.
+
+---
+
+## 10. Roslynator.Analyzers and Meziantou.Analyzer added alongside SonarAnalyzer
+
+Requested by the owner directly ("i use it in PBJ, and want it here too"), and traced to
+[`PinKushin/ANALYZER-COVERAGE-LOG.md`](https://github.com/PinKushin/PinKushin/blob/main/ANALYZER-COVERAGE-LOG.md)
+(entry 2026-09-08), which surveyed the house's C# repos and identified Meziantou as a genuine
+fourth analyzer rather than a duplicate of Sonar/Roslynator — its standout categories are async
+correctness (`ConfigureAwait`, and `using` on a `Task<IDisposable>` disposing the Task itself
+rather than the awaited result) and culture-sensitive string comparison, which neither existing
+tool focuses on as heavily. This SDK is an async HTTP client throughout, exactly the shape those
+rules target.
+
+Adding both surfaced 49 unique findings across four rule IDs, resolved as follows rather than
+suppressed wholesale:
+
+- **MA0048** ("file name must match type name"), 33 sites — disabled repo-wide via
+  `.editorconfig`. This codebase deliberately groups small, tightly related types in one file
+  (`Resources.cs` holds six resource classes, `GraphQlMessages.cs` a `JsonContext` plus the
+  message types it serializes) so a reader following one concept finds every type for it in one
+  place. Splitting them would be a purely mechanical, purely cosmetic change against how the
+  codebase is organized on purpose — not a defect the rule caught.
+- **MA0015** ("is not a valid parameter name"), 6 sites, all in `TcgDexOptions.Validate()` —
+  the identical pattern Sonar's `S3928` was already suppressed for at the same call sites:
+  `Validate()` is parameterless by design and reports the offending *property* name via
+  `nameof` for an actionable `ArgumentException.ParamName`, which neither analyzer's parameter-
+  matching heuristic recognises as valid. Folded into the existing suppressed span rather than a
+  second pragma repeating the same reasoning.
+- **MA0051** ("method is too long"), 7 sites, longest 107 lines — threshold raised from 60 to
+  130 via `.editorconfig`, not disabled. This codebase documents *why* alongside *what*, so a
+  method that exceeds 60 lines usually does so because of the comments explaining a non-obvious
+  decision, not because the control flow does too much. The 107-line outlier is
+  `BoundedContent.ReadAsBytesAsync` — the decompression-bomb guard — where splitting it for a
+  line count would fragment security-relevant logic across methods with no independent
+  correctness meaning, in a codebase where the "verify by manipulation" testing discipline
+  demands re-verifying anything touched. 130 leaves headroom without disabling the rule outright.
+- **RCS1139** ("add summary element"), 3 sites — fixed for real rather than suppressed: three
+  methods had a `<remarks>` block with no `<summary>`, which is a genuine documentation gap
+  (`<summary>` is what an IDE tooltip shows; `<remarks>` is secondary) rather than a false
+  positive.
+
+Full local gate green after: build (0 warnings across all three TFMs), unit tests (519/518/514,
+unchanged — no test source touched), coverage (99.82% line / 96.29% branch, both above gate),
+docs (0 warnings).
