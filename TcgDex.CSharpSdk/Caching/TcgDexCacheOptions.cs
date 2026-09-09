@@ -92,6 +92,7 @@ public class TcgDexCacheOptions
         return IsSingleCardPath(path) ? PricingTimeToLive : DefaultTimeToLive;
     }
 
+    /// <summary>Whether <paramref name="path"/> is one of the enumeration/catalog endpoints.</summary>
     /// <remarks>
     /// <para>
     /// A <c>foreach</c> rather than <c>CatalogEndpoints.Any(e =&gt; …)</c>, which

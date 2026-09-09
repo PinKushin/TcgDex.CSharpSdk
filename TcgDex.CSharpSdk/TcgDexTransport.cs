@@ -253,6 +253,7 @@ internal sealed class TcgDexTransport
     private CancellationTokenSource? CreateBudget(CancellationToken cancellationToken)
         => RequestBudget.Create(_timeout, cancellationToken);
 
+    /// <summary>Sends the request, applying this SDK's timeout on top of the caller's own cancellation.</summary>
     /// <param name="uri">The resource being fetched.</param>
     /// <param name="activity">The span to record a failure on, if any.</param>
     /// <param name="deadline">

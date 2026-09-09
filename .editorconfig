@@ -102,6 +102,33 @@ dotnet_diagnostic.S3267.severity = none
 # an OS path separator. False positive for a REST client building request paths.
 dotnet_diagnostic.S1075.severity = none
 
+# MA0048 (Meziantou): "file name must match type name" fires on every file that
+# groups several small, tightly related types together on purpose —
+# Resources.cs holds six resource classes, ITcgDexResources.cs their six
+# interfaces, Models/CardSet.cs five records that only ever appear together,
+# GraphQlMessages.cs a JsonContext plus the message types it serializes. That
+# grouping is deliberate: a reader following one concept finds every type for
+# it in one file instead of jumping between a dozen one-type files, and there
+# is no case in this SDK where the rule would have caught a real problem
+# instead of this style choice. 33 sites at adoption (2026-09-09); splitting
+# them would be a purely mechanical, purely cosmetic change against how this
+# codebase is organized on purpose.
+dotnet_diagnostic.MA0048.severity = none
+
+# MA0051 (Meziantou): default ceiling is 60 lines. Every method here that
+# exceeds it does so because of the comments explaining a non-obvious decision
+# alongside the logic, not because the control flow is doing too much — this
+# repo's methods routinely carry as much reasoning as code. The longest at
+# adoption (2026-09-09) is 107 lines, in BoundedContent.ReadAsBytesAsync — the
+# decompression-bomb guard, where the logic is inherently sequential (bound
+# check, stream setup, pooled buffer, byte-counted read loop) and splitting it
+# for a line count would fragment security-relevant logic across methods with
+# no independent correctness meaning of their own, in a codebase where
+# "verify by manipulation" demands re-verifying anything touched. 130 leaves
+# headroom above the current max rather than disabling the rule outright, so a
+# method that grows meaningfully past today's longest still gets flagged.
+MA0051.maximum_lines_per_method = 130
+
 # Model types deliberately mirror the wrapped API's vocabulary so that this
 # SDK's surface maps one-to-one onto the TCGdex documentation. `Set` collides
 # with a VB.NET keyword (CA1716); renaming it to something like `CardSet` would

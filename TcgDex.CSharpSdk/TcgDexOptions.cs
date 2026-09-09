@@ -196,7 +196,10 @@ public sealed class TcgDexOptions
         // by design — it validates instance state). Reporting the offending
         // property is the actionable diagnostic for the caller, and the
         // ArgumentException contract is part of the pinned public API.
-#pragma warning disable S3928
+        // MA0015 (Meziantou) is the identical check under a different id — same
+        // reasoning, so it rides in the same suppressed span rather than a
+        // second pragma repeating the justification six more times.
+#pragma warning disable S3928, MA0015
         if (!BaseAddress.IsAbsoluteUri)
         {
             throw new ArgumentException(
@@ -265,6 +268,6 @@ public sealed class TcgDexOptions
                 $"Supported languages are: {string.Join(", ", TcgDexLanguages.All)}.",
                 nameof(Language));
         }
-#pragma warning restore S3928
+#pragma warning restore S3928, MA0015
     }
 }
