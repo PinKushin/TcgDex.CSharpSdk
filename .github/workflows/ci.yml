@@ -213,12 +213,23 @@ jobs:
         shell: pwsh
         run: ./TcgDex.CSharpSdk.AotSmokeTest/bin/Release/net10.0/win-x64/publish/TcgDex.CSharpSdk.AotSmokeTest.exe
 
-  # Verify that test results from every lane cover the full inventory without gaps or duplicates.
-  # This catches: a filter that matched nothing (silent 0 exit), a shard that ran only part of
-  # the suite, or a test disabled in one lane. Runs after all test jobs complete.
+  # Verify that every lane actually ran its expected number of tests. This catches: a filter that
+  # matched nothing (silent 0 exit), a test host that died partway (prints a truncated "Passed!"),
+  # or a test disabled in one lane. Runs after all test jobs complete.
   #
-  # See C3 in CONVENTIONS-HARVEST.md: a dedicated job that asserts the union of every shard,
-  # serial lane, and special lane equals the full test inventory.
+  # See C3 in CONVENTIONS-HARVEST.md. PER-LANE FLOORS, not a union total across every .trx: the
+  # union form has a real blind spot here specifically, because net10.0 (ubuntu, macos) and net472
+  # (windows) run the identical suite by test NAME. A test silently dropped from just the net472
+  # lane, while it still runs on net10.0, is invisible to a union-of-unique-names check - the name
+  # still appears in the set from the other lanes. Checking each lane's own .trx independently
+  # cannot have that blind spot, because it never merges names across files at all. Found and
+  # fixed 2026-09-09, per PinKushin/C3-COVERAGE-LOG.md's cross-repo comparison against
+  # Tf2DemoSalvage's build/assert-test-count.sh, which this mirrors.
+  #
+  # Floors, not exact counts: an exact match makes every added test a red build, and this repo's
+  # old union total was hand-bumped twice in one week for exactly that reason (9499f9e, c879724).
+  # A floor still catches a host dying mid-run or a filter matching nothing - the failures that
+  # hide - without needing an edit every time a test is added.
   verify-test-coverage:
     name: Verify test coverage across all lanes
     needs: [build-and-test, macos-test, framework-test]
@@ -232,9 +243,20 @@ jobs:
         with:
           path: all-test-results
 
-      - name: Verify complete coverage
+      # Measured 2026-09-09 (run 34302573126): 519 / 11 / 519 / 514. Lower a floor only when
+      # tests were deliberately removed, and say why in the same commit.
+      - name: ubuntu net10.0 unit tests
         shell: pwsh
-        run: >
-          ./scripts/Verify-TestCoverage.ps1
-          -ResultsDirectory ./all-test-results
-          -ExpectedTestCount 532
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 519 -Label 'ubuntu net10.0'
+
+      - name: ubuntu offline integration tests
+        shell: pwsh
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName integration-offline.trx -Floor 11 -Label 'ubuntu offline integration'
+
+      - name: macOS net10.0 unit tests
+        shell: pwsh
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 519 -Label 'macOS net10.0'
+
+      - name: Windows net472 unit tests
+        shell: pwsh
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName framework-tests.trx -Floor 514 -Label 'Windows net472'
