@@ -292,3 +292,77 @@ suppressed wholesale:
 Full local gate green after: build (0 warnings across all three TFMs), unit tests (519/518/514,
 unchanged — no test source touched), coverage (99.82% line / 96.29% branch, both above gate),
 docs (0 warnings).
+
+---
+
+## 11. `thirdParty` modelled against the real live shape, not the pre-deployment guess
+
+Waited deliberately, per `thirdparty-pending-upstream` in memory: TCGdex merged
+[`cards-database#2184`](https://github.com/tcgdex/cards-database/pull/2184) on 2026-08-27,
+removing the `deepOmit` that stripped `thirdParty` from card responses, but it had not
+redeployed to `api.tcgdex.net` yet. Modelling against a merged-but-undeployed PR is exactly the
+mistake the SDK rewrite existed to undo — the discarded SDK shipped ~10 fields the API never
+actually served. The daily `live-api.yml` fixture-drift check was left as the trigger rather than
+guessing a redeploy date, and it went red on 2026-09-07.
+
+**The real shape differed from what the memory anticipated in two ways**, both found by fetching
+live cards rather than assumed from the PR description:
+
+- **A third marketplace.** The memory named `tcgplayer`/`cardmarket`; the live payload also
+  carries `cardtrader`, observed only *intermittently* — present on one fetch of a card and gone
+  on the next fetch of the same card. Modelled as `int?` alongside the other two rather than
+  assumed absent because a given fixture snapshot happened not to catch it.
+- **Two independent placements, not one.** `thirdParty` sits at the card root **or** inside each
+  `variants_detailed[]` entry depending on the card — `swsh3-136` (two distinctly-priced
+  printings) carries it per-variant with no root-level field; `swsh1-1` (one undifferentiated
+  `"generated"` printing) carries it at the root instead, with its single variant carrying none.
+  This exactly mirrors how `Pricing` was already placed at both levels, which is what made the
+  right shape recognisable rather than another guess: `ThirdParty` follows the same pattern as
+  the type it sits beside, not a new one invented for this field.
+
+Landed alongside an unrelated drift in the same fixture-refresh: `Serie.LastSet` (typed
+`SetBrief`, which already had `Logo`/`Symbol`) had a recorded fixture where the referenced set
+predated those fields being populated for it — a data-completeness gap in the recording, not a
+schema gap, so no model change, only `scripts/Update-Fixtures.ps1`.
+
+New tests written first (red on a compile pass against fixtures with no `thirdParty` yet, since
+the model didn't exist), confirmed red for the right reason, then the model added and fixtures
+refreshed per `Update-Fixtures.ps1`'s own instruction to update the SDK before refreshing — a
+refresh first would have made the drift check pass while hiding the change it was reporting.
+
+---
+
+## 12. C3's per-lane floors get raised whenever tests are added — REVERSAL
+
+Reverses the "no need to bump a floor when tests are added" framing decision #10's neighbouring
+PR (#56, C3's union-to-per-lane-floors change) shipped with.
+
+### The original position
+
+`scripts/Assert-TestCount.ps1`'s header and `ci.yml`'s comment both said a floor's advantage over
+an exact count is that it "does not need an edit every time a test is added" — motivated by this
+repo's old union-total check having been hand-bumped twice in one week (`9499f9e`, `c879724`) for
+exactly that kind of churn. When three new tests (this PR, thirdParty) pushed the real count from
+519/519/514 to 522/522/517, the floors were left at 519/519/514 on the reasoning that 522 ≥ 519
+already passes, so nothing needed to change.
+
+### The correction
+
+Owner: **"no floors get bumped when you add tests too or they are worthlessx."**
+
+A floor set once and never raised drifts further from the true count with every addition, and
+the gap it leaves IS the blind spot the whole check exists to close. If the true count grows to
+600 while the floor stays at 519, up to 81 tests could silently stop running and the check would
+still pass — silently, which is exactly the failure mode C3 exists to make loud. "Does not need
+an edit" was true in the narrow sense that CI would not turn red, and wrong in the sense that
+mattered: the check's actual sensitivity had quietly degraded.
+
+### What actually follows
+
+The floor's real exemption from exact-count maintenance is narrower than the original framing
+claimed: it need not be bumped for a transient dip that resolves on its own (a flaky skip, a
+timing-dependent count). Anything that changes the suite **on purpose** — tests added or removed
+— changes the floor in the same commit. Raised here: 519/11/519/514 → 522/11/522/517, in the
+same PR as the tests that moved the count. `Assert-TestCount.ps1`'s header and the `ci.yml`
+comment both corrected to say this outright, and `PinKushin/C3-COVERAGE-LOG.md` carries the same
+correction for whichever repo copies this pattern next.

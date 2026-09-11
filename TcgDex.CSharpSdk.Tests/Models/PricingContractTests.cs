@@ -19,14 +19,14 @@ public sealed class PricingContractTests
 
         cardmarket.Unit.ShouldBe("EUR");
         cardmarket.IdProduct.ShouldBe(483559);
-        cardmarket.Avg.ShouldBe(0.11m);
+        cardmarket.Avg.ShouldBe(0.08m);
         cardmarket.Low.ShouldBe(0.02m);
 
         // These map to `avg-holo` / `low-holo`, which do not round-trip without
         // explicit name mapping.
-        cardmarket.AvgHolo.ShouldBe(0.29m);
+        cardmarket.AvgHolo.ShouldBe(0.26m);
         cardmarket.LowHolo.ShouldBe(0.04m);
-        cardmarket.Avg30Holo.ShouldBe(0.32m);
+        cardmarket.Avg30Holo.ShouldBe(0.3m);
     }
 
     [Test]
@@ -42,7 +42,7 @@ public sealed class PricingContractTests
         TcgPlayerPrice normal = tcgplayer["normal"].ShouldNotBeNull();
         normal.ProductId.ShouldBe(219333);
         normal.LowPrice.ShouldBe(0.02m);
-        normal.MarketPrice.ShouldBe(0.09m);
+        normal.MarketPrice.ShouldBe(0.24m);
         normal.DirectLowPrice.ShouldBeNull("this printing has no TCGplayer Direct price");
     }
 
@@ -101,6 +101,62 @@ public sealed class PricingContractTests
         variants.Holo.ShouldBeFalse();
         variants.FirstEdition.ShouldBeFalse();
         variants.WPromo.ShouldBeFalse();
+    }
+
+    // ---- thirdParty (live 2026-09-11; see docs/DECISIONS.md and
+    // thirdparty-pending-upstream in memory for why this waited on upstream) ----
+
+    [Test]
+    public void Deserialize_ThirdParty_OnEachDetailedVariant()
+    {
+        // swsh3-136 carries thirdParty per printing rather than at the card
+        // root — each variant sells under a different product listing.
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
+
+        card.ThirdParty.ShouldBeNull(
+            "this card's ids live on each printing, not the card root");
+
+        ThirdParty normal = card.VariantsDetailed[0].ThirdParty.ShouldNotBeNull();
+        normal.Cardmarket.ShouldBe(483559);
+        normal.Tcgplayer.ShouldBe(219333);
+
+        ThirdParty reverse = card.VariantsDetailed[1].ThirdParty.ShouldNotBeNull();
+        reverse.Cardmarket.ShouldBe(483559);
+        reverse.Tcgplayer.ShouldBe(219333);
+    }
+
+    [Test]
+    public void Deserialize_ThirdParty_OnTheCardRoot_WhenThereIsNoPerPrintingBreakdown()
+    {
+        // swsh1-1 has a single "generated" variant with no pricing of its own,
+        // so the API places thirdParty on the card instead. Root and per-variant
+        // are independently populated, mirroring how Pricing already works.
+        Card card = Fixture.Load<Card>("card-damage-string.json");
+
+        ThirdParty ids = card.ThirdParty.ShouldNotBeNull();
+        ids.Cardmarket.ShouldBe(427231);
+        ids.Tcgplayer.ShouldBe(206047);
+        ids.Cardtrader.ShouldBeNull("not every card lists on Cardtrader");
+
+        card.VariantsDetailed[0].ThirdParty.ShouldBeNull(
+            "this card's single variant has no product ids of its own");
+    }
+
+    [Test]
+    public void ThirdParty_Cardtrader_RoundTrips()
+    {
+        // Measured live only intermittently (present one fetch, absent the
+        // next), so this is exercised directly rather than depending on a
+        // recorded fixture happening to have caught it. Constructed via the
+        // context the SDK actually deserializes with, not a hand-rolled
+        // JsonSerializer.Deserialize call, so a source-generator regression
+        // here would fail this test too.
+        ThirdParty ids = Fixture.Parse<ThirdParty>(
+            """{"cardmarket":278422,"tcgplayer":83543,"cardtrader":991234}""");
+
+        ids.Cardmarket.ShouldBe(278422);
+        ids.Tcgplayer.ShouldBe(83543);
+        ids.Cardtrader.ShouldBe(991234);
     }
 
 }

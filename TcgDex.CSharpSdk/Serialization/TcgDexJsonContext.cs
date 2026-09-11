@@ -38,6 +38,7 @@ using TcgDex.Models;
 [JsonSerializable(typeof(CardmarketPricing))]
 [JsonSerializable(typeof(TcgPlayerPricing))]
 [JsonSerializable(typeof(TcgPlayerPrice))]
+[JsonSerializable(typeof(ThirdParty))]
 [JsonSerializable(typeof(TcgDexProblem))]
 [JsonSerializable(typeof(IReadOnlyList<string>))]
 [JsonSerializable(typeof(IReadOnlyList<int>))]

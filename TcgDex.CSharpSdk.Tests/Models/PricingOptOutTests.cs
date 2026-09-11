@@ -43,7 +43,7 @@ public sealed class PricingOptOutTests
         Card? card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
         card.ShouldNotBeNull().Pricing.ShouldNotBeNull()
-            .Cardmarket.ShouldNotBeNull().Avg.ShouldBe(0.11m);
+            .Cardmarket.ShouldNotBeNull().Avg.ShouldBe(0.08m);
     }
 
     [Test]

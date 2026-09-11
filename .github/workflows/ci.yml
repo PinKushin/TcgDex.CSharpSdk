@@ -243,11 +243,24 @@ jobs:
         with:
           path: all-test-results
 
-      # Measured 2026-09-09 (run 34302573126): 519 / 11 / 519 / 514. Lower a floor only when
-      # tests were deliberately removed, and say why in the same commit.
+      # RAISE THIS EVERY TIME TESTS ARE ADDED, in the same commit as the tests. A
+      # floor that is set once and left alone drifts further from the true count
+      # with every addition, and the gap it leaves is exactly the blind spot this
+      # check exists to close: if the true count grows to 600 while the floor
+      # stays at 519, up to 80 tests could silently stop running and this would
+      # still pass. Owner's correction, 2026-09-11: "no floors get bumped when
+      # you add tests too or they are worthlessx" - a floor's advantage over an
+      # exact count was never "never touch it", only "does not go red for a
+      # legitimate run-to-run wobble" (see Tf2DemoSalvage's assert-test-count.sh,
+      # which this mirrors). Lower a floor only when tests were deliberately
+      # removed, and say why in the same commit; raise it whenever they grow.
+      #
+      # Measured 2026-09-11 locally (net10.0/net472 dotnet test): 522 / 11 / 522 / 517.
+      # Same figures the CI lanes themselves produce - ubuntu and macOS both run
+      # net10.0, and windows runs net472, exactly as measured here.
       - name: ubuntu net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 519 -Label 'ubuntu net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 522 -Label 'ubuntu net10.0'
 
       - name: ubuntu offline integration tests
         shell: pwsh
@@ -255,8 +268,8 @@ jobs:
 
       - name: macOS net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 519 -Label 'macOS net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 522 -Label 'macOS net10.0'
 
       - name: Windows net472 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName framework-tests.trx -Floor 514 -Label 'Windows net472'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName framework-tests.trx -Floor 517 -Label 'Windows net472'

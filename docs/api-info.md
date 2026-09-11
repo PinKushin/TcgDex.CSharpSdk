@@ -300,6 +300,26 @@ labels, so treat as free text rather than an enum.
 
 Pricing appears both at the card root and inside each `variants_detailed[]` entry.
 
+#### ThirdParty
+Live on `api.tcgdex.net` since 2026-09 ([tcgdex/cards-database#2184](https://github.com/tcgdex/cards-database/pull/2184)).
+External marketplace product ids: `cardmarket`, `tcgplayer`, `cardtrader` — all `int`, all
+independently nullable. `cardtrader` is observed only **intermittently**: present on one fetch of
+a card and absent on the next fetch of the same card, so do not assume its absence means the card
+is never listed there.
+
+Placed exactly like `Pricing`: at the card root **or** inside each `variants_detailed[]` entry,
+but not necessarily both at once for the same card —
+
+- A card with several distinctly-priced printings (`swsh3-136`: normal + reverse) carries
+  `thirdParty` on each `variants_detailed[]` entry, with **no** root-level `thirdParty`.
+- A card with a single undifferentiated printing (`swsh1-1`, `variantId: "generated"`, no
+  per-variant pricing of its own) carries `thirdParty` at the **card root** instead, with the
+  single `variants_detailed[]` entry carrying none.
+
+> Which shape a card gets is a property of that card's data, not something to switch on
+> structurally — check both locations independently rather than assuming one implies the other's
+> absence.
+
 ### CardBrief — list responses
 
 `id`, `localId`, `name`, `image` (optional). Nothing else — `category`, `rarity` and
