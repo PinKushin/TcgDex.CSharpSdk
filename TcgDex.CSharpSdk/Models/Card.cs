@@ -96,6 +96,14 @@ public sealed record Card
     /// <summary>Market pricing across the whole card.</summary>
     public Pricing? Pricing { get; init; }
 
+    /// <summary>
+    /// External marketplace product ids for the card as a whole, when the API
+    /// has no per-printing breakdown to hang them on instead. See
+    /// <see cref="Models.ThirdParty"/> for how this relates to the same ids on
+    /// each <see cref="DetailedVariant"/>.
+    /// </summary>
+    public ThirdParty? ThirdParty { get; init; }
+
     /// <summary>Tournament legality.</summary>
     public Legality? Legal { get; init; }
 

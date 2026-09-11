@@ -46,29 +46,22 @@ passes through.
 
 ---
 
-## Committed — waiting on upstream
-
-Decided, not started, and deliberately blocked on TCGdex shipping the field —
-because modelling against a *guessed* shape is the exact mistake the rewrite
-existed to undo (the old SDK shipped ~10 fields the API never served).
-
-- **Model `thirdParty` external IDs.** [`cards-database#2184`](https://github.com/tcgdex/cards-database/pull/2184)
-  (merged 2026-08-27) removes the `deepOmit` that stripped `thirdParty` IDs
-  (tcgplayer / cardmarket product IDs) from card responses, so they will start
-  appearing as a new field. As of 2026-08-28 it is **not yet live** on
-  `api.tcgdex.net` — `base1-4` shows no `thirdParty` field. Additive and
-  non-breaking (the SDK ignores unknown fields), so there is no rush and no risk
-  in waiting. The daily [`live-api.yml`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/.github/workflows/live-api.yml) drift
-  check is the trigger: when the Live API run goes red on it, the failure message
-  carries the exact shape — model against *that*, verify it round-trips, ship it.
-
----
-
 ## Done
 
 Recorded because the reasoning behind each is worth keeping, and because a
 roadmap that only lists future work hides what the project already decided.
 
+- **Model `thirdParty` external marketplace ids.** Was under "Committed —
+  waiting on upstream" from 2026-08-28: [`cards-database#2184`](https://github.com/tcgdex/cards-database/pull/2184)
+  removed the `deepOmit` that stripped the field, but `api.tcgdex.net` had not
+  yet redeployed it, and modelling against a *guessed* shape is the exact
+  mistake the SDK rewrite existed to undo (the old SDK shipped ~10 fields the
+  API never served). The daily [`live-api.yml`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/.github/workflows/live-api.yml)
+  drift check went red on it 2026-09-07; modelled against the real shape and
+  shipped 2026-09-11. `cardmarket` / `tcgplayer` / `cardtrader` ids, each
+  independently nullable, present at the card root or per `variants_detailed[]`
+  entry exactly like `Pricing` already was. See
+  [`docs/api-info.md`](api-info.md#thirdparty) and `docs/DECISIONS.md`.
 - **Full REST surface** — cards, sets, series, random, and all 13 enumeration
   endpoints.
 - **Typed query builder** over every operator the API actually has, translating

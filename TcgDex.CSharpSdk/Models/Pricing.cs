@@ -112,6 +112,40 @@ public sealed record TcgPlayerPricing
 }
 
 /// <summary>
+/// External marketplace product identifiers for a card or printing — what
+/// builds a direct link to that listing on Cardmarket, TCGplayer or Cardtrader.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Distinct from <see cref="Pricing"/>: these are the marketplace's own catalog
+/// ids, not price points. Live on <c>api.tcgdex.net</c> since 2026-09 — see
+/// <c>docs/DECISIONS.md</c> for why the SDK waited to model it rather than
+/// guessing the shape.
+/// </para>
+/// <para>
+/// Present at both <see cref="Card.ThirdParty"/> (the card as a whole) and each
+/// <see cref="DetailedVariant.ThirdParty"/> (per printing), independently and
+/// mirroring exactly how <see cref="Pricing"/> is placed at both levels: a card
+/// with several distinctly-priced printings carries the ids per variant, while
+/// a card with a single undifferentiated printing carries them at the root
+/// instead. Every id is independently nullable — <see cref="Cardtrader"/> in
+/// particular is present only intermittently, observed to appear and disappear
+/// between successive fetches of the same card.
+/// </para>
+/// </remarks>
+public sealed record ThirdParty
+{
+    /// <summary>Cardmarket's internal product identifier.</summary>
+    public int? Cardmarket { get; init; }
+
+    /// <summary>TCGplayer's internal product identifier.</summary>
+    public int? Tcgplayer { get; init; }
+
+    /// <summary>Cardtrader's internal product identifier, when this card is listed there.</summary>
+    public int? Cardtrader { get; init; }
+}
+
+/// <summary>
 /// The price points TCGplayer reports for a single printing. Any individual
 /// figure may be <see langword="null"/>.
 /// </summary>

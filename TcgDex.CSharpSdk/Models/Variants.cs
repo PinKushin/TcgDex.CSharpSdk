@@ -61,4 +61,11 @@ public sealed record DetailedVariant
 
     /// <summary>Market pricing for this specific printing. REST only.</summary>
     public Pricing? Pricing { get; init; }
+
+    /// <summary>
+    /// External marketplace product ids for this specific printing, when the
+    /// API breaks pricing down by variant rather than reporting it once at
+    /// <see cref="Card.ThirdParty"/>. REST only.
+    /// </summary>
+    public ThirdParty? ThirdParty { get; init; }
 }

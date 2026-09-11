@@ -15,6 +15,16 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+### Added
+
+- **`ThirdParty` external marketplace ids.** TCGdex started serving Cardmarket, TCGplayer and
+  Cardtrader product ids on 2026-09. New `Card.ThirdParty` and `DetailedVariant.ThirdParty`
+  properties, each independently nullable and placed the same way `Pricing` already is — a card
+  with several distinctly-priced printings carries it per printing; a card with one
+  undifferentiated printing carries it at the card root instead. `Cardtrader` in particular is
+  present only intermittently on the live API, so do not treat its absence on one fetch as
+  permanent.
+
 ## [0.5.0] - 2026-09-06
 
 **Breaking.** Client-side failover and mirror selection are gone. If you called

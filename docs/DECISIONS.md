@@ -292,3 +292,40 @@ suppressed wholesale:
 Full local gate green after: build (0 warnings across all three TFMs), unit tests (519/518/514,
 unchanged — no test source touched), coverage (99.82% line / 96.29% branch, both above gate),
 docs (0 warnings).
+
+---
+
+## 11. `thirdParty` modelled against the real live shape, not the pre-deployment guess
+
+Waited deliberately, per `thirdparty-pending-upstream` in memory: TCGdex merged
+[`cards-database#2184`](https://github.com/tcgdex/cards-database/pull/2184) on 2026-08-27,
+removing the `deepOmit` that stripped `thirdParty` from card responses, but it had not
+redeployed to `api.tcgdex.net` yet. Modelling against a merged-but-undeployed PR is exactly the
+mistake the SDK rewrite existed to undo — the discarded SDK shipped ~10 fields the API never
+actually served. The daily `live-api.yml` fixture-drift check was left as the trigger rather than
+guessing a redeploy date, and it went red on 2026-09-07.
+
+**The real shape differed from what the memory anticipated in two ways**, both found by fetching
+live cards rather than assumed from the PR description:
+
+- **A third marketplace.** The memory named `tcgplayer`/`cardmarket`; the live payload also
+  carries `cardtrader`, observed only *intermittently* — present on one fetch of a card and gone
+  on the next fetch of the same card. Modelled as `int?` alongside the other two rather than
+  assumed absent because a given fixture snapshot happened not to catch it.
+- **Two independent placements, not one.** `thirdParty` sits at the card root **or** inside each
+  `variants_detailed[]` entry depending on the card — `swsh3-136` (two distinctly-priced
+  printings) carries it per-variant with no root-level field; `swsh1-1` (one undifferentiated
+  `"generated"` printing) carries it at the root instead, with its single variant carrying none.
+  This exactly mirrors how `Pricing` was already placed at both levels, which is what made the
+  right shape recognisable rather than another guess: `ThirdParty` follows the same pattern as
+  the type it sits beside, not a new one invented for this field.
+
+Landed alongside an unrelated drift in the same fixture-refresh: `Serie.LastSet` (typed
+`SetBrief`, which already had `Logo`/`Symbol`) had a recorded fixture where the referenced set
+predated those fields being populated for it — a data-completeness gap in the recording, not a
+schema gap, so no model change, only `scripts/Update-Fixtures.ps1`.
+
+New tests written first (red on a compile pass against fixtures with no `thirdParty` yet, since
+the model didn't exist), confirmed red for the right reason, then the model added and fixtures
+refreshed per `Update-Fixtures.ps1`'s own instruction to update the SDK before refreshing — a
+refresh first would have made the drift check pass while hiding the change it was reporting.

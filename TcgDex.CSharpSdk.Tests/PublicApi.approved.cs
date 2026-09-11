@@ -177,6 +177,7 @@ namespace TcgDex.Models
         public required TcgDex.Models.SetBrief Set { get; init; }
         public string? Stage { get; init; }
         public string? Suffix { get; init; }
+        public TcgDex.Models.ThirdParty? ThirdParty { get; init; }
         public string? TrainerType { get; init; }
         public System.Collections.Generic.IReadOnlyList<string> Types { get; init; }
         public System.DateTimeOffset? Updated { get; init; }
@@ -244,6 +245,7 @@ namespace TcgDex.Models
         public string? Size { get; init; }
         public System.Collections.Generic.IReadOnlyList<string> Stamp { get; init; }
         public string? Subtype { get; init; }
+        public TcgDex.Models.ThirdParty? ThirdParty { get; init; }
         public string? Type { get; init; }
         public string? VariantId { get; init; }
     }
@@ -364,6 +366,13 @@ namespace TcgDex.Models
         public System.Collections.Generic.IReadOnlyDictionary<string, TcgDex.Models.TcgPlayerPrice> Printings { get; init; }
         public string? Unit { get; init; }
         public System.DateTimeOffset? Updated { get; init; }
+    }
+    public sealed class ThirdParty : System.IEquatable<TcgDex.Models.ThirdParty>
+    {
+        public ThirdParty() { }
+        public int? Cardmarket { get; init; }
+        public int? Cardtrader { get; init; }
+        public int? Tcgplayer { get; init; }
     }
     public sealed class Variants : System.IEquatable<TcgDex.Models.Variants>
     {
@@ -493,6 +502,7 @@ namespace TcgDex.Serialization
     [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.TcgDexProblem))]
     [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.TcgPlayerPrice))]
     [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.TcgPlayerPricing))]
+    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.ThirdParty))]
     [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.Variants))]
     [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.WeaknessOrResistance))]
     [System.Text.Json.Serialization.JsonSourceGenerationOptions(DefaultIgnoreCondition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull, PropertyNameCaseInsensitive=true, PropertyNamingPolicy=System.Text.Json.Serialization.JsonKnownNamingPolicy.CamelCase, ReadCommentHandling=System.Text.Json.JsonCommentHandling.Disallow)]
@@ -537,6 +547,7 @@ namespace TcgDex.Serialization
         public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.TcgDexProblem> TcgDexProblem { get; }
         public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.TcgPlayerPrice> TcgPlayerPrice { get; }
         public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.TcgPlayerPricing> TcgPlayerPricing { get; }
+        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.ThirdParty> ThirdParty { get; }
         public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.Variants> Variants { get; }
         public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.WeaknessOrResistance> WeaknessOrResistance { get; }
         public static TcgDex.Serialization.TcgDexJsonContext Default { get; }
