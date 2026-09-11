@@ -330,6 +330,36 @@ the model didn't exist), confirmed red for the right reason, then the model adde
 refreshed per `Update-Fixtures.ps1`'s own instruction to update the SDK before refreshing — a
 refresh first would have made the drift check pass while hiding the change it was reporting.
 
+**Addendum, 2026-09-11 afternoon — the deploy itself may not have been intentional.** Asked in the
+TCGdex Discord whether the 2026-09-07 change was announced anywhere. Ryan (FalconChipp) and
+Thomas, the maintainers, had no record of it — Thomas: *"that would be impressive if it was, i
+dont even know that"*. After the owner described the shape, Thomas: **"well this might have been
+an unintentional release when the infra switched over."**
+
+Doesn't change the model or the decision to wait for the live shape — that reasoning holds
+regardless of whether the deploy was deliberate.
+
+"Unintentional" and "unstable" are separate claims, though, and only the first is established
+here. **Owner's read, and the more relevant one going forward:** *"i dont think it will be
+reverted, the fact it rolled out and worked for 5 days without complaints, or even some people
+noticing, means it should be ok to run publicly."* Five days of live operation with no incident,
+no rollback and no visible complaint is real evidence toward the field staying, not just an
+absence of evidence against it. The practical risk is low; "unplanned at deploy time" describes
+how it arrived, not how long it is expected to last.
+
+**Sharper still, from the owner:** *"this was a planned update, and pretty much done that im
+aware, so it just needed rolled out, it doing it accidently during the server migration is just a
+happy accident i guess."* "Unintentional" describes the TRIGGER, not the FEATURE — the field was
+already finished, planned work on TCGdex's side; what was accidental is only that the infra
+migration flipped it on as a side effect instead of a formal announcement doing it. That is a
+stronger stability signal than an experimental field slipping out early: this is the real,
+intended release, just reached production by the side door rather than the front one.
+
+No SDK change is warranted either way — every `ThirdParty` property is nullable by design, so if
+it is ever pulled back the field just deserializes to `null`, a state already handled. Recorded so
+a future "why did `thirdParty` disappear" investigation starts from this conversation rather than
+re-diagnosing it as a bug, whichever way it turns out.
+
 ---
 
 ## 12. C3's per-lane floors get raised whenever tests are added — REVERSAL
