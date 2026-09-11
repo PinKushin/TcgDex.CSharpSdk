@@ -337,12 +337,20 @@ dont even know that"*. After the owner described the shape, Thomas: **"well this
 an unintentional release when the infra switched over."**
 
 Doesn't change the model or the decision to wait for the live shape — that reasoning holds
-regardless of whether the deploy was deliberate. It changes the field's stability going forward:
-an unintentional release during an infra migration could be reverted without notice, unlike a
-deliberate one. No SDK change needed if that happens — every `ThirdParty` property is nullable by
-design, so the field going away again just means it deserializes to `null`, a state the model
-already handles. Recorded here so a future "why did `thirdParty` disappear" investigation starts
-from this conversation rather than re-diagnosing it as a bug.
+regardless of whether the deploy was deliberate.
+
+"Unintentional" and "unstable" are separate claims, though, and only the first is established
+here. **Owner's read, and the more relevant one going forward:** *"i dont think it will be
+reverted, the fact it rolled out and worked for 5 days without complaints, or even some people
+noticing, means it should be ok to run publicly."* Five days of live operation with no incident,
+no rollback and no visible complaint is real evidence toward the field staying, not just an
+absence of evidence against it. The practical risk is low; "unplanned at deploy time" describes
+how it arrived, not how long it is expected to last.
+
+No SDK change is warranted either way — every `ThirdParty` property is nullable by design, so if
+it is ever pulled back the field just deserializes to `null`, a state already handled. Recorded so
+a future "why did `thirdParty` disappear" investigation starts from this conversation rather than
+re-diagnosing it as a bug, whichever way it turns out.
 
 ---
 
