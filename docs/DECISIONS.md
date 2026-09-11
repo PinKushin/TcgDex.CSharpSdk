@@ -347,6 +347,14 @@ no rollback and no visible complaint is real evidence toward the field staying, 
 absence of evidence against it. The practical risk is low; "unplanned at deploy time" describes
 how it arrived, not how long it is expected to last.
 
+**Sharper still, from the owner:** *"this was a planned update, and pretty much done that im
+aware, so it just needed rolled out, it doing it accidently during the server migration is just a
+happy accident i guess."* "Unintentional" describes the TRIGGER, not the FEATURE — the field was
+already finished, planned work on TCGdex's side; what was accidental is only that the infra
+migration flipped it on as a side effect instead of a formal announcement doing it. That is a
+stronger stability signal than an experimental field slipping out early: this is the real,
+intended release, just reached production by the side door rather than the front one.
+
 No SDK change is warranted either way — every `ThirdParty` property is nullable by design, so if
 it is ever pulled back the field just deserializes to `null`, a state already handled. Recorded so
 a future "why did `thirdParty` disappear" investigation starts from this conversation rather than
