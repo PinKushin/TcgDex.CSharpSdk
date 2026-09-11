@@ -330,6 +330,20 @@ the model didn't exist), confirmed red for the right reason, then the model adde
 refreshed per `Update-Fixtures.ps1`'s own instruction to update the SDK before refreshing — a
 refresh first would have made the drift check pass while hiding the change it was reporting.
 
+**Addendum, 2026-09-11 afternoon — the deploy itself may not have been intentional.** Asked in the
+TCGdex Discord whether the 2026-09-07 change was announced anywhere. Ryan (FalconChipp) and
+Thomas, the maintainers, had no record of it — Thomas: *"that would be impressive if it was, i
+dont even know that"*. After the owner described the shape, Thomas: **"well this might have been
+an unintentional release when the infra switched over."**
+
+Doesn't change the model or the decision to wait for the live shape — that reasoning holds
+regardless of whether the deploy was deliberate. It changes the field's stability going forward:
+an unintentional release during an infra migration could be reverted without notice, unlike a
+deliberate one. No SDK change needed if that happens — every `ThirdParty` property is nullable by
+design, so the field going away again just means it deserializes to `null`, a state the model
+already handles. Recorded here so a future "why did `thirdParty` disappear" investigation starts
+from this conversation rather than re-diagnosing it as a bug.
+
 ---
 
 ## 12. C3's per-lane floors get raised whenever tests are added — REVERSAL
