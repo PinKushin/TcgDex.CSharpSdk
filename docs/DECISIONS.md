@@ -396,3 +396,39 @@ timing-dependent count). Anything that changes the suite **on purpose** — test
 same PR as the tests that moved the count. `Assert-TestCount.ps1`'s header and the `ci.yml`
 comment both corrected to say this outright, and `PinKushin/C3-COVERAGE-LOG.md` carries the same
 correction for whichever repo copies this pattern next.
+
+---
+
+## 13. A `User-Agent` header, requested by TCGdex directly
+
+Before this, the SDK sent none at all — `HttpClient` adds no default the way a browser or `curl`
+does, so every request from every consumer of this library was, on the wire, indistinguishable
+from any other .NET client hitting the API.
+
+Raised in TCGdex's Discord while debugging an unrelated latency report. Avior: *"Might be better
+to set a standard one with the version of the SDK them[selves]."* Asked why it mattered beyond
+courtesy, since the traffic is already read-only and low-risk: *"i store logs for stats and
+debugging purposes and to respect GDPR i don't store ip addresses, so the only way i can
+'identify' [a client] is by using the user agent."* With no header at all, this SDK's traffic was
+unidentifiable by design — not a minor gap, the only signal TCGdex's own privacy stance leaves
+available.
+
+Format agreed in the same conversation and matched exactly: `TcgDex.CSharpSdk/{version}`.
+
+**Applied per `HttpRequestMessage`, not via `HttpClient.DefaultRequestHeaders`.** The SDK is used
+two ways — owning its own `HttpClient` (`TcgDexClient.Create`, `AddTcgDex`) or given one the
+caller built and shares with the rest of their application. Setting a header on the client object
+itself would reach into a caller's shared instance, the same reasoning `RequestBudget` already
+applies to the request timeout. Setting it per-request works identically either way and touches
+nothing the SDK doesn't own.
+
+**Version read from `AssemblyName.Version`, not `AssemblyInformationalVersionAttribute`.** Both
+report "0.6.0" today — this repository sets no build-metadata suffix — but `AssemblyName.Version`
+is assembly identity the runtime always preserves, while a custom attribute is metadata a trimmer
+can remove when nothing else references it. Chosen so the header needs no Native AOT verification
+of its own beyond what `TcgDex.CSharpSdk.AotSmokeTest` already provides by publishing and running
+a real binary.
+
+Verified live as well as in the test suite: sent one request with `User-Agent: pinkushin-debug/1.0`
+directly against `api.tcgdex.net` so Avior could confirm the header actually reaches his logs
+before relying on it.

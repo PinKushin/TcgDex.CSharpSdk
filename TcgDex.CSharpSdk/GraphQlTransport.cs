@@ -191,6 +191,7 @@ internal sealed class GraphQlTransport(
 
             using HttpRequestMessage httpRequest =
                 new(HttpMethod.Post, _options.GraphQlEndpoint) { Content = content };
+            TcgDexUserAgent.Apply(httpRequest);
 
             // ResponseHeadersRead, not PostAsync. PostAsync defaults to
             // ResponseContentRead, which buffers the ENTIRE body inside
