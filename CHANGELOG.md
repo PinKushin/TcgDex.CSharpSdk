@@ -15,6 +15,8 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-12
+
 ### Added
 
 - **`User-Agent` header on every outbound request**, `TcgDex.CSharpSdk/{version}` — requested by
