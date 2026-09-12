@@ -34,6 +34,7 @@ Console.WriteLine(card?.Name);   // Furret
 | **[API reference](api/TcgDex.yml)** | Generated from the source. Every public type and member. |
 | **[API notes](api-info.md)** | The TCGdex API itself, verified field by field against live responses. |
 | **[Architecture](architecture.md)** | How the SDK is built, and how to extend it. |
+| **[Contributing](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/CONTRIBUTING.md)** | Environment, the gate to run before a PR, and how a change gets merged. |
 | **[Learnings](learnings.md)** | Non-obvious behaviour discovered while building it. |
 | **[Coverage](coverage.md)** | Test coverage: how it is measured and where it stands. |
 | **[Roadmap](roadmap.md)** | What is left before 1.0. |
