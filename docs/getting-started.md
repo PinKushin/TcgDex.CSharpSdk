@@ -184,7 +184,14 @@ Two things to know, both properties of the API rather than the SDK:
 Requests go to `api.tcgdex.net`, and for the official API that is the address to
 use. TCGdex deployed new infrastructure in September 2026 and retired the
 per-node hostnames (`api.eu1.…`, `api.na1.…` and the rest); the main route now
-routes around a node that is down, so there is nothing left to choose between.
+routes around a node that is down, so there is no mirror list to choose from.
+
+One case where the address still matters: TCGdex's own geo-routing occasionally
+sends a request to the wrong region, and the fix is a specific override host —
+`api.na-east.tcgdex.net` for someone stuck being routed to the EU service, for
+example. That is a manual escape hatch from TCGdex, not something the SDK
+curates or picks for you; set it the same way as any other custom address,
+below.
 
 To point the SDK somewhere else — an unofficial mirror, a self-hosted instance,
 or a local test server — set both endpoints:
