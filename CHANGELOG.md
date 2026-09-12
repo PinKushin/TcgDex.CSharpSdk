@@ -15,6 +15,12 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+### Added
+
+- **`User-Agent` header on every outbound request**, `TcgDex.CSharpSdk/{version}` — requested by
+  TCGdex directly so their logs (which store no IP address, for GDPR) can identify SDK traffic.
+  Applied per-request; does not touch a caller-supplied `HttpClient`'s own headers.
+
 ## [0.6.0] - 2026-09-11
 
 ### Added

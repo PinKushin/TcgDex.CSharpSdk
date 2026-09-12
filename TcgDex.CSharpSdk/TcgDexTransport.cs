@@ -276,6 +276,7 @@ internal sealed class TcgDexTransport
         try
         {
             using HttpRequestMessage request = new(HttpMethod.Get, uri);
+            TcgDexUserAgent.Apply(request);
 
             return await _httpClient
                 .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline)
