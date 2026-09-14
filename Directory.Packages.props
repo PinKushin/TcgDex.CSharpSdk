@@ -104,7 +104,7 @@
          asset** — no netstandard2.0 — so it is referenced for net8.0 and
          net10.0 and excluded from the net472 leg of the unit suite, the same
          shape as PublicApiGenerator above. -->
-    <PackageVersion Include="CsCheck" Version="4.8.0" />
+    <PackageVersion Include="CsCheck" Version="4.9.0" />
   </ItemGroup>
 
   <!-- Analyzer-only, referenced by the shipped library project alone (see the
@@ -122,9 +122,9 @@
        HTTP client throughout, which is exactly the shape those rules target.
        See docs/DECISIONS.md for the full record. -->
   <ItemGroup>
-    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.33.0.1635" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.34.0.3385" />
     <PackageVersion Include="Roslynator.Analyzers" Version="5.0.0" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.231" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.257" />
   </ItemGroup>
 
 </Project>
