@@ -280,6 +280,9 @@ case "$MODE" in
 
   stryker)
     dotnet tool restore 9>&-
+    # Stryker adds a dated folder per run and never prunes, so the copy below would carry
+    # every past report into every run directory (~300 MB each by 2026-09-23).
+    rm -rf StrykerOutput
     # --concurrency defaults to HALF the logical processors, which integer-divides to 1
     # on a 3-core box. Set here rather than in stryker-config.json, where the conservative
     # default is right for a developer's machine.
