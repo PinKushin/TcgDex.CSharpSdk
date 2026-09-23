@@ -432,3 +432,13 @@ a real binary.
 Verified live as well as in the test suite: sent one request with `User-Agent: pinkushin-debug/1.0`
 directly against `api.tcgdex.net` so Avior could confirm the header actually reaches his logs
 before relying on it.
+
+## 14. CI stays on `ubuntu-latest` through the Ubuntu 26 migration — not pinned
+
+GitHub annotated every Linux job on 2026-09-21: `ubuntu-latest` moves to Ubuntu 26 from
+2026-10-19. Pinning `ubuntu-24.04` was offered and declined. The owner, 2026-09-23: *"let it
+switch, i want my shit to stay updated and keep everything it uses updated, thats what makes a good
+program imo."*
+
+So the runner image follows GitHub's default, the same way Dependabot keeps packages and actions
+current. If the switch breaks a job, fix the job for Ubuntu 26. Do not pin back.
