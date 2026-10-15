@@ -467,3 +467,7 @@ Asked whether to turn on the repository's **Allow auto-merge** setting, which wa
 
 Enabled. Branch protection is unchanged: 6 required checks, branch must be up to date, no force
 pushes, no deletions. An auto-merge PR merges only after every required check passes.
+
+**Dependabot PRs are excluded.** The owner, the same day: *"i want to review dependabot wwith you,
+before a merge, it can fuck up sometimes i think."* Dependabot PRs are reviewed with the owner, and
+merged by hand on their approval. Auto-merge is never enabled on them.
