@@ -15,6 +15,31 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-10-15
+
+### Fixed
+
+- A connection that drops partway through a response body now throws `TcgDexApiException`, with the
+  original `IOException` as `InnerException`, instead of a raw `IOException`. This covers card and
+  error responses, GraphQL, and `TcgDexCachingHandler`.
+- An error response (such as a 500) whose body stalls past `TcgDexOptions.Timeout` now throws
+  `TcgDexApiException` (timed out) instead of a raw cancellation exception.
+- `TcgDexCachingHandler` now stores the new `ETag` when a `304 Not Modified` carries one, so the
+  next revalidation uses the server's current validator.
+- `TcgDexCachingHandler` no longer sends `If-None-Match` twice when a handler above it re-sends the
+  same request.
+- `TcgDexCachingHandler` disposes an error response if a custom cache's `RemoveAsync` throws.
+- A response declaring a large `Content-Length` with a small body no longer pre-allocates the
+  declared size. The initial buffer is capped at 1 MiB and grows as needed.
+
+### Changed
+
+- On .NET Framework, `TcgDexOptions.Timeout` does not end a response body that stalls after its
+  headers arrive. That platform's `HttpClientHandler` ignores cancellation on an in-progress read,
+  so the body ends at its `ReadWriteTimeout` (five minutes by default) instead.
+- `TcgDexCachingHandler` throws `TcgDexApiException`, not `HttpRequestException`, for an oversized
+  or broken body, so retry policies do not re-download it.
+
 ## [0.6.2] - 2026-10-15
 
 ### Changed
@@ -348,7 +373,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.5.0...v0.6.0

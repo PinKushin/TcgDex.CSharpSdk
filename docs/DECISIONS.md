@@ -515,3 +515,21 @@ also matched the net472 test leg. So the netstandard2.0 asset was only ever test
 dependencies, never the 8.0.x ones it ships with. The condition is now `== net10.0`.
 `DependencyLineTests` asserts the resolved major version on every leg, and it was seen failing on
 net472 before the fix.
+
+## 18. `TcgDexCachingHandler` throws `TcgDexApiException`, not `HttpRequestException`
+
+`TcgDexCachingHandler` is a public `DelegatingHandler`. When a body is too large, or its connection
+fails mid-read, it throws `TcgDexApiException` from inside the `HttpClient` pipeline. A review in
+0.6.2 asked whether `HttpRequestException` would be more conventional for a handler.
+
+The owner, 2026-10-15, asked which of the two was more useful, and answered: *"yea keep it, thats a
+decision"*. The reasoning came from the assistant, and the owner accepted it:
+
+- Retry policies such as `AddStandardResilienceHandler` retry `HttpRequestException`. A body that
+  is too large will be too large again, so retrying only downloads it again, up to the limit, on
+  every attempt.
+- Callers going through `TcgDexClient` see `TcgDexApiException` either way, because the transport
+  wraps `HttpRequestException` itself. Only a caller using the handler directly can tell the
+  difference.
+
+The behaviour is documented in the handler's XML remarks.

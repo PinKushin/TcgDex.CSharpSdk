@@ -255,12 +255,12 @@ jobs:
       # which this mirrors). Lower a floor only when tests were deliberately
       # removed, and say why in the same commit; raise it whenever they grow.
       #
-      # Measured 2026-09-11 locally (net10.0/net472 dotnet test): 522 / 11 / 522 / 517.
+      # Measured 2026-10-15 locally (net10.0/net472 dotnet test): 538 / 11 / 538 / 532.
       # Same figures the CI lanes themselves produce - ubuntu and macOS both run
       # net10.0, and windows runs net472, exactly as measured here.
       - name: ubuntu net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 522 -Label 'ubuntu net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 538 -Label 'ubuntu net10.0'
 
       - name: ubuntu offline integration tests
         shell: pwsh
@@ -268,8 +268,8 @@ jobs:
 
       - name: macOS net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 522 -Label 'macOS net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 538 -Label 'macOS net10.0'
 
       - name: Windows net472 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName framework-tests.trx -Floor 517 -Label 'Windows net472'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName framework-tests.trx -Floor 532 -Label 'Windows net472'
