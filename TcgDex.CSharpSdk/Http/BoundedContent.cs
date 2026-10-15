@@ -87,12 +87,8 @@ internal static class BoundedContent
     {
         if (maxBytes <= 0)
         {
-#if NETSTANDARD2_0
-            cancellationToken.ThrowIfCancellationRequested();
-            byte[] unbounded = await content.ReadAsByteArrayAsync().ConfigureAwait(false);
-#else
+            // On netstandard2.0 this resolves to the HttpContentExtensions shim.
             byte[] unbounded = await content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-#endif
             return new ArraySegment<byte>(unbounded);
         }
 
