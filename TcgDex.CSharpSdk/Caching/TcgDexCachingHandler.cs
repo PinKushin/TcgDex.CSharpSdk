@@ -35,6 +35,15 @@ using System.Net.Http.Headers;
 /// transport, so it is transparent to every resource client and composes with
 /// any other handler a caller adds.
 /// </para>
+/// <para>
+/// <b>Exceptions.</b> A body larger than the configured limit, or one whose
+/// connection fails mid-read, throws <see cref="TcgDexApiException"/> out of
+/// this handler rather than <see cref="HttpRequestException"/>. This is
+/// deliberate: retry policies such as <c>AddStandardResilienceHandler</c> retry
+/// <see cref="HttpRequestException"/>, and re-downloading a body that is too
+/// large will only fail the same way again. Callers going through
+/// <see cref="TcgDexClient"/> see <see cref="TcgDexApiException"/> either way.
+/// </para>
 /// </remarks>
 public sealed class TcgDexCachingHandler : DelegatingHandler
 {
@@ -268,6 +277,9 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         // resource comes back as 304 with no body.
         if (cached?.ETag is { Length: > 0 } etag)
         {
+            // Cleared first: a handler above this one may send the same message
+            // again, and adding each time sent the validator twice.
+            request.Headers.IfNoneMatch.Clear();
             request.Headers.IfNoneMatch.TryParseAdd(etag);
         }
 
@@ -277,10 +289,18 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
 
         if (response.StatusCode == HttpStatusCode.NotModified && cached is not null)
         {
+            // RFC 7232 §4.1: a 304 may carry an updated validator. Taking it
+            // also moves the transport's parsed-model cache, which is keyed by
+            // this same ETag, onto the new value.
+            string? renewedETag = response.Headers.ETag?.ToString();
             response.Dispose();
             Interlocked.Increment(ref _revalidations);
 
-            CachedResponse refreshed = cached with { StoredAt = _timeProvider.GetUtcNow() };
+            CachedResponse refreshed = cached with
+            {
+                StoredAt = _timeProvider.GetUtcNow(),
+                ETag = renewedETag ?? cached.ETag,
+            };
             await _cache.SetAsync(key, refreshed, timeToLive, cancellationToken).ConfigureAwait(false);
 
             return FetchResult.FromCache(refreshed);
@@ -291,7 +311,18 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             // Errors are never cached: a 404 now must not suppress a card that
             // appears later, and a 5xx blip must not become a persistent outage
             // for the caller. The real response goes back untouched.
-            await _cache.RemoveAsync(key, cancellationToken).ConfigureAwait(false);
+            //
+            // The response is not the caller's until it is returned, so a
+            // custom cache whose eviction throws must not leak it.
+            try
+            {
+                await _cache.RemoveAsync(key, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                response.Dispose();
+                throw;
+            }
 
             return FetchResult.FromResponse(response);
         }

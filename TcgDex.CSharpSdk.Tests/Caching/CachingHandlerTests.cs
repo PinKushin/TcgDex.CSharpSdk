@@ -107,6 +107,93 @@ public sealed class CachingHandlerTests
     }
 
     [Test]
+    public async Task ANewETagOnA304_IsTheValidatorUsedNextTime()
+    {
+        // RFC 7232 §4.1 lets a 304 carry an updated ETag. Keeping the old one
+        // revalidates against a validator the server has already replaced.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler _, HttpClient? client, CountingHandler? inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"x"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"b\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"b\"");
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+        await GetAsync(client);
+
+        inner.Requests[2].Headers.IfNoneMatch.ToString().ShouldBe("\"b\"");
+    }
+
+    /// <summary>Re-sends the same request message once if the first attempt fails.</summary>
+    private sealed class RetryOnceHandler : DelegatingHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await base.SendAsync(request, cancellationToken);
+            }
+            catch (HttpRequestException)
+            {
+                return await base.SendAsync(request, cancellationToken);
+            }
+        }
+    }
+
+    [Test]
+    public async Task AResentRequest_CarriesOneIfNoneMatch()
+    {
+        // A handler above this one may send the same message twice. Each fetch
+        // added the validator again, so the retry went out as `"a", "a"`.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, HttpClient _, CountingHandler inner) = Build(time);
+        using HttpClient client = new(new RetryOnceHandler { InnerHandler = handler });
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"x"}""", Etag);
+        inner.Throw(new HttpRequestException("reset"));
+        inner.Respond(HttpStatusCode.NotModified, "", Etag);
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+        await GetAsync(client);
+
+        inner.Requests.Count.ShouldBe(3);
+        inner.Requests[2].Headers.IfNoneMatch.Count.ShouldBe(1);
+    }
+
+    /// <summary>A cache whose eviction fails.</summary>
+    private sealed class ThrowingRemoveCache : ITcgDexResponseCache
+    {
+        public ValueTask<CachedResponse?> GetAsync(string key, CancellationToken cancellationToken = default)
+            => new((CachedResponse?)null);
+
+        public ValueTask SetAsync(string key, CachedResponse response, TimeSpan timeToLive, CancellationToken cancellationToken = default)
+            => default;
+
+        public ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("cache backend down");
+    }
+
+    [Test]
+    public async Task AFailingEviction_StillDisposesTheErrorResponse()
+    {
+        CountingHandler inner = new();
+        TrackedResponse tracked = new(HttpStatusCode.InternalServerError);
+        inner.RespondTracked(tracked, "", null);
+
+        using HttpClient client = new(new TcgDexCachingHandler(new ThrowingRemoveCache()) { InnerHandler = inner });
+
+        await Should.ThrowAsync<InvalidOperationException>(() => client.GetAsync(CardUrl, CancellationToken.None));
+
+        tracked.WasDisposed.ShouldBeTrue();
+    }
+
+    [Test]
     public async Task Revalidation_ResetsTheFreshnessWindow()
     {
         FakeTimeProvider time = new();
