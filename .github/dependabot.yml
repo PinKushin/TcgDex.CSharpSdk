@@ -40,9 +40,10 @@ updates:
   # net10.0, 8.0.x for net8.0/netstandard2.0), and each line tracks its newest
   # patch (DECISIONS #17). Moving a line, which is a major bump, would drag
   # ASP.NET Core 8, .NET Framework and Unity consumers onto the 10.x graph.
-  # Dependabot does not know that, so **a major bump on Microsoft.Extensions.*
-  # needs a human decision, not a merge.** Grouping them separately is what
-  # makes that visible.
+  # Dependabot does not know that, so majors on these are ignored below and
+  # Dependabot never raises them. A new major is a human decision, and it is
+  # surfaced by the owner's weekly local scheduled check (`dotnet list package
+  # --outdated`), not here.
   - package-ecosystem: nuget
     directory: /
     schedule:

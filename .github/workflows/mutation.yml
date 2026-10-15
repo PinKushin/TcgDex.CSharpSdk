@@ -44,11 +44,13 @@ jobs:
       - name: Summarize
         if: always()
         run: |
-          {
-            echo '```'
-            grep -E "final mutation score|Killed:|Survived:|Timeout:|NoCoverage" stryker.log | tail -8
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [ ! -s stryker.log ]; then
+            echo "::warning::stryker.log missing or empty; no score to summarize"
+            exit 0
+          fi
+          # Strip terminal escape sequences; the score line is the one Stryker always prints.
+          sed 's/\x1b\[[0-9;?]*[A-Za-z]//g' stryker.log | grep "final mutation score" >> "$GITHUB_STEP_SUMMARY" \
+            || echo "::warning::no 'final mutation score' line in stryker.log"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
