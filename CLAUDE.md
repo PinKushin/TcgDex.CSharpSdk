@@ -60,4 +60,4 @@ See `docs/DECISIONS.md` (sections 2–8) for the full reasoning behind these rul
 - **Public API pinned by `PublicApi.approved.cs`.** Regenerate with **LF** line endings only.
 - **Strict analyzers scoped to the library only.** Test code noise is noise; accept it on tests.
 - **Native AOT needs VS Installer on `PATH`.** Or native link step fails with a misleading error.
-- **`main` is protected.** Work through PR; auto-merge is off; releases are git-tagged.
+- **`main` is protected.** Work through PR; auto-merge is on (DECISIONS #16); releases are git-tagged.

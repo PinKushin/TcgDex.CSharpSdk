@@ -459,3 +459,11 @@ Measurement work now runs on GitHub Actions.
 an artifact and the score in the job summary. A score below `stryker-config.json`'s `break`
 threshold fails the run. `build/run-measurements.sh` still holds the box's `stryker` mode, and it is
 dead code for as long as the box is down.
+
+## 16. Repository auto-merge enabled; `main` stays protected
+
+Asked whether to turn on the repository's **Allow auto-merge** setting, which was off. The owner,
+2026-10-15: *"i mean sure as long as main is still protected."*
+
+Enabled. Branch protection is unchanged: 6 required checks, branch must be up to date, no force
+pushes, no deletions. An auto-merge PR merges only after every required check passes.
