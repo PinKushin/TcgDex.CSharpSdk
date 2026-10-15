@@ -63,17 +63,20 @@ public sealed class RequestTimeoutTests
     /// indefinitely rather than failing, which is worse than not having it.
     /// </para>
     /// <para>
-    /// That overload is .NET 5+, so this pair is scoped to the modern targets.
-    /// The behaviour under test is target-independent — it comes from passing
-    /// the deadline into <c>BoundedContent</c> — so proving it here is enough.
+    /// That overload is .NET 5+, so these are scoped to the modern targets.
+    /// The SDK's half is target-independent — it passes the deadline into
+    /// <c>BoundedContent</c> — but the outcome is not: .NET Framework's
+    /// <c>HttpClientHandler</c> ignores the token on an in-flight body read, so
+    /// there a stalled body ends at its five-minute <c>ReadWriteTimeout</c>
+    /// instead. Documented on <see cref="TcgDexOptions.Timeout"/>.
     /// </para>
     /// </remarks>
-    private sealed class StallingBodyHandler : HttpMessageHandler
+    private sealed class StallingBodyHandler(HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
-            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            => Task.FromResult(new HttpResponseMessage(status)
             {
                 Content = new StreamContent(new StallingStream()),
             });
@@ -212,6 +215,22 @@ public sealed class RequestTimeoutTests
 
         Should.Throw<TcgDexApiException>(
             () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
+    }
+
+    [Test]
+    [CancelAfter(15000)]
+    public void AStalledErrorBody_AlsoTimesOut()
+    {
+        // The problem-document read on a 500 runs under the same deadline, and
+        // its expiry escaped raw out of the failure path.
+        using TcgDexClient client = Client(
+            new StallingBodyHandler(HttpStatusCode.InternalServerError),
+            TimeSpan.FromMilliseconds(200));
+
+        TcgDexApiException error = Should.Throw<TcgDexApiException>(
+            () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
+
+        error.Message.ShouldContain("timed out", Case.Insensitive);
     }
 
 #endif

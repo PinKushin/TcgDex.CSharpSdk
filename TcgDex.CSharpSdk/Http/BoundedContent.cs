@@ -38,6 +38,9 @@ internal static class BoundedContent
     /// </summary>
     private const int ChunkSize = 16 * 1024;
 
+    /// <summary>The most a declared Content-Length may pre-allocate.</summary>
+    private const int MaxInitialCapacity = 1024 * 1024;
+
     /// <summary>
     /// Reads <paramref name="content"/> as UTF-8 bytes, failing if it exceeds
     /// <paramref name="maxBytes"/>.
@@ -50,7 +53,9 @@ internal static class BoundedContent
     /// The body, as a segment over a buffer this method owns. Valid until the
     /// caller finishes with it; nothing else references it.
     /// </returns>
-    /// <exception cref="TcgDexApiException">The body exceeded the ceiling.</exception>
+    /// <exception cref="TcgDexApiException">
+    /// The body exceeded the ceiling, or the connection failed mid-body.
+    /// </exception>
     internal static async Task<ArraySegment<byte>> ReadAsBytesAsync(
         HttpContent content,
         long maxBytes,
@@ -59,6 +64,27 @@ internal static class BoundedContent
     {
         Guard.NotNull(content);
 
+        // Responses are read with ResponseHeadersRead, so a connection that
+        // drops mid-body surfaces here as an IOException (HttpIOException on
+        // net8+), or as HttpRequestException from the buffered read — never
+        // from the send, whose handler cannot see it. Every caller of this
+        // method is a path the one-exception contract covers.
+        try
+        {
+            return await ReadCoreAsync(content, maxBytes, uri, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or HttpRequestException)
+        {
+            throw new TcgDexApiException($"The response body from '{uri}' could not be read.", ex);
+        }
+    }
+
+    private static async Task<ArraySegment<byte>> ReadCoreAsync(
+        HttpContent content,
+        long maxBytes,
+        Uri uri,
+        CancellationToken cancellationToken)
+    {
         if (maxBytes <= 0)
         {
 #if NETSTANDARD2_0
@@ -96,8 +122,12 @@ internal static class BoundedContent
         // against the limit above, and the byte counting below remains the only
         // thing that enforces it. This uses the value as a *hint* for capacity,
         // where being wrong costs a resize rather than a bypassed guard.
+        //
+        // Capped, though: an uncapped hint let a 10-byte body declaring 32 MiB
+        // commit 32 MiB per request. 1 MiB covers every endpoint but the
+        // unpaginated card list exactly, and a larger body grows by doubling.
         int capacity = content.Headers.ContentLength is { } hint && hint > 0 && hint <= maxBytes
-            ? (int)Math.Min(hint, int.MaxValue)
+            ? (int)Math.Min(hint, MaxInitialCapacity)
             : 0;
 
         // Rented, not allocated. A fresh 16 KB chunk on every request was by

@@ -135,7 +135,16 @@ internal sealed class TcgDexTransport
 
         if (!response.IsSuccessStatusCode)
         {
-            return await HandleFailureAsync<T>(uri, response, activity, deadline).ConfigureAwait(false);
+            // The problem-document read runs under the same deadline as the
+            // success body, so its expiry needs the same translation.
+            try
+            {
+                return await HandleFailureAsync<T>(uri, response, activity, deadline).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw TimedOut(uri, activity, ex);
+            }
         }
 
         // Checked before the body is read, not just before it is parsed: on a
@@ -289,7 +298,7 @@ internal sealed class TcgDexTransport
 
             throw new TcgDexApiException($"The request to '{uri}' could not be completed.", ex);
         }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             // Cancellation requested by the caller is theirs to observe; this
             // branch is specifically a client-side timeout, which is a fault.
