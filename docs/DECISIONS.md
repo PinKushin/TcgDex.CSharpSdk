@@ -468,6 +468,23 @@ Asked whether to turn on the repository's **Allow auto-merge** setting, which wa
 Enabled. Branch protection is unchanged: 6 required checks, branch must be up to date, no force
 pushes, no deletions. An auto-merge PR merges only after every required check passes.
 
-**Dependabot PRs are excluded.** The owner, the same day: *"i want to review dependabot wwith you,
-before a merge, it can fuck up sometimes i think."* Dependabot PRs are reviewed with the owner, and
-merged by hand on their approval. Auto-merge is never enabled on them.
+**Dependabot PRs: reviewed by risk — REVERSAL, same day.**
+
+- **First position:** review every Dependabot PR before merge. The owner: *"i want to review
+  dependabot wwith you, before a merge, it can fuck up sometimes i think."*
+- **What changed it:** the owner, refining the worry: *"if they dont break anything, it should be
+  fine, i just worry if we have a weak test it will bring a bug in."* Only packages that ship inside
+  the SDK can bring a bug into it. Test tooling can quietly weaken tests, and the test count plus the
+  daily mutation score catch that. Analyzers and CI actions never ship. The owner: *"yea thats a
+  decision, go with that."*
+
+The rule now:
+
+| The bump touches | Who merges |
+|---|---|
+| A runtime dependency of the shipped library (`System.Text.Json`, `Microsoft.Extensions.*`, `Microsoft.Bcl.*`, …) | **Reviewed with the owner** before merge |
+| Test tooling (NUnit, the test adapter, coverlet, CsCheck, Test.Sdk) | Merged without the owner, once CI is green and the test totals per TFM have not dropped |
+| Analyzers (`PrivateAssets=all`) and GitHub Actions | Merged without the owner, once CI is green with no new annotations |
+
+Classify by package, not by the Dependabot group name. The `runtime` group has carried analyzers.
+Auto-merge is never enabled on Dependabot PRs.
