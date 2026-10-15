@@ -488,3 +488,29 @@ The rule now:
 
 Classify by package, not by the Dependabot group name. The `runtime` group has carried analyzers.
 Auto-merge is never enabled on Dependabot PRs.
+
+## 17. Dependencies track the latest patch of each target's line — not a minimum-version policy — CORRECTION
+
+`Directory.Packages.props` and `dependabot.yml` used to say runtime dependencies were pinned to the
+*lowest* version that satisfies each target. That was never the owner's intent. The owner,
+2026-10-15: *"I never meant for anything to be minimum version, I wanted true usage and backwards
+compatibility for Unity and people who might not be on windows 10 or 11, but i never wanted the
+modern .net to get behind in updates, because those updates are security and features and
+performance."* And: *"latest patches, because those are the best performing and secure normally,
+although if the lates is slower or less secure then of course we dont use it."*
+
+The rule now:
+
+- Each target framework stays on its own release line. net10.0 uses Microsoft.Extensions 10.x.
+  net8.0 and netstandard2.0 use 8.0.x, because 10.x there would drag ASP.NET Core 8, .NET Framework
+  and Unity consumers onto the 10.x graph. Moving a line stays a human decision.
+- Within its line, every dependency tracks the **newest patch**. Not doing so is a finding.
+- **Exception:** a release measured slower, or carrying a known vulnerability or regression, is
+  skipped. Say why next to the pin.
+- netstandard2.0 exists for compatibility, not to hold versions back.
+
+The same review found a test gap. The 10.x condition was `!= net8.0 and != netstandard2.0`, which
+also matched the net472 test leg. So the netstandard2.0 asset was only ever tested against 10.x
+dependencies, never the 8.0.x ones it ships with. The condition is now `== net10.0`.
+`DependencyLineTests` asserts the resolved major version on every leg, and it was seen failing on
+net472 before the fix.

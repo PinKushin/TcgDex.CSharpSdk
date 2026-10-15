@@ -74,6 +74,18 @@ jobs:
             exit 1
           fi
 
+          # The tag decides what ships, but a release whose PR forgot the bump
+          # leaves <Version> and the changelog describing the previous release.
+          CSPROJ=$(grep -oP '(?<=<Version>)[^<]+' TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj)
+          if [ "$CSPROJ" != "$VERSION" ]; then
+            echo "::error::publishing $VERSION but TcgDex.CSharpSdk.csproj <Version> is $CSPROJ"
+            exit 1
+          fi
+          if ! grep -qF "## [$VERSION] " CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$VERSION]' section"
+            exit 1
+          fi
+
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "publishing $VERSION"
 

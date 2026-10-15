@@ -398,6 +398,9 @@ Central Package Management made it easy to pin one version of
 app to drag its whole `Microsoft.Extensions` graph to 10.0.x, and collides with
 an ASP.NET Core 8 app that pins `8.0.x`.
 
+*(Superseded 2026-10-15 by DECISIONS #17: each target tracks the latest patch of its own line,
+not the lowest version. The line split below still holds.)*
+
 A library should request the **lowest** version that satisfies it, per target,
 because NuGet resolves upwards on its own: a consumer already on 10.0.x still
 gets 10.0.x. `Directory.Packages.props` now conditions its `PackageVersion`
@@ -630,7 +633,8 @@ because **a library's dependency versions become a floor for every consumer**.
 Taking 10.x would force a `net8.0` application onto the 10.x
 `Microsoft.Extensions` graph and conflict with an ASP.NET Core 8 app pinned to
 8.0.x. NuGet resolves upwards on its own, so asking for the lowest version that
-satisfies each target costs nobody anything and constrains them least.
+satisfies each target costs nobody anything and constrains them least. *(Superseded by DECISIONS
+#17: the line split stands, but each line now tracks its latest patch.)*
 
 **No test here can catch that, and no test could.** The harm lands on a consumer
 who does not exist yet, and a test suite can only represent code that exists.
