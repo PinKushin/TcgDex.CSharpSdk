@@ -115,6 +115,8 @@ worked through at length in [`docs/learnings.md`](docs/learnings.md):
 - CI must be green **and carry zero annotations** — a passing check only means no step exited
   non-zero, not that the run was clean. Check annotations explicitly if a run looks green but
   something feels off.
-- Auto-merge is off. A merge is an explicit step taken once CI is actually clean.
+- Auto-merge is on, but it only merges once every required check passes, and branch protection is
+  unchanged. Dependabot PRs are never auto-merged; they are triaged by risk (`docs/DECISIONS.md`
+  #16).
 - Releases are git-tagged (`v*`) and published by `release.yml` — merging to `main` does not
   publish a new version on its own.
