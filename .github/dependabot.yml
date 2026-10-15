@@ -42,7 +42,8 @@ updates:
   # ASP.NET Core 8, .NET Framework and Unity consumers onto the 10.x graph.
   # Dependabot does not know that, so majors on these are ignored below and
   # Dependabot never raises them. A new major is a human decision, and it is
-  # surfaced by the weekly TcgDex check (`dotnet list package --outdated`), not here.
+  # surfaced by the owner's weekly local scheduled check (`dotnet list package
+  # --outdated`), not here.
   - package-ecosystem: nuget
     directory: /
     schedule:

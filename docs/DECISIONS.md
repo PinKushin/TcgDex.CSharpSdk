@@ -243,7 +243,8 @@ similar.
 ## 9. `main` is protected
 
 Direct pushes to `main` are disabled. All work goes through a pull request. Auto-merge is off, so
-a merge is an explicit step taken after CI is green. Releases are git-tagged and published by
+a merge is an explicit step taken after CI is green. *(Auto-merge superseded 2026-10-15 by #16:
+now on, and still gated on every required check.)* Releases are git-tagged and published by
 workflow, not by hand.
 
 This arrangement ensures every commit to the main branch has been reviewed and CI-validated.
