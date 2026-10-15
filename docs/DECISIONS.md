@@ -442,3 +442,20 @@ program imo."*
 
 So the runner image follows GitHub's default, the same way Dependabot keeps packages and actions
 current. If the switch breaks a job, fix the job for Ubuntu 26. Do not pin back.
+
+## 15. Mutation testing moved from the Oracle box to GitHub Actions
+
+By 2026-10-15 `mutation-box` had been unreachable for some time. The owner, 2026-10-15: *"the oracle
+box is down, been down"*, *"we are using github now"*, and *"using github counts for all the
+projects, the oracle box got shutdown, and not because it wasnt being used, but because some stupid
+trial ended, and their customer service sucks so they care not getting my CC, trying to get money
+back if they fuck up and charge me for soemthing will be impossible."*
+
+So the move is permanent and covers every project, not only this one. Oracle ended a trial, and the
+owner will not hand Oracle a card to keep the box, because a wrong charge would be unrecoverable.
+Measurement work now runs on GitHub Actions.
+
+`.github/workflows/mutation.yml` runs Stryker daily and on dispatch. It publishes the HTML report as
+an artifact and the score in the job summary. A score below `stryker-config.json`'s `break`
+threshold fails the run. `build/run-measurements.sh` still holds the box's `stryker` mode, and it is
+dead code for as long as the box is down.

@@ -1,0 +1,58 @@
+name: Mutation
+
+# Scheduled, not a per-push gate: a run takes ~15 minutes, which is too slow to
+# block a merge on and too valuable to skip. Moved here from the Oracle
+# mutation box (DECISIONS #15). A score under stryker-config.json's `break`
+# threshold fails the run.
+on:
+  schedule:
+    # Daily 05:17 UTC, off the hour to avoid the on-the-hour queue.
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  stryker:
+    name: Stryker
+    runs-on: ubuntu-latest
+    # measured healthy: ~15 min (mutation-box 3 cores, 2026-09-23); not yet measured on a GitHub runner
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68  # v6.0.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - run: dotnet tool restore
+
+      # Stryker defaults to half the logical processors.
+      - name: Run Stryker
+        run: |
+          set -o pipefail
+          dotnet stryker --concurrency "$(nproc)" | tee stryker.log
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo '```'
+            grep -E "final mutation score|Killed:|Survived:|Timeout:|NoCoverage" stryker.log | tail -8
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        if: always()
+        with:
+          name: mutation-report
+          path: StrykerOutput/*/reports/mutation-report.html
+          if-no-files-found: error
