@@ -20,7 +20,8 @@ something an application can observe — those live in the commit history.
 ### Changed
 
 - **net10.0:** `Microsoft.Extensions.Http`, `Microsoft.Extensions.Logging.Abstractions` and
-  `Microsoft.Extensions.Options` now require 10.0.13, up from 10.0.10. The net8.0 and
+  `Microsoft.Extensions.Options` now require 10.0.13, up from 10.0.10. Each target tracks the
+  latest patch of its own line, for the security, bug and performance fixes. The net8.0 and
   netstandard2.0 builds are unchanged and still depend on the 8.0.x line.
 
 ## [0.6.1] - 2026-09-12
