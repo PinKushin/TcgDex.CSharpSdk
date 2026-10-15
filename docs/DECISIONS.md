@@ -442,3 +442,49 @@ program imo."*
 
 So the runner image follows GitHub's default, the same way Dependabot keeps packages and actions
 current. If the switch breaks a job, fix the job for Ubuntu 26. Do not pin back.
+
+## 15. Mutation testing moved from the Oracle box to GitHub Actions
+
+By 2026-10-15 `mutation-box` had been unreachable for some time. The owner, 2026-10-15: *"the oracle
+box is down, been down"*, *"we are using github now"*, and *"using github counts for all the
+projects, the oracle box got shutdown, and not because it wasnt being used, but because some stupid
+trial ended, and their customer service sucks so they care not getting my CC, trying to get money
+back if they fuck up and charge me for soemthing will be impossible."*
+
+So the move is permanent and covers every project, not only this one. Oracle ended a trial, and the
+owner will not hand Oracle a card to keep the box, because a wrong charge would be unrecoverable.
+Measurement work now runs on GitHub Actions.
+
+`.github/workflows/mutation.yml` runs Stryker daily and on dispatch. It publishes the HTML report as
+an artifact and the score in the job summary. A score below `stryker-config.json`'s `break`
+threshold fails the run. `build/run-measurements.sh` still holds the box's `stryker` mode, and it is
+dead code for as long as the box is down.
+
+## 16. Repository auto-merge enabled; `main` stays protected
+
+Asked whether to turn on the repository's **Allow auto-merge** setting, which was off. The owner,
+2026-10-15: *"i mean sure as long as main is still protected."*
+
+Enabled. Branch protection is unchanged: 6 required checks, branch must be up to date, no force
+pushes, no deletions. An auto-merge PR merges only after every required check passes.
+
+**Dependabot PRs: reviewed by risk — REVERSAL, same day.**
+
+- **First position:** review every Dependabot PR before merge. The owner: *"i want to review
+  dependabot wwith you, before a merge, it can fuck up sometimes i think."*
+- **What changed it:** the owner, refining the worry: *"if they dont break anything, it should be
+  fine, i just worry if we have a weak test it will bring a bug in."* Only packages that ship inside
+  the SDK can bring a bug into it. Test tooling can quietly weaken tests, and the test count plus the
+  daily mutation score catch that. Analyzers and CI actions never ship. The owner: *"yea thats a
+  decision, go with that."*
+
+The rule now:
+
+| The bump touches | Who merges |
+|---|---|
+| A runtime dependency of the shipped library (`System.Text.Json`, `Microsoft.Extensions.*`, `Microsoft.Bcl.*`, …) | **Reviewed with the owner** before merge |
+| Test tooling (NUnit, the test adapter, coverlet, CsCheck, Test.Sdk) | Merged without the owner, once CI is green and the test totals per TFM have not dropped |
+| Analyzers (`PrivateAssets=all`) and GitHub Actions | Merged without the owner, once CI is green with no new annotations |
+
+Classify by package, not by the Dependabot group name. The `runtime` group has carried analyzers.
+Auto-merge is never enabled on Dependabot PRs.
