@@ -21,9 +21,9 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' != 'net8.0' and '$(TargetFramework)' != 'netstandard2.0'">
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.13" />
   </ItemGroup>
 
   <!-- netstandard2.0 has no in-box System.Text.Json, no IAsyncEnumerable, and
