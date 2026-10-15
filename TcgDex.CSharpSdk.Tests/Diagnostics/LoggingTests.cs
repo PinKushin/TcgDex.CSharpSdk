@@ -287,6 +287,43 @@ public sealed class LoggingTests
     }
 
     [Test]
+    public void AnOversizedBody_LogsOnceAndMarksTheActivityAsError()
+    {
+        // The body read is a third failure site after the send and the status
+        // check, and it reported neither a log entry nor a failed span.
+        (ActivityListener? listener, List<Activity>? recorded) = ListenForActivities();
+        using ActivityListener _ = listener;
+
+        RecordingLogger log = new(LogLevel.Trace);
+        using TcgDexClient client = new(
+            new HttpClient(new RecordingHandler().RespondWith(HttpStatusCode.OK, """{"id":"swsh3-136"}""")),
+            new TcgDexOptions { MaxResponseBytes = 4 },
+            log.Factory);
+
+        Should.ThrowAsync<TcgDexApiException>(async () =>
+            await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Wait();
+
+        log.Entries.Where(e => e.Level >= LogLevel.Warning).ShouldHaveSingleItem().EventId.ShouldBe(1004);
+        recorded.ShouldHaveSingleItem().Status.ShouldBe(ActivityStatusCode.Error);
+    }
+
+    [Test]
+    public void AMalformedBody_MarksTheActivityAsError()
+    {
+        (ActivityListener? listener, List<Activity>? recorded) = ListenForActivities();
+        using ActivityListener _ = listener;
+
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "<html>");
+
+        (TcgDexClient? client, RecordingLogger _) = Build(handler);
+
+        Should.ThrowAsync<TcgDexApiException>(async () =>
+            await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Wait();
+
+        recorded.ShouldHaveSingleItem().Status.ShouldBe(ActivityStatusCode.Error);
+    }
+
+    [Test]
     public void ATimeout_MarksTheActivityAsError()
     {
         // The other exception-shaped failure, and the other RecordFailure call.

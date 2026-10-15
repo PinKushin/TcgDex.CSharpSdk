@@ -203,6 +203,15 @@ internal sealed class GraphQlTransport(
                 .SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, deadline)
                 .ConfigureAwait(false);
 
+            // The status is checked before the body is read: an error body was
+            // never used, and one that reset or was oversized hid the status.
+            if (!httpResponse.IsSuccessStatusCode)
+            {
+                throw new TcgDexApiException(
+                    $"The TCGdex GraphQL endpoint returned {(int)httpResponse.StatusCode}.",
+                    httpResponse.StatusCode);
+            }
+
             ArraySegment<byte> body = await BoundedContent
                 .ReadAsBytesAsync(
                     httpResponse.Content,
@@ -210,13 +219,6 @@ internal sealed class GraphQlTransport(
                     _options.GraphQlEndpoint,
                     deadline)
                 .ConfigureAwait(false);
-
-            if (!httpResponse.IsSuccessStatusCode)
-            {
-                throw new TcgDexApiException(
-                    $"The TCGdex GraphQL endpoint returned {(int)httpResponse.StatusCode}.",
-                    httpResponse.StatusCode);
-            }
 
             return JsonSerializer.Deserialize(
                     new ReadOnlySpan<byte>(body.Array, body.Offset, body.Count),

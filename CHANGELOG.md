@@ -22,8 +22,16 @@ something an application can observe — those live in the commit history.
 - A connection that drops partway through a response body now throws `TcgDexApiException` instead
   of a raw `IOException`. Successful responses, GraphQL and `TcgDexCachingHandler` carry the
   original failure as `InnerException`. Error responses report their status code instead.
-- A `404` whose body cannot be read now throws `TcgDexApiException` instead of returning `null`.
-  Only the body tells a missing resource apart from an unsupported language.
+- A `404` whose body cannot be read (reset or larger than `MaxResponseBytes`) now throws
+  `TcgDexApiException` with `StatusCode` `404` instead of returning `null`, with the read failure as
+  `InnerException`. Only the body tells a missing resource apart from an unsupported language.
+- A GraphQL error response now reports its status code even when its body resets or is too large.
+- Cancelling a request now always surfaces as `OperationCanceledException`, including on a
+  platform that reports the cancelled body read as an `IOException`.
+- A body that fails to read, or is not valid JSON, is now logged and marks the request's
+  `Activity` as failed, like other failures.
+- `TcgDexCachingHandler` keeps an `If-None-Match` the caller set, adding its own `ETag` beside it,
+  instead of replacing it.
 - An error response (such as a 500) whose body stalls past `TcgDexOptions.Timeout` now throws
   `TcgDexApiException` (timed out) instead of a raw cancellation exception.
 - `TcgDexCachingHandler` now stores the new `ETag` when a `304 Not Modified` carries one, so the

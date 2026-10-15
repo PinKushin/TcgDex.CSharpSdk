@@ -75,6 +75,14 @@ internal static class BoundedContent
         }
         catch (Exception ex) when (ex is IOException or HttpRequestException)
         {
+            // A platform may surface a cancelled read as an aborted-read
+            // IOException. The token decides: callers above tell a budget expiry
+            // from a caller's cancel by their own token.
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(ex.Message, ex, cancellationToken);
+            }
+
             throw new TcgDexApiException($"The response body from '{uri}' could not be read.", ex);
         }
     }

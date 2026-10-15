@@ -166,6 +166,28 @@ public sealed class CachingHandlerTests
         inner.Requests[2].Headers.IfNoneMatch.Count.ShouldBe(1);
     }
 
+    [Test]
+    public async Task ACallerSetIfNoneMatch_SurvivesRevalidation()
+    {
+        // Only the handler's own validator is the handler's to manage; clearing
+        // the collection dropped one the caller had set.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler _, HttpClient? client, CountingHandler? inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"x"}""", Etag);
+        inner.Respond(HttpStatusCode.NotModified, "", Etag);
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("\"x\"");
+        using HttpResponseMessage _ = await client.SendAsync(request, CancellationToken.None);
+
+        string[] sent = inner.Requests[1].Headers.IfNoneMatch.Select(t => t.ToString()).ToArray();
+        sent.ShouldBe(["\"x\"", Etag], ignoreOrder: true);
+    }
+
     /// <summary>A cache whose eviction fails.</summary>
     private sealed class ThrowingRemoveCache : ITcgDexResponseCache
     {

@@ -7,11 +7,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using TcgDex;
 using TcgDex.Caching;
+using TcgDex.Querying;
 
 /// <summary>
-/// The failures that arrive after the headers: a body that breaks mid-read, a
-/// handler that reports the SDK's own expiry as a bare cancellation, and a
-/// Content-Length that lies.
+/// The failures that arrive after the headers: a body that breaks mid-read or
+/// is too large, on a success or an error status, a cancellation that surfaces
+/// as an aborted read, and a Content-Length that lies.
 /// </summary>
 /// <remarks>
 /// The transport reads with <see cref="HttpCompletionOption.ResponseHeadersRead"/>,
@@ -135,6 +136,19 @@ public sealed class ExceptionContractTests
     }
 
     [Test]
+    public async Task AGraphQlErrorBodyResetMidRead_StillReportsTheStatusCode()
+    {
+        using TcgDexClient client = Client(new ResettingBodyHandler(HttpStatusCode.BadGateway));
+
+        TcgDexApiException error = await Should.ThrowAsync<TcgDexApiException>(
+            () => client.Cards.SearchDetailedAsync(
+                new CardFilter { Name = "Furret" },
+                cancellationToken: CancellationToken.None));
+
+        error.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
+    }
+
+    [Test]
     public void ANotFoundWhoseBodyResets_IsNotReportedAsMissing()
     {
         // A 404 is "not found" only once its body proves it is not a language
@@ -142,8 +156,90 @@ public sealed class ExceptionContractTests
         // rather than return null.
         using TcgDexClient client = Client(new ResettingBodyHandler(HttpStatusCode.NotFound));
 
-        Should.Throw<TcgDexApiException>(
+        TcgDexApiException error = Should.Throw<TcgDexApiException>(
             () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
+
+        error.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        error.InnerException.ShouldBeOfType<TcgDexApiException>();
+    }
+
+    [Test]
+    public void AnOversizedNotFoundBody_ReportsTheStatus_NotTheLimit()
+    {
+        // Raising MaxResponseBytes is the wrong advice for an error page: the
+        // caller needs to hear about the 404 whose body could not be read.
+        using TcgDexClient client = new(
+            new HttpClient(new RecordingHandler().RespondWith(HttpStatusCode.NotFound, """{"title":"Not Found"}""")),
+            new TcgDexOptions { MaxResponseBytes = 4 });
+
+        TcgDexApiException error = Should.Throw<TcgDexApiException>(
+            () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
+
+        error.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        error.Message.ShouldContain("404");
+        error.Message.ShouldNotContain(nameof(TcgDexOptions.MaxResponseBytes));
+        error.InnerException.ShouldBeOfType<TcgDexApiException>();
+    }
+
+    /// <summary>Cancels its source, then fails the way an aborted read does.</summary>
+    private sealed class CancelThenFailStream(CancellationTokenSource source) : Stream
+    {
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            source.Cancel();
+            throw new IOException("the read was aborted");
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            => Task.FromResult(Read(buffer, offset, count));
+
+#if NET8_0_OR_GREATER
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(Read([], 0, 0));
+#endif
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    [Test]
+    public async Task ACancellationSurfacedAsAnIOException_StaysACancellation()
+    {
+        // A platform may report a cancelled read as an aborted-read IOException.
+        // The caller asked to stop, so they must see the cancellation, not a fault.
+        using CancellationTokenSource source = new();
+        using StreamContent content = new(new CancelThenFailStream(source));
+
+        OperationCanceledException error = await Should.ThrowAsync<OperationCanceledException>(
+            () => BoundedContent.ReadAsBytesAsync(
+                content,
+                1024,
+                new Uri("https://api.tcgdex.net/v2/en/cards/a"),
+                source.Token));
+
+        error.CancellationToken.ShouldBe(source.Token);
+        error.InnerException.ShouldBeAssignableTo<IOException>();
     }
 
     [Test]

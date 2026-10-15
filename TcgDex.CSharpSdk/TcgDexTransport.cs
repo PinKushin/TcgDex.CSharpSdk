@@ -126,8 +126,27 @@ internal sealed class TcgDexTransport
         using CancellationTokenSource? budget = CreateBudget(cancellationToken);
         CancellationToken deadline = budget?.Token ?? cancellationToken;
 
-        using HttpResponseMessage response = await SendAsync(uri, activity, deadline, cancellationToken)
-            .ConfigureAwait(false);
+        // One translation for every await under the budget — the send, the
+        // problem-document read and the success body alike. Three copies of
+        // this catch existed before, and the body read was found missing one
+        // by a test; a single catch cannot be forgotten by the next await.
+        try
+        {
+            return await GetUnderBudgetAsync<T>(uri, activity, timestamp, deadline).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Cancellation requested by the caller is theirs to observe; this
+            // branch is specifically the SDK's own timeout, which is a fault.
+            throw TimedOut(uri, activity, ex);
+        }
+    }
+
+    /// <summary>The body of <see cref="GetAsync{T}"/> that runs under the budget.</summary>
+    private async Task<T?> GetUnderBudgetAsync<T>(Uri uri, Activity? activity, long timestamp, CancellationToken deadline)
+        where T : class
+    {
+        using HttpResponseMessage response = await SendAsync(uri, activity, deadline).ConfigureAwait(false);
 
         long elapsed = (long)ElapsedSince(timestamp).TotalMilliseconds;
         activity?.AddTag("http.response.status_code", (int)response.StatusCode);
@@ -135,16 +154,7 @@ internal sealed class TcgDexTransport
 
         if (!response.IsSuccessStatusCode)
         {
-            // The problem-document read runs under the same deadline as the
-            // success body, so its expiry needs the same translation.
-            try
-            {
-                return await HandleFailureAsync<T>(uri, response, activity, deadline).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-            {
-                throw TimedOut(uri, activity, ex);
-            }
+            return await HandleFailureAsync<T>(uri, response, activity, deadline).ConfigureAwait(false);
         }
 
         // Checked before the body is read, not just before it is parsed: on a
@@ -158,32 +168,22 @@ internal sealed class TcgDexTransport
             return cached;
         }
 
-        // The read is guarded as well as the send. A body that stops arriving
-        // mid-stream expires the same deadline, and without this the
-        // TaskCanceledException escapes raw — breaking the one-error contract at
-        // the exact moment a caller is least able to reason about it. Found by
-        // a test rather than by inspection: the send path had been guarded since
-        // the beginning and the read path never had.
-        byte[] bodyBuffer;
-        int bodyOffset;
-        int bodyCount;
+        ArraySegment<byte> body;
 
         try
         {
-            ArraySegment<byte> body = await BoundedContent
+            body = await BoundedContent
                 .ReadAsBytesAsync(response.Content, _maxResponseBytes, uri, deadline)
                 .ConfigureAwait(false);
-
-            bodyBuffer = body.Array!;
-            bodyOffset = body.Offset;
-            bodyCount = body.Count;
         }
-        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (TcgDexApiException ex)
         {
-            throw TimedOut(uri, activity, ex);
+            // Reset or oversized: reported like the send and status failures.
+            Errored(uri, activity, ex);
+            throw;
         }
 
-        T? value = Deserialize<T>(new ArraySegment<byte>(bodyBuffer, bodyOffset, bodyCount), uri);
+        T? value = Deserialize<T>(body, uri, activity);
 
         // Report a card the API sent malformed, once, here on the deserialize
         // path rather than on the cache-hit path above, so a warm hit does not
@@ -262,25 +262,16 @@ internal sealed class TcgDexTransport
     private CancellationTokenSource? CreateBudget(CancellationToken cancellationToken)
         => RequestBudget.Create(_timeout, cancellationToken);
 
-    /// <summary>Sends the request, applying this SDK's timeout on top of the caller's own cancellation.</summary>
+    /// <summary>Sends the request under the deadline.</summary>
     /// <param name="uri">The resource being fetched.</param>
     /// <param name="activity">The span to record a failure on, if any.</param>
     /// <param name="deadline">
-    /// The effective token: the caller's, plus this SDK's timeout.
-    /// </param>
-    /// <param name="cancellationToken">
-    /// The caller's token alone. Kept separate because it is what distinguishes
-    /// the two ways a request can end early — an expiry this SDK imposed is a
-    /// fault to report, while cancellation the caller asked for is theirs to
-    /// observe. Testing <paramref name="deadline"/> instead would report every
-    /// caller cancellation as a timeout.
+    /// The effective token: the caller's, plus this SDK's timeout. Telling the
+    /// two apart is <see cref="GetAsync{T}"/>'s job, which holds the caller's
+    /// token alone.
     /// </param>
     /// <returns>The response, for the caller to dispose.</returns>
-    private async Task<HttpResponseMessage> SendAsync(
-        Uri uri,
-        Activity? activity,
-        CancellationToken deadline,
-        CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> SendAsync(Uri uri, Activity? activity, CancellationToken deadline)
     {
         try
         {
@@ -293,17 +284,24 @@ internal sealed class TcgDexTransport
         }
         catch (HttpRequestException ex)
         {
-            _logger.RequestErrored(ex, uri);
-            TcgDexActivity.RecordFailure(activity, ex);
+            Errored(uri, activity, ex);
 
             throw new TcgDexApiException($"The request to '{uri}' could not be completed.", ex);
         }
-        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (TcgDexApiException ex)
         {
-            // Cancellation requested by the caller is theirs to observe; this
-            // branch is specifically a client-side timeout, which is a fault.
-            throw TimedOut(uri, activity, ex);
+            // Thrown by a handler in the pipeline, such as the caching handler
+            // failing to read a body it was storing.
+            Errored(uri, activity, ex);
+            throw;
         }
+    }
+
+    /// <summary>Logs and records a failure that has no error status to report.</summary>
+    private void Errored(Uri uri, Activity? activity, Exception ex)
+    {
+        _logger.RequestErrored(ex, uri);
+        TcgDexActivity.RecordFailure(activity, ex);
     }
 
     /// <summary>
@@ -322,8 +320,19 @@ internal sealed class TcgDexTransport
         CancellationToken cancellationToken)
         where T : class
     {
-        TcgDexProblem? problem = await ReadProblemAsync(response, _maxResponseBytes, uri, cancellationToken)
-            .ConfigureAwait(false);
+        TcgDexProblem? problem;
+
+        try
+        {
+            problem = await ReadProblemAsync(response, _maxResponseBytes, uri, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (TcgDexApiException ex)
+        {
+            // Only a 404 lets this through (see ReadProblemAsync). The status is
+            // still the news; the read failure rides along as the cause.
+            throw Failed(uri, response, activity, "the response body could not be read", problem: null, ex);
+        }
 
         if (response.StatusCode == HttpStatusCode.NotFound && problem?.IsLanguageError != true)
         {
@@ -334,16 +343,29 @@ internal sealed class TcgDexTransport
 
         string description = problem?.Describe() ?? response.ReasonPhrase ?? "no detail supplied";
 
+        throw Failed(uri, response, activity, description, problem, innerException: null);
+    }
+
+    /// <summary>Logs, records and builds the exception for an error status.</summary>
+    private TcgDexApiException Failed(
+        Uri uri,
+        HttpResponseMessage response,
+        Activity? activity,
+        string description,
+        TcgDexProblem? problem,
+        Exception? innerException)
+    {
         _logger.RequestFailed(uri, (int)response.StatusCode, description);
 
         TcgDexApiException exception = new(
             $"The TCGdex API returned {(int)response.StatusCode} for '{uri}': {description}",
             response.StatusCode,
-            problem);
+            problem,
+            innerException);
 
         TcgDexActivity.RecordFailure(activity, exception);
 
-        throw exception;
+        return exception;
     }
 
     /// <summary>
@@ -419,7 +441,7 @@ internal sealed class TcgDexTransport
     /// System.Text.Json reads UTF-8 natively, so passing the buffer straight
     /// through avoids a full copy of every response body.
     /// </remarks>
-    private T? Deserialize<T>(ArraySegment<byte> body, Uri uri)
+    private T? Deserialize<T>(ArraySegment<byte> body, Uri uri, Activity? activity)
         where T : class
     {
         try
@@ -433,6 +455,7 @@ internal sealed class TcgDexTransport
         catch (JsonException ex)
         {
             _logger.DeserializationFailed(ex, uri, typeof(T).Name);
+            TcgDexActivity.RecordFailure(activity, ex);
 
             // Callers should need to catch only one exception type, so a
             // malformed body (an HTML error page from a proxy, say) is reported

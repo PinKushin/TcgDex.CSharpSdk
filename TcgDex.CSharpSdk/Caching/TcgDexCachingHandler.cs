@@ -275,11 +275,14 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
     {
         // A stale entry with a validator is worth revalidating: an unchanged
         // resource comes back as 304 with no body.
-        if (cached?.ETag is { Length: > 0 } etag)
+        //
+        // Added only when absent: a handler above this one may send the same
+        // message again, and adding each time sent the validator twice. Any
+        // validator the caller set is theirs and stays (owner: "only remove our
+        // own value").
+        if (cached?.ETag is { Length: > 0 } etag
+            && !request.Headers.IfNoneMatch.Any(t => string.Equals(t.ToString(), etag, StringComparison.Ordinal)))
         {
-            // Cleared first: a handler above this one may send the same message
-            // again, and adding each time sent the validator twice.
-            request.Headers.IfNoneMatch.Clear();
             request.Headers.IfNoneMatch.TryParseAdd(etag);
         }
 
