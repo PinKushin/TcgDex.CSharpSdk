@@ -19,9 +19,11 @@ something an application can observe — those live in the commit history.
 
 ### Fixed
 
-- A connection that drops partway through a response body now throws `TcgDexApiException`, with the
-  original `IOException` as `InnerException`, instead of a raw `IOException`. This covers card and
-  error responses, GraphQL, and `TcgDexCachingHandler`.
+- A connection that drops partway through a response body now throws `TcgDexApiException` instead
+  of a raw `IOException`. Successful responses, GraphQL and `TcgDexCachingHandler` carry the
+  original failure as `InnerException`. Error responses report their status code instead.
+- A `404` whose body cannot be read now throws `TcgDexApiException` instead of returning `null`.
+  Only the body tells a missing resource apart from an unsupported language.
 - An error response (such as a 500) whose body stalls past `TcgDexOptions.Timeout` now throws
   `TcgDexApiException` (timed out) instead of a raw cancellation exception.
 - `TcgDexCachingHandler` now stores the new `ETag` when a `304 Not Modified` carries one, so the
@@ -34,11 +36,12 @@ something an application can observe — those live in the commit history.
 
 ### Changed
 
-- On .NET Framework, `TcgDexOptions.Timeout` does not end a response body that stalls after its
-  headers arrive. That platform's `HttpClientHandler` ignores cancellation on an in-progress read,
-  so the body ends at its `ReadWriteTimeout` (five minutes by default) instead.
-- `TcgDexCachingHandler` throws `TcgDexApiException`, not `HttpRequestException`, for an oversized
-  or broken body, so retry policies do not re-download it.
+- Documented: on .NET Framework, `TcgDexOptions.Timeout` may not end a response body that stalls
+  after its headers arrive, because that platform's `HttpClientHandler` does not cancel an
+  in-progress read. This is known platform behaviour, not measured by this SDK's tests.
+- `TcgDexCachingHandler` now throws `TcgDexApiException` for a body whose connection fails mid-read,
+  where it previously threw a raw `IOException`. An oversized body already threw
+  `TcgDexApiException`. That choice is deliberate, so retry policies do not re-download it.
 
 ## [0.6.2] - 2026-10-15
 

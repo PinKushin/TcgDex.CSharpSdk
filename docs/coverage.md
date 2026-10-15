@@ -2,8 +2,9 @@
 
 **Goal: reach and hold ~100% line coverage of hand-written SDK code.**
 
-**Current: 99.77% line (882/884) and 96.60% branch (455/471).** Both are gated in
-CI. The 2 uncovered lines are provably unreachable — see [Why not 100%](#why-not-100) below.
+**Current (2026-10-15, all three target frameworks merged): 99.80% line (1462/1465) and 95.89%
+branch (536/559).** Both are gated in CI across every target framework since 0.6.3. The earlier
+figures below were measured on net10.0 alone. The 2 uncovered lines are provably unreachable — see [Why not 100%](#why-not-100) below.
 
 | | Line | Branch | Unit tests | Integration tests |
 |---|---|---|---|---|

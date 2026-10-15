@@ -104,10 +104,11 @@ public sealed class TcgDexOptions
     /// observe rather than a fault to report.
     /// </para>
     /// <para>
-    /// <b>.NET Framework:</b> its <c>HttpClientHandler</c> ignores cancellation
-    /// on a body read already in progress, so a response whose headers arrive
-    /// and whose body then stalls is not ended by this limit there. It ends at
-    /// that handler's own <c>ReadWriteTimeout</c>, five minutes by default. The
+    /// <b>.NET Framework:</b> its <c>HttpClientHandler</c> does not cancel a
+    /// body read already in progress, so a response whose headers arrive and
+    /// whose body then stalls may not be ended by this limit there. It ends at
+    /// that handler's own <c>ReadWriteTimeout</c>, five minutes by default. This
+    /// is known platform behaviour, not measured by this SDK's tests. The
     /// headers, and every other target, are bounded as described above.
     /// </para>
     /// </remarks>

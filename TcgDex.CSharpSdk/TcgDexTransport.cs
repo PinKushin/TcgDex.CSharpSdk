@@ -386,12 +386,14 @@ internal sealed class TcgDexTransport
             // the caller still gets a TcgDexApiException, just without detail.
             return null;
         }
-        catch (TcgDexApiException)
+        // Not on a 404: that status means "missing" only once the body shows it
+        // is not a language error, and an unreadable body shows nothing.
+        catch (TcgDexApiException) when (response.StatusCode != HttpStatusCode.NotFound)
         {
-            // An oversized error body is bounded like any other, but here the
-            // status code is the real news. Swallowing this keeps the caller's
-            // exception describing the 500 they got rather than the size of the
-            // page the server sent to explain it.
+            // An oversized or reset error body is bounded like any other, but here
+            // the status code is the real news. Swallowing this keeps the caller's
+            // exception describing the 500 they got rather than the page the
+            // server sent to explain it.
             return null;
         }
     }

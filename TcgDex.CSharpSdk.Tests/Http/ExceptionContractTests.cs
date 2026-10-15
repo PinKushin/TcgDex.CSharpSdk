@@ -86,27 +86,12 @@ public sealed class ExceptionContractTests
             => Task.FromResult(new HttpResponseMessage(status) { Content = new StreamContent(new ResettingStream()) });
     }
 
-    /// <summary>
-    /// Waits for the SDK's deadline, then reports it as a plain
-    /// <see cref="OperationCanceledException"/> — what a handler calling
-    /// <c>ThrowIfCancellationRequested()</c> produces.
-    /// </summary>
-    private sealed class PlainCancellationHandler : HttpMessageHandler
-    {
-        protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            TaskCompletionSource<bool> expired = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            using (cancellationToken.Register(static state => ((TaskCompletionSource<bool>)state!).SetResult(true), expired))
-            {
-                await expired.Task.ConfigureAwait(false);
-            }
-
-            throw new OperationCanceledException(cancellationToken);
-        }
-    }
+    // No test for a handler throwing a plain OperationCanceledException at the
+    // SDK's deadline: HttpClient converts it to TaskCanceledException on
+    // net472, net8.0 and net10.0 alike, with or without a token (verified
+    // 2026-10-15 by reverting the transport catch; the test still passed). The
+    // catch was widened to OperationCanceledException anyway, which is harmless
+    // because TaskCanceledException derives from it.
 
     private static TcgDexClient Client(HttpMessageHandler handler, TimeSpan? timeout = null)
         => new(new HttpClient(handler), new TcgDexOptions { Timeout = timeout ?? TimeSpan.FromSeconds(30) });
@@ -150,6 +135,18 @@ public sealed class ExceptionContractTests
     }
 
     [Test]
+    public void ANotFoundWhoseBodyResets_IsNotReportedAsMissing()
+    {
+        // A 404 is "not found" only once its body proves it is not a language
+        // error. A body that never arrived proves nothing, so this must throw
+        // rather than return null.
+        using TcgDexClient client = Client(new ResettingBodyHandler(HttpStatusCode.NotFound));
+
+        Should.Throw<TcgDexApiException>(
+            () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
+    }
+
+    [Test]
     public async Task ABodyResetMidRead_InsideTheCachingHandler_IsTheOneErrorType()
     {
         TcgDexCachingHandler caching = new(new MemoryTcgDexResponseCache())
@@ -163,31 +160,6 @@ public sealed class ExceptionContractTests
             () => http.GetAsync(new Uri("https://api.tcgdex.net/v2/en/cards/swsh3-136"), CancellationToken.None));
 
         error.InnerException.ShouldBeAssignableTo<IOException>();
-    }
-
-    [Test]
-    [CancelAfter(15000)]
-    public void APlainCancellationAfterTheSdkTimeout_IsReportedAsATimeout()
-    {
-        using TcgDexClient client = Client(new PlainCancellationHandler(), TimeSpan.FromMilliseconds(100));
-
-        TcgDexApiException error = Should.Throw<TcgDexApiException>(
-            () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
-
-        error.Message.ShouldContain("timed out", Case.Insensitive);
-    }
-
-    [Test]
-    [CancelAfter(15000)]
-    public void APlainCancellationTheCallerAskedFor_StaysACancellation()
-    {
-        using TcgDexClient client = Client(new PlainCancellationHandler(), TimeSpan.FromMinutes(5));
-        using CancellationTokenSource cancelled = new();
-
-        cancelled.CancelAfter(TimeSpan.FromMilliseconds(100));
-
-        Should.Throw<OperationCanceledException>(
-            () => client.Cards.GetAsync("swsh3-136", cancelled.Token).GetAwaiter().GetResult());
     }
 
     [Test]
