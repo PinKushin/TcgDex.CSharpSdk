@@ -74,6 +74,7 @@ changes first.
 - **Dependabot** raises updates weekly for NuGet packages and GitHub Actions,
   so advisories are not the only thing that moves versions.
 - **CodeQL** runs on every push.
-- Runtime dependencies are pinned to the *lowest* version that satisfies each
-  target framework rather than the newest, because a library's floor becomes
-  every consumer's floor. See `Directory.Packages.props` for the reasoning.
+- Runtime dependencies track the **latest patch** of each target framework's
+  release line (10.x for net10.0, 8.0.x for net8.0 and netstandard2.0), so
+  security fixes arrive promptly without moving older consumers onto a newer
+  major. See `Directory.Packages.props` for the reasoning.

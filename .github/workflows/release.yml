@@ -81,7 +81,7 @@ jobs:
             echo "::error::publishing $VERSION but TcgDex.CSharpSdk.csproj <Version> is $CSPROJ"
             exit 1
           fi
-          if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
+          if ! grep -qF "## [$VERSION] " CHANGELOG.md; then
             echo "::error::CHANGELOG.md has no '## [$VERSION]' section"
             exit 1
           fi
