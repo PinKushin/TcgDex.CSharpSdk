@@ -533,3 +533,22 @@ decision"*. The reasoning came from the assistant, and the owner accepted it:
   difference.
 
 The behaviour is documented in the handler's XML remarks.
+
+## 19. A soft bar for 1.0
+
+The first cross-model review (Fable over Opus-written code, 2026-10-15) found one real bug and
+several leaks in the exception contract, in the three files with the lowest mutation scores. On 1.0
+those fixes would have pushed toward a major version. On 0.x they are a patch. The owner: *"im
+actually glad this wasnt in a 1.0 now"*, then *"add that 1.0 bar to the decisions doc, at least a
+soft bar, we do need to raise those scores if they can be."*
+
+**Before tagging 1.0** (soft: a missed item needs a stated reason, not a silent skip):
+
+1. **A full cross-model review comes back clean.** The whole shipped library must be reviewed by a
+   model other than the one that wrote it. A review of a single diff does not count.
+2. **The weakest files' mutation scores are raised toward the rest of the library**, as far as they
+   can be. At 2026-09-23 those were `Caching/TcgDexCachingHandler.cs` 67%, `Http/BoundedContent.cs`
+   65% and `TcgDexTransport.cs` 77%, against 88% overall. "If they can be": a surviving mutant that is
+   equivalent, or untestable for a stated reason, is acceptable once written down.
+3. **CI and the local gate measure the same thing.** Met on 2026-10-15: CI now gates coverage across
+   all three target frameworks.
