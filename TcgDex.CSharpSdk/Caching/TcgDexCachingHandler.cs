@@ -130,7 +130,11 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             return BuildResponse(request, cached, HttpStatusCode.OK);
         }
 
-        FetchResult result = _options.CoalesceConcurrentRequests
+        // A caller's own If-None-Match (or `*`) makes the outcome specific to
+        // that request, so it neither leads nor joins a shared fetch: whichever
+        // validator went out would otherwise decide the answer for both.
+        // Contains, not IfNoneMatch.Count, so an unparsable caller value counts.
+        FetchResult result = _options.CoalesceConcurrentRequests && !request.Headers.Contains("If-None-Match")
             ? await FetchCoalescedAsync(key, request, cached, timeToLive, cancellationToken).ConfigureAwait(false)
             : await FetchAsync(key, request, cached, timeToLive, cancellationToken).ConfigureAwait(false);
 
@@ -294,29 +298,46 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
     }
 
     /// <summary>Removes, and forgets, the tag an earlier send of this message added.</summary>
+    /// <remarks>
+    /// Ours is the exact instance we added — the collection keeps the instances
+    /// it is given — so a caller's textually identical tag is never taken for
+    /// it. <see cref="HttpHeaderValueCollection{T}.Remove"/> matches by
+    /// <c>Equals</c> and could take the caller's, so every equal value comes off
+    /// and the caller's are put back.
+    /// </remarks>
     private static void RemoveAddedETag(HttpRequestMessage request)
     {
 #if NET5_0_OR_GREATER
-        HttpRequestOptionsKey<string> key = new(AddedETagKey);
-        _ = request.Options.TryGetValue(key, out string? added);
+        HttpRequestOptionsKey<EntityTagHeaderValue> key = new(AddedETagKey);
+        _ = request.Options.TryGetValue(key, out EntityTagHeaderValue? added);
         ((IDictionary<string, object?>)request.Options).Remove(AddedETagKey);
 #else
         _ = request.Properties.TryGetValue(AddedETagKey, out object? value);
         _ = request.Properties.Remove(AddedETagKey);
-        string? added = value as string;
+        EntityTagHeaderValue? added = value as EntityTagHeaderValue;
 #endif
-        EntityTagHeaderValue? stale = request.Headers.IfNoneMatch.FirstOrDefault(
-            t => string.Equals(t.ToString(), added, StringComparison.Ordinal));
-        if (stale is not null)
+        HttpHeaderValueCollection<EntityTagHeaderValue> tags = request.Headers.IfNoneMatch;
+        if (added is null || !tags.Any(t => ReferenceEquals(t, added)))
         {
-            request.Headers.IfNoneMatch.Remove(stale);
+            return;
+        }
+
+        List<EntityTagHeaderValue> callers = [.. tags.Where(t => !ReferenceEquals(t, added) && t.Equals(added))];
+        for (int i = 0; i <= callers.Count; i++)
+        {
+            _ = tags.Remove(added);
+        }
+
+        foreach (EntityTagHeaderValue tag in callers)
+        {
+            tags.Add(tag);
         }
     }
 
-    private static void SetAddedETag(HttpRequestMessage request, string etag)
+    private static void SetAddedETag(HttpRequestMessage request, EntityTagHeaderValue etag)
     {
 #if NET5_0_OR_GREATER
-        request.Options.Set(new HttpRequestOptionsKey<string>(AddedETagKey), etag);
+        request.Options.Set(new HttpRequestOptionsKey<EntityTagHeaderValue>(AddedETagKey), etag);
 #else
         request.Properties[AddedETagKey] = etag;
 #endif
@@ -345,14 +366,14 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         string? ourETag = cached?.ETag is { Length: > 0 } e ? e : null;
         bool callerValidator = request.Headers.IfNoneMatch.Any(t => !SameTag(t.ToString(), ourETag));
 
-        // Remembered in the header's normalised form, so a later send removes
-        // exactly the tag that went into the collection.
+        // The instance itself is remembered, so a later send removes exactly the
+        // value that went into the collection and never the caller's twin.
         if (!callerWildcard
             && EntityTagHeaderValue.TryParse(ourETag, out EntityTagHeaderValue? ours)
             && !request.Headers.IfNoneMatch.Any(t => SameTag(t.ToString(), ourETag)))
         {
             request.Headers.IfNoneMatch.Add(ours);
-            SetAddedETag(request, ours.ToString());
+            SetAddedETag(request, ours);
         }
 
         // Not disposed with `using`: a non-cacheable response is returned to the

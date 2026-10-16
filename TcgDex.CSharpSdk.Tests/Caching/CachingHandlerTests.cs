@@ -2,6 +2,7 @@ namespace TcgDex.Tests.Caching;
 
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using TcgDex.Caching;
@@ -357,6 +358,44 @@ public sealed class CachingHandlerTests
         inner.Requests[3].Headers.IfNoneMatch.ToString().ShouldBe("\"b\"");
         body.ShouldBe("""{"id":"old"}""");
         handler.Revalidations.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task AResentRequest_KeepsTheCallersTagIdenticalToOurs()
+    {
+        // Between sends the caller puts its own "a" ahead of the "a" we added.
+        // Matching by text removed the first "a" found — the caller's. Only the
+        // instance we added is ours (owner: "only remove our own value").
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, MemoryTcgDexResponseCache cache, CountingHandler inner) = BuildSeeded(time);
+        await SeedAsync(cache, time, "\"a\"");
+        time.Advance(TimeSpan.FromMinutes(10));
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+
+        using HttpMessageInvoker invoker = new(handler);
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        (await invoker.SendAsync(request, CancellationToken.None)).Dispose();
+
+        EntityTagHeaderValue callers = new("\"a\"");
+        List<EntityTagHeaderValue> ours = [.. request.Headers.IfNoneMatch];
+        request.Headers.IfNoneMatch.Clear();
+        request.Headers.IfNoneMatch.Add(callers);
+        foreach (EntityTagHeaderValue tag in ours)
+        {
+            request.Headers.IfNoneMatch.Add(tag);
+        }
+
+        // Precondition: the collection keeps the instances it is given, on
+        // every TFM — otherwise there is no "ours" to tell apart.
+        request.Headers.IfNoneMatch.ShouldContain(t => ReferenceEquals(t, callers));
+        request.Headers.IfNoneMatch.ShouldContain(t => ReferenceEquals(t, ours[0]));
+
+        time.Advance(TimeSpan.FromMinutes(10));
+        (await invoker.SendAsync(request, CancellationToken.None)).Dispose();
+
+        request.Headers.IfNoneMatch.ShouldContain(t => ReferenceEquals(t, callers));
+        inner.Requests[1].Headers.IfNoneMatch.ToString().ShouldBe("\"a\"");
     }
 
     /// <summary>A handler over a cache the test seeds directly, as a custom cache could.</summary>

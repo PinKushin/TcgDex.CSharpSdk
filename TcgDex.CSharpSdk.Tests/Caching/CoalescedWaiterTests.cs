@@ -125,6 +125,89 @@ public sealed class CoalescedWaiterTests
     }
 
     [Test]
+    public async Task ARequestWithItsOwnValidator_IsNotCoalescedWithAPlainOne()
+    {
+        // B (plain) leads; A carries If-None-Match "x". Joining B's fetch handed
+        // A the cached 200 that B's validator earned, though A asked about "x".
+        FakeTimeProvider time = new();
+        ValidatorHandler inner = new();
+        TcgDexCachingHandler caching = new(
+            new MemoryTcgDexResponseCache(timeProvider: time),
+            new TcgDexCacheOptions { CoalesceConcurrentRequests = true },
+            time)
+        {
+            InnerHandler = inner,
+        };
+
+        using HttpClient client = new(caching);
+        (await client.GetAsync(Card, CancellationToken.None)).Dispose();
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        Task<HttpResponseMessage> b = client.GetAsync(Card, CancellationToken.None);
+        await inner.Arrived.Task;
+
+        using HttpRequestMessage withValidator = new(HttpMethod.Get, Card);
+        withValidator.Headers.IfNoneMatch.ParseAdd("\"x\"");
+        Task<HttpResponseMessage> a = client.SendAsync(withValidator, CancellationToken.None);
+
+        inner.Release.SetResult(true);
+
+        using HttpResponseMessage aResponse = await a;
+        using HttpResponseMessage bResponse = await b;
+
+        aResponse.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        bResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await bResponse.Content.ReadAsStringAsync(CancellationToken.None)).ShouldBe(Body);
+        inner.Requests.ShouldBe(3, "priming, then one upstream request each");
+    }
+
+    private const string Body = """{"id":"swsh3-136","name":"Furret"}""";
+
+    /// <summary>
+    /// 200 "a" first; then a 304 "x" for a request carrying "x", and a gated
+    /// 304 "a" for a plain revalidation.
+    /// </summary>
+    private sealed class ValidatorHandler : HttpMessageHandler
+    {
+        private int _requests;
+
+        internal TaskCompletionSource<bool> Arrived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal TaskCompletionSource<bool> Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal int Requests => Volatile.Read(ref _requests);
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _requests) == 1)
+            {
+                HttpResponseMessage first = new(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(Body, System.Text.Encoding.UTF8, "application/json"),
+                };
+                first.Headers.ETag = new("\"a\"");
+                return first;
+            }
+
+            if (request.Headers.IfNoneMatch.Any(t => t.Tag == "\"x\""))
+            {
+                HttpResponseMessage notModified = new(HttpStatusCode.NotModified);
+                notModified.Headers.ETag = new("\"x\"");
+                return notModified;
+            }
+
+            Arrived.TrySetResult(true);
+            await Release.Task.ConfigureAwait(false);
+
+            HttpResponseMessage revalidated = new(HttpStatusCode.NotModified);
+            revalidated.Headers.ETag = new("\"a\"");
+            return revalidated;
+        }
+    }
+
+    [Test]
     public async Task AWaiterCanStopWaiting()
     {
         // Awaiting the shared task bare made a waiter's own cancellation

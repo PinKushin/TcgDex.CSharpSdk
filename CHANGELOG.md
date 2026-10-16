@@ -37,6 +37,9 @@ something an application can observe — those live in the commit history.
   request message sent again after the cached `ETag` changed carries only the current one.
 - `TcgDexCachingHandler` no longer adds its `ETag` beside a caller's `If-None-Match: *`, which
   produced an invalid header; a `304` answering `*` is returned to the caller untouched.
+- With `CoalesceConcurrentRequests`, a request carrying its own `If-None-Match` is no longer
+  merged with a concurrent request for the same URL, so it gets the answer to its own validator
+  rather than the other request's.
 - A request cancelled by the HTTP pipeline, such as a shorter `HttpClient.Timeout`, now throws
   `TcgDexApiException` saying so, instead of reporting that `TcgDexOptions.Timeout` expired. The
   "timed out" message is reserved for the SDK's own timeout.
