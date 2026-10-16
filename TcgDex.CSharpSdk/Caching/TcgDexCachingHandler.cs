@@ -280,22 +280,30 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         // message again, and adding each time sent the validator twice. Any
         // validator the caller set is theirs and stays (owner: "only remove our
         // own value").
-        if (cached?.ETag is { Length: > 0 } etag
-            && !request.Headers.IfNoneMatch.Any(t => string.Equals(t.ToString(), etag, StringComparison.Ordinal)))
+        string? ourETag = cached?.ETag is { Length: > 0 } e ? e : null;
+        bool callerValidator = request.Headers.IfNoneMatch.Any(
+            t => !string.Equals(t.ToString(), ourETag, StringComparison.Ordinal));
+
+        if (ourETag is not null
+            && !request.Headers.IfNoneMatch.Any(t => string.Equals(t.ToString(), ourETag, StringComparison.Ordinal)))
         {
-            request.Headers.IfNoneMatch.TryParseAdd(etag);
+            request.Headers.IfNoneMatch.TryParseAdd(ourETag);
         }
 
         // Not disposed with `using`: a non-cacheable response is returned to the
         // caller, who owns it from then on.
         HttpResponseMessage response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        string? renewedETag = response.Headers.ETag?.ToString();
 
-        if (response.StatusCode == HttpStatusCode.NotModified && cached is not null)
+        // A 304 is ours only if it cannot be validating the caller's copy: with
+        // no caller validator every 304 answers our ETag, so a new ETag on it
+        // renews ours (RFC 7232 §4.1); with one, only a 304 naming our cached
+        // ETag is ours, and a different or absent ETag goes back untouched.
+        if (response.StatusCode == HttpStatusCode.NotModified && cached is not null
+            && (!callerValidator || string.Equals(renewedETag, cached.ETag, StringComparison.Ordinal)))
         {
-            // RFC 7232 §4.1: a 304 may carry an updated validator. Taking it
-            // also moves the transport's parsed-model cache, which is keyed by
-            // this same ETag, onto the new value.
-            string? renewedETag = response.Headers.ETag?.ToString();
+            // Taking a renewed ETag also moves the transport's parsed-model
+            // cache, which is keyed by this same ETag, onto the new value.
             response.Dispose();
             Interlocked.Increment(ref _revalidations);
 
@@ -307,6 +315,12 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             await _cache.SetAsync(key, refreshed, timeToLive, cancellationToken).ConfigureAwait(false);
 
             return FetchResult.FromCache(refreshed);
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotModified)
+        {
+            // The caller's 304: neither served from nor evicted from our entry.
+            return FetchResult.FromResponse(response);
         }
 
         if (!response.IsSuccessStatusCode)

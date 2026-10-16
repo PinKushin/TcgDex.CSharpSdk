@@ -188,6 +188,57 @@ public sealed class CachingHandlerTests
         sent.ShouldBe(["\"x\"", Etag], ignoreOrder: true);
     }
 
+    [Test]
+    public async Task A304ValidatingTheCallersETag_IsPassedThroughNotServedFromCache()
+    {
+        // The caller's "x" and our stale "a" go out together. A 304 naming "x"
+        // validates the caller's copy, not ours: serving "a"'s body would hand
+        // back a stale representation as current.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"x\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("\"x\"");
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        (await response.Content.ReadAsStringAsync(CancellationToken.None)).ShouldBeEmpty();
+        handler.Revalidations.ShouldBe(0);
+
+        // The entry is untouched: still stale, still validated by "a".
+        string next = await GetAsync(client);
+        inner.Requests[2].Headers.IfNoneMatch.ToString().ShouldBe("\"a\"");
+        next.ShouldBe("""{"id":"old"}""");
+    }
+
+    [Test]
+    public async Task A304WithoutETag_WhenTheCallerAlsoSentOne_IsPassedThrough()
+    {
+        // Ambiguous: it may validate the caller's copy rather than ours.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", null);
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("\"x\"");
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        handler.Revalidations.ShouldBe(0);
+    }
+
     /// <summary>A cache whose eviction fails.</summary>
     private sealed class ThrowingRemoveCache : ITcgDexResponseCache
     {
