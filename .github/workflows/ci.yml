@@ -269,7 +269,8 @@ jobs:
       #
       # Measured 2026-10-15 locally: net10.0 560, net8.0 559, net472 554, offline 11.
       # Raised by six: the fifth review round's wildcard, normalised-tag,
-      # fresh-resend, empty-ETag and unparsable-ETag caching tests.
+      # non-canonical resend, fresh-resend, empty-ETag and unparsable-ETag
+      # caching tests.
       # Windows now runs all three frameworks; LogFilePrefix writes one
       # framework-tests_<tfm>_<timestamp>.trx per framework.
       - name: ubuntu net10.0 unit tests
