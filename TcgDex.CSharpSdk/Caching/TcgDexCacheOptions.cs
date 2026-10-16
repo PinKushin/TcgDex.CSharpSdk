@@ -5,13 +5,13 @@ namespace TcgDex.Caching;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The API sends <c>Cache-Control: no-cache, no-store, must-revalidate</c>, so
-/// nothing caches by default. Enabling this cache knowingly overrides that
-/// header: entries are kept and served within the freshness window, then
-/// revalidated with <c>If-None-Match</c>, so a resource that has not changed
-/// costs a <c>304</c> and zero bytes of body. Time-to-live therefore controls
-/// how long you are willing to serve data without asking, not how long before
-/// you pay for it again.
+/// The API sends <c>Cache-Control: no-cache, no-store, must-revalidate</c>,
+/// which is aimed at shared and intermediary caches. This SDK's cache is an
+/// opt-in, application-level cache: it keeps entries for the freshness window
+/// and then revalidates them with <c>If-None-Match</c>, which the API answers
+/// with <c>304</c> and no body when nothing changed. Time-to-live therefore
+/// controls how long you are willing to serve data without asking, not how long
+/// before you pay for it again.
 /// </para>
 /// <para>
 /// Not sealed: <see cref="GetTimeToLive"/> is the extension point for a caller
