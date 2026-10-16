@@ -31,9 +31,10 @@ something an application can observe — those live in the commit history.
 - On REST requests, a body that fails to read, or is not valid JSON, is now logged and marks the
   request's `Activity` as failed, like other failures.
 - `TcgDexCachingHandler` keeps an `If-None-Match` the caller set, adding its own `ETag` beside it,
-  instead of replacing it. A `304 Not Modified` is served from the cache only when it validates the
-  cached `ETag`; one answering the caller's validator (or carrying no `ETag` beside it) is returned
-  to the caller untouched, rather than serving the stale cached body as current.
+  instead of replacing it. A `304 Not Modified` is served from the cache when the caller sent no
+  validator of their own, or when the 304 names the cached `ETag` (weak or strong form); otherwise
+  it is returned to the caller untouched, rather than serving the stale cached body as current. A
+  request message sent again after the cached `ETag` changed carries only the current one.
 - A request cancelled by the HTTP pipeline, such as a shorter `HttpClient.Timeout`, now throws
   `TcgDexApiException` saying so, instead of reporting that `TcgDexOptions.Timeout` expired. The
   "timed out" message is reserved for the SDK's own timeout.

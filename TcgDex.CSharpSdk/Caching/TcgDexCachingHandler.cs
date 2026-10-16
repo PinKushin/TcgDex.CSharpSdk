@@ -266,6 +266,50 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
 #endif
     }
 
+    private const string AddedETagKey = "TcgDex.CachingHandler.AddedETag";
+
+    /// <summary>
+    /// Weak comparison (RFC 9110 §13.1.2 / §8.8.3.2), which If-None-Match uses: <c>W/"a"</c>
+    /// and <c>"a"</c> match. An absent tag never matches anything, so a 304
+    /// without an ETag is not tied to an entry stored without one.
+    /// </summary>
+    private static bool SameTag(string? a, string? b)
+    {
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
+        {
+            return false;
+        }
+
+        return EntityTagHeaderValue.TryParse(a, out EntityTagHeaderValue? x)
+            && EntityTagHeaderValue.TryParse(b, out EntityTagHeaderValue? y)
+                ? string.Equals(x.Tag, y.Tag, StringComparison.Ordinal)
+                : string.Equals(a, b, StringComparison.Ordinal);
+    }
+
+    /// <summary>Reads and clears the tag an earlier send of this message added.</summary>
+    private static string? TakeAddedETag(HttpRequestMessage request)
+    {
+#if NET5_0_OR_GREATER
+        HttpRequestOptionsKey<string> key = new(AddedETagKey);
+        _ = request.Options.TryGetValue(key, out string? added);
+        ((IDictionary<string, object?>)request.Options).Remove(AddedETagKey);
+        return added;
+#else
+        _ = request.Properties.TryGetValue(AddedETagKey, out object? added);
+        _ = request.Properties.Remove(AddedETagKey);
+        return added as string;
+#endif
+    }
+
+    private static void SetAddedETag(HttpRequestMessage request, string etag)
+    {
+#if NET5_0_OR_GREATER
+        request.Options.Set(new HttpRequestOptionsKey<string>(AddedETagKey), etag);
+#else
+        request.Properties[AddedETagKey] = etag;
+#endif
+    }
+
     private async Task<FetchResult> FetchAsync(
         string key,
         HttpRequestMessage request,
@@ -280,14 +324,26 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         // message again, and adding each time sent the validator twice. Any
         // validator the caller set is theirs and stays (owner: "only remove our
         // own value").
+        //
+        // A re-sent message still carries the tag an earlier send added, which
+        // may no longer be our ETag; it is removed first so it is never
+        // mistaken for the caller's.
+        string? previouslyAdded = TakeAddedETag(request);
+        EntityTagHeaderValue? stale = request.Headers.IfNoneMatch.FirstOrDefault(
+            t => string.Equals(t.ToString(), previouslyAdded, StringComparison.Ordinal));
+        if (stale is not null)
+        {
+            request.Headers.IfNoneMatch.Remove(stale);
+        }
+
         string? ourETag = cached?.ETag is { Length: > 0 } e ? e : null;
-        bool callerValidator = request.Headers.IfNoneMatch.Any(
-            t => !string.Equals(t.ToString(), ourETag, StringComparison.Ordinal));
+        bool callerValidator = request.Headers.IfNoneMatch.Any(t => !SameTag(t.ToString(), ourETag));
 
         if (ourETag is not null
-            && !request.Headers.IfNoneMatch.Any(t => string.Equals(t.ToString(), ourETag, StringComparison.Ordinal)))
+            && !request.Headers.IfNoneMatch.Any(t => SameTag(t.ToString(), ourETag))
+            && request.Headers.IfNoneMatch.TryParseAdd(ourETag))
         {
-            request.Headers.IfNoneMatch.TryParseAdd(ourETag);
+            SetAddedETag(request, ourETag);
         }
 
         // Not disposed with `using`: a non-cacheable response is returned to the
@@ -297,10 +353,10 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
 
         // A 304 is ours only if it cannot be validating the caller's copy: with
         // no caller validator every 304 answers our ETag, so a new ETag on it
-        // renews ours (RFC 7232 §4.1); with one, only a 304 naming our cached
+        // renews ours (RFC 9110 §15.4.5); with one, only a 304 naming our cached
         // ETag is ours, and a different or absent ETag goes back untouched.
         if (response.StatusCode == HttpStatusCode.NotModified && cached is not null
-            && (!callerValidator || string.Equals(renewedETag, cached.ETag, StringComparison.Ordinal)))
+            && (!callerValidator || SameTag(renewedETag, cached.ETag)))
         {
             // Taking a renewed ETag also moves the transport's parsed-model
             // cache, which is keyed by this same ETag, onto the new value.
