@@ -2,8 +2,8 @@
 
 **Goal: reach and hold ~100% line coverage of hand-written SDK code.**
 
-**Current (2026-10-15, all three target frameworks merged): 99.73% line (1478/1482) and 95.74%
-branch (539/563).** Both are gated in CI across every target framework since 0.6.3. The earlier
+**Current (2026-10-15, all three target frameworks merged): 99.74% line (1508/1512) and 95.71%
+branch (558/583).** Both are gated in CI across every target framework since 0.6.3. The earlier
 figures below were measured on net10.0 alone. The 4 uncovered lines, as `Check-Coverage.ps1`
 names them: `ExpressionTranslator.cs` 293–294 (provably unreachable — see
 [Why not 100%](#why-not-100) below), `TcgDexCachingHandler.cs` 262 (the coalesced waiter's
@@ -12,10 +12,10 @@ cancellation on the `netstandard2.0` build) and `BoundedLru.cs` 175 (a lost-race
 | | Line | Branch | Unit tests | Integration tests |
 |---|---|---|---|---|
 | Baseline (`f45e496`) | 83.2% | — | 113 | 22 |
-| Now | **99.73%** | **95.74%** | **543** (net10.0) | **149** |
+| Now | **99.74%** | **95.71%** | **550** (net10.0) | **149** |
 
-The unit tests run on `net472`, `net8.0` and `net10.0` — 1622 executions (543,
-542 and 537 per framework). Coverage is collected from all three runs and
+The unit tests run on `net472`, `net8.0` and `net10.0` — 1643 executions (550,
+549 and 544 per framework). Coverage is collected from all three runs and
 merged: the `net472` run produces its own cobertura file, so code compiled
 solely for `netstandard2.0` is measured by the gate too.
 

@@ -27,6 +27,39 @@ public sealed class LoggingTests
         return (client, log);
     }
 
+    /// <summary>Never answers; completes only by being cancelled.</summary>
+    private sealed class HangingHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            TaskCompletionSource<HttpResponseMessage> never =
+                new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            using (cancellationToken.Register(() => never.TrySetCanceled(cancellationToken)))
+            {
+                return await never.Task.ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A client whose SDK budget (200 ms) is the only limit, so the timeout it
+    /// reports is genuinely the SDK's. A handler throwing TaskCanceledException
+    /// is the pipeline cancelling, not the budget.
+    /// </summary>
+    private static (TcgDexClient Client, RecordingLogger Log) BuildTimingOut()
+    {
+        RecordingLogger log = new(LogLevel.Trace);
+        TcgDexClient client = new(
+            new HttpClient(new HangingHandler()) { Timeout = Timeout.InfiniteTimeSpan },
+            new TcgDexOptions { Timeout = TimeSpan.FromMilliseconds(200) },
+            log.Factory);
+
+        return (client, log);
+    }
+
     [Test]
     public void AnHttpBaseAddress_WarnsThatTrafficIsPlaintext()
     {
@@ -133,15 +166,31 @@ public sealed class LoggingTests
     {
         // Warning rather than Error: a timeout is usually transient and the
         // caller may well retry.
-        RecordingHandler handler = new RecordingHandler()
-            .RespondWith(_ => throw new TaskCanceledException("timed out"));
-
-        (TcgDexClient? client, RecordingLogger? log) = Build(handler);
+        (TcgDexClient client, RecordingLogger log) = BuildTimingOut();
+        using TcgDexClient _ = client;
 
         Should.ThrowAsync<TcgDexApiException>(async () =>
             await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Wait();
 
         log.Entries.ShouldContain(e => e.EventId == 1005 && e.Level == LogLevel.Warning);
+    }
+
+    [Test]
+    public void APipelineCancellation_LogsOnceAsAnErrorNotATimeout()
+    {
+        // Not the SDK's budget, so not the "timed out" event: that would name a
+        // limit the caller never reached.
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWith(_ => throw new TaskCanceledException("cancelled"));
+
+        (TcgDexClient client, RecordingLogger log) = Build(handler);
+
+        Should.ThrowAsync<TcgDexApiException>(async () =>
+            await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Wait();
+
+        log.Entries.Where(e => e.EventId == 1004).ShouldHaveSingleItem()
+            .Exception.ShouldBeOfType<TaskCanceledException>();
+        log.Entries.ShouldNotContain(e => e.EventId == 1005);
     }
 
     [Test]
@@ -330,10 +379,8 @@ public sealed class LoggingTests
         (ActivityListener? listener, List<Activity>? recorded) = ListenForActivities();
         using ActivityListener _ = listener;
 
-        RecordingHandler handler = new RecordingHandler()
-            .RespondWith(_ => throw new TaskCanceledException("timed out"));
-
-        (TcgDexClient? client, RecordingLogger _) = Build(handler);
+        (TcgDexClient client, RecordingLogger _) = BuildTimingOut();
+        using TcgDexClient __ = client;
 
         Should.ThrowAsync<TcgDexApiException>(async () =>
             await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Wait();

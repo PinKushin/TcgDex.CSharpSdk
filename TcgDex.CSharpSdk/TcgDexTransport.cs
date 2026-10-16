@@ -134,11 +134,27 @@ internal sealed class TcgDexTransport
         {
             return await GetUnderBudgetAsync<T>(uri, activity, timestamp, deadline).ConfigureAwait(false);
         }
-        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException ex)
+            when (!cancellationToken.IsCancellationRequested || ex.CancellationToken != cancellationToken)
         {
-            // Cancellation requested by the caller is theirs to observe; this
-            // branch is specifically the SDK's own timeout, which is a fault.
-            throw TimedOut(uri, activity, ex);
+            // Three owners, three outcomes. The caller's cancellation stays
+            // theirs, re-issued on their token so `when (ex.CancellationToken ==
+            // mine)` matches; only the SDK's budget firing is "timed out"; any
+            // other canceller (HttpClient.Timeout, a handler) must not name a
+            // limit that was never reached.
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw RequestBudget.CallerCancelled(ex, cancellationToken);
+            }
+
+            if (budget?.IsCancellationRequested == true)
+            {
+                throw TimedOut(uri, activity, ex);
+            }
+
+            _logger.RequestErrored(ex, uri);
+            TcgDexActivity.RecordFailure(activity, ex);
+            throw RequestBudget.PipelineCancelled(uri, ex);
         }
     }
 

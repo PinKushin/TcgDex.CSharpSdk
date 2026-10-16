@@ -28,10 +28,17 @@ something an application can observe — those live in the commit history.
 - A GraphQL error response now reports its status code even when its body resets or is too large.
 - Cancelling a request now always surfaces as `OperationCanceledException`, including on a
   platform that reports the cancelled body read as an `IOException`.
-- A body that fails to read, or is not valid JSON, is now logged and marks the request's
-  `Activity` as failed, like other failures.
+- On REST requests, a body that fails to read, or is not valid JSON, is now logged and marks the
+  request's `Activity` as failed, like other failures.
 - `TcgDexCachingHandler` keeps an `If-None-Match` the caller set, adding its own `ETag` beside it,
-  instead of replacing it.
+  instead of replacing it. A `304 Not Modified` is served from the cache only when it validates the
+  cached `ETag`; one answering the caller's validator (or carrying no `ETag` beside it) is returned
+  to the caller untouched, rather than serving the stale cached body as current.
+- A request cancelled by the HTTP pipeline, such as a shorter `HttpClient.Timeout`, now throws
+  `TcgDexApiException` saying so, instead of reporting that `TcgDexOptions.Timeout` expired. The
+  "timed out" message is reserved for the SDK's own timeout.
+- When the caller cancels a request, the `OperationCanceledException` now carries the caller's own
+  token, so `catch (OperationCanceledException ex) when (ex.CancellationToken == token)` matches.
 - An error response (such as a 500) whose body stalls past `TcgDexOptions.Timeout` now throws
   `TcgDexApiException` (timed out) instead of a raw cancellation exception.
 - `TcgDexCachingHandler` now stores the new `ETag` when a `304 Not Modified` carries one, so the

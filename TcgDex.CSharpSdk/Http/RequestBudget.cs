@@ -52,4 +52,25 @@ internal static class RequestBudget
 
         return source;
     }
+
+    /// <summary>
+    /// The caller's cancellation, re-issued on the caller's token: the one that
+    /// escaped carries the linked deadline's, which no caller can compare with.
+    /// </summary>
+    internal static OperationCanceledException CallerCancelled(
+        OperationCanceledException ex,
+        CancellationToken cancellationToken)
+        => new(ex.Message, ex, cancellationToken);
+
+    /// <summary>
+    /// A cancellation neither the caller nor the SDK's budget asked for — an
+    /// <see cref="HttpClient.Timeout"/> or a handler. Naming
+    /// <see cref="TcgDexOptions.Timeout"/> here would send the reader to raise a
+    /// limit that was never reached.
+    /// </summary>
+    internal static TcgDexApiException PipelineCancelled(Uri uri, OperationCanceledException ex)
+        => new(
+            $"The request to '{uri}' was cancelled by the HTTP pipeline " +
+            "(for example HttpClient.Timeout).",
+            ex);
 }
