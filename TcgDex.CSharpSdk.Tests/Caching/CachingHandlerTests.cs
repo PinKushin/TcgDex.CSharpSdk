@@ -359,6 +359,158 @@ public sealed class CachingHandlerTests
         handler.Revalidations.ShouldBe(2);
     }
 
+    /// <summary>A handler over a cache the test seeds directly, as a custom cache could.</summary>
+    private static (TcgDexCachingHandler Handler, MemoryTcgDexResponseCache Cache, CountingHandler Inner) BuildSeeded(
+        FakeTimeProvider time)
+    {
+        CountingHandler inner = new();
+        MemoryTcgDexResponseCache cache = new(timeProvider: time);
+        TcgDexCachingHandler handler = new(cache, new TcgDexCacheOptions(), time) { InnerHandler = inner };
+        return (handler, cache, inner);
+    }
+
+    private static ValueTask SeedAsync(MemoryTcgDexResponseCache cache, FakeTimeProvider time, string? etag)
+        => cache.SetAsync(
+            CardUrl,
+            new CachedResponse { Body = "{\"id\":\"old\"}"u8.ToArray(), ETag = etag, StoredAt = time.GetUtcNow() },
+            TimeSpan.FromHours(1));
+
+    [Test]
+    public async Task ACallersWildcardIfNoneMatch_IsSentAlone_AndIts304PassesThrough()
+    {
+        // RFC 9110 §13.1.2: If-None-Match is "*" / #entity-tag, never both.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("*");
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        inner.Requests[1].Headers.GetValues("If-None-Match").ShouldBe(["*"]);
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        handler.Revalidations.ShouldBe(0);
+
+        // Untouched: still stale, still validated by "a".
+        (await GetAsync(client)).ShouldBe("""{"id":"old"}""");
+        inner.Requests[2].Headers.IfNoneMatch.ToString().ShouldBe("\"a\"");
+    }
+
+    [Test]
+    public async Task AResentRequest_WithANonCanonicalCachedETag_DropsTheOldTagWeAdded()
+    {
+        // " \"a\"" is stored as a custom cache might hold it; the header
+        // normalises it to "\"a\"", so removing by the raw string missed it.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, MemoryTcgDexResponseCache cache, CountingHandler inner) = BuildSeeded(time);
+        await SeedAsync(cache, time, " \"a\"");
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpClient client = new(new ResendAfterHookHandler(async () =>
+        {
+            await SeedAsync(cache, time, "\"b\"");
+            time.Advance(TimeSpan.FromMinutes(10));
+        })
+        {
+            InnerHandler = handler,
+        });
+
+        inner.Throw(new HttpRequestException("reset"));
+        inner.Respond(HttpStatusCode.NotModified, "", "\"b\"");
+
+        await GetAsync(client);
+
+        inner.Requests[1].Headers.IfNoneMatch.ToString().ShouldBe("\"b\"");
+    }
+
+    [Test]
+    public async Task AResentRequest_ServedFresh_NoLongerCarriesTheTagWeAdded()
+    {
+        // The first send added "a"; the resend is a fresh hit and never fetches,
+        // so only clearing on every path takes "a" back off the message.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, MemoryTcgDexResponseCache cache, CountingHandler inner) = BuildSeeded(time);
+        await SeedAsync(cache, time, "\"a\"");
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpClient client = new(new ResendAfterHookHandler(() => SeedAsync(cache, time, "\"b\"").AsTask())
+        {
+            InnerHandler = handler,
+        });
+
+        inner.Throw(new HttpRequestException("reset"));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        inner.Requests.Count.ShouldBe(1);
+        handler.FreshHits.ShouldBe(1);
+        request.Headers.IfNoneMatch.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task AnEntryStoredWithAnEmptyETag_IsRefetchedWithoutAValidator()
+    {
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, MemoryTcgDexResponseCache cache, CountingHandler inner) = BuildSeeded(time);
+        await SeedAsync(cache, time, "");
+        time.Advance(TimeSpan.FromMinutes(10));
+        inner.Respond(HttpStatusCode.OK, """{"id":"new"}""", null);
+
+        using HttpClient client = new(handler);
+        string body = await GetAsync(client);
+
+        inner.Requests[0].Headers.IfNoneMatch.ShouldBeEmpty();
+        body.ShouldBe("""{"id":"new"}""");
+    }
+
+    [Test]
+    public async Task AnUnparsableStoredETag_IsNeverSent_AndNeverMatchesA304()
+    {
+        // "abc" has no quotes, so it is not an entity-tag. It cannot be added to
+        // If-None-Match, and the caller's 304 is not ours.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, MemoryTcgDexResponseCache cache, CountingHandler inner) = BuildSeeded(time);
+        await SeedAsync(cache, time, "abc");
+        time.Advance(TimeSpan.FromMinutes(10));
+        inner.Respond(HttpStatusCode.NotModified, "", "\"x\"");
+
+        using HttpClient client = new(handler);
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("\"x\"");
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        inner.Requests[0].Headers.GetValues("If-None-Match").ShouldBe(["\"x\""]);
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        handler.Revalidations.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task AnUnparsableCallerIfNoneMatch_IsKeptBesideOurs()
+    {
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler _, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.TryAddWithoutValidation("If-None-Match", "abc").ShouldBeTrue();
+        using HttpResponseMessage _ = await client.SendAsync(request, CancellationToken.None);
+
+        string.Join(",", inner.Requests[1].Headers.GetValues("If-None-Match")).ShouldContain("abc");
+        string.Join(",", inner.Requests[1].Headers.GetValues("If-None-Match")).ShouldContain("\"a\"");
+    }
+
     /// <summary>A cache whose eviction fails.</summary>
     private sealed class ThrowingRemoveCache : ITcgDexResponseCache
     {

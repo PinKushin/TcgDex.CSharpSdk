@@ -35,6 +35,8 @@ something an application can observe — those live in the commit history.
   validator of their own, or when the 304 names the cached `ETag` (weak or strong form); otherwise
   it is returned to the caller untouched, rather than serving the stale cached body as current. A
   request message sent again after the cached `ETag` changed carries only the current one.
+- `TcgDexCachingHandler` no longer adds its `ETag` beside a caller's `If-None-Match: *`, which
+  produced an invalid header; a `304` answering `*` is returned to the caller untouched.
 - A request cancelled by the HTTP pipeline, such as a shorter `HttpClient.Timeout`, now throws
   `TcgDexApiException` saying so, instead of reporting that `TcgDexOptions.Timeout` expired. The
   "timed out" message is reserved for the SDK's own timeout.

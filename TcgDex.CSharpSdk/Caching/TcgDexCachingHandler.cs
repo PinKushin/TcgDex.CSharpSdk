@@ -109,6 +109,12 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
     {
         Guard.NotNull(request);
 
+        // A re-sent message still carries the tag an earlier send added, which
+        // may no longer be our ETag. It comes off on every path — a fresh hit
+        // or a non-GET would otherwise leave it on the message — and before any
+        // check, so it is never mistaken for the caller's.
+        RemoveAddedETag(request);
+
         if (request.Method != HttpMethod.Get || request.RequestUri is null)
         {
             return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -280,25 +286,31 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             return false;
         }
 
+        // An unparsable tag is not an entity-tag, so it matches nothing — not
+        // even an identical string.
         return EntityTagHeaderValue.TryParse(a, out EntityTagHeaderValue? x)
             && EntityTagHeaderValue.TryParse(b, out EntityTagHeaderValue? y)
-                ? string.Equals(x.Tag, y.Tag, StringComparison.Ordinal)
-                : string.Equals(a, b, StringComparison.Ordinal);
+            && string.Equals(x.Tag, y.Tag, StringComparison.Ordinal);
     }
 
-    /// <summary>Reads and clears the tag an earlier send of this message added.</summary>
-    private static string? TakeAddedETag(HttpRequestMessage request)
+    /// <summary>Removes, and forgets, the tag an earlier send of this message added.</summary>
+    private static void RemoveAddedETag(HttpRequestMessage request)
     {
 #if NET5_0_OR_GREATER
         HttpRequestOptionsKey<string> key = new(AddedETagKey);
         _ = request.Options.TryGetValue(key, out string? added);
         ((IDictionary<string, object?>)request.Options).Remove(AddedETagKey);
-        return added;
 #else
-        _ = request.Properties.TryGetValue(AddedETagKey, out object? added);
+        _ = request.Properties.TryGetValue(AddedETagKey, out object? value);
         _ = request.Properties.Remove(AddedETagKey);
-        return added as string;
+        string? added = value as string;
 #endif
+        EntityTagHeaderValue? stale = request.Headers.IfNoneMatch.FirstOrDefault(
+            t => string.Equals(t.ToString(), added, StringComparison.Ordinal));
+        if (stale is not null)
+        {
+            request.Headers.IfNoneMatch.Remove(stale);
+        }
     }
 
     private static void SetAddedETag(HttpRequestMessage request, string etag)
@@ -325,25 +337,22 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         // validator the caller set is theirs and stays (owner: "only remove our
         // own value").
         //
-        // A re-sent message still carries the tag an earlier send added, which
-        // may no longer be our ETag; it is removed first so it is never
-        // mistaken for the caller's.
-        string? previouslyAdded = TakeAddedETag(request);
-        EntityTagHeaderValue? stale = request.Headers.IfNoneMatch.FirstOrDefault(
-            t => string.Equals(t.ToString(), previouslyAdded, StringComparison.Ordinal));
-        if (stale is not null)
-        {
-            request.Headers.IfNoneMatch.Remove(stale);
-        }
-
+        // A caller's `*` is never combined with ours: the grammar is
+        // "*" / #entity-tag (RFC 9110 §13.1.2), and a 304 answering `*` says
+        // nothing about our copy.
+        bool callerWildcard = request.Headers.IfNoneMatch.Any(
+            t => string.Equals(t.Tag, "*", StringComparison.Ordinal));
         string? ourETag = cached?.ETag is { Length: > 0 } e ? e : null;
         bool callerValidator = request.Headers.IfNoneMatch.Any(t => !SameTag(t.ToString(), ourETag));
 
-        if (ourETag is not null
-            && !request.Headers.IfNoneMatch.Any(t => SameTag(t.ToString(), ourETag))
-            && request.Headers.IfNoneMatch.TryParseAdd(ourETag))
+        // Remembered in the header's normalised form, so a later send removes
+        // exactly the tag that went into the collection.
+        if (!callerWildcard
+            && EntityTagHeaderValue.TryParse(ourETag, out EntityTagHeaderValue? ours)
+            && !request.Headers.IfNoneMatch.Any(t => SameTag(t.ToString(), ourETag)))
         {
-            SetAddedETag(request, ourETag);
+            request.Headers.IfNoneMatch.Add(ours);
+            SetAddedETag(request, ours.ToString());
         }
 
         // Not disposed with `using`: a non-cacheable response is returned to the
@@ -355,7 +364,7 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         // no caller validator every 304 answers our ETag, so a new ETag on it
         // renews ours (RFC 9110 §15.4.5); with one, only a 304 naming our cached
         // ETag is ours, and a different or absent ETag goes back untouched.
-        if (response.StatusCode == HttpStatusCode.NotModified && cached is not null
+        if (response.StatusCode == HttpStatusCode.NotModified && cached is not null && !callerWildcard
             && (!callerValidator || SameTag(renewedETag, cached.ETag)))
         {
             // Taking a renewed ETag also moves the transport's parsed-model
