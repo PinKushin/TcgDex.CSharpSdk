@@ -148,17 +148,38 @@ public sealed class CoalescedWaiterTests
 
         using HttpRequestMessage withValidator = new(HttpMethod.Get, Card);
         withValidator.Headers.IfNoneMatch.ParseAdd("\"x\"");
-        Task<HttpResponseMessage> a = client.SendAsync(withValidator, CancellationToken.None);
 
-        inner.Release.SetResult(true);
-
-        using HttpResponseMessage aResponse = await a;
-        using HttpResponseMessage bResponse = await b;
+        // A is awaited while B is still held. Not coalesced, A reaches the
+        // handler and completes on its own. Coalesced, A waits on B's held fetch
+        // and can only end by this guard — so the test fails rather than
+        // depending on whether A joined before B finished.
+        using CancellationTokenSource guard = new(TimeSpan.FromSeconds(10));
+        using HttpResponseMessage aResponse = await client.SendAsync(withValidator, guard.Token);
 
         aResponse.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        inner.Requests.ShouldBe(3, "A went upstream while B was still held");
+
+        inner.Release.SetResult(true);
+        using HttpResponseMessage bResponse = await b;
+
         bResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await bResponse.Content.ReadAsStringAsync(CancellationToken.None)).ShouldBe(Body);
         inner.Requests.ShouldBe(3, "priming, then one upstream request each");
+    }
+
+    [Test]
+    public void AnEmptiedIfNoneMatch_IsNoLongerPresent()
+    {
+        // The coalescing check uses Headers.Contains after our own tag is taken
+        // off a re-sent message. That relies on an emptied header disappearing;
+        // a lingering empty entry would make every re-send bypass coalescing.
+        using HttpRequestMessage request = new(HttpMethod.Get, Card);
+        System.Net.Http.Headers.EntityTagHeaderValue ours = new("\"a\"");
+        request.Headers.IfNoneMatch.Add(ours);
+
+        request.Headers.IfNoneMatch.Remove(ours).ShouldBeTrue();
+
+        request.Headers.Contains("If-None-Match").ShouldBeFalse();
     }
 
     private const string Body = """{"id":"swsh3-136","name":"Furret"}""";

@@ -267,15 +267,16 @@ jobs:
       # which this mirrors). Lower a floor only when tests were deliberately
       # removed, and say why in the same commit; raise it whenever they grow.
       #
-      # Measured 2026-10-15 locally: net10.0 562, net8.0 561, net472 556, offline 11.
-      # Raised by two: the sixth review round's
-      # AResentRequest_KeepsTheCallersTagIdenticalToOurs and
-      # ARequestWithItsOwnValidator_IsNotCoalescedWithAPlainOne.
+      # Measured 2026-10-15 locally: net10.0 563, net8.0 562, net472 557, offline 11.
+      # Raised by three across the sixth review round:
+      # AResentRequest_KeepsTheCallersTagIdenticalToOurs,
+      # ARequestWithItsOwnValidator_IsNotCoalescedWithAPlainOne and
+      # AnEmptiedIfNoneMatch_IsNoLongerPresent.
       # Windows now runs all three frameworks; LogFilePrefix writes one
       # framework-tests_<tfm>_<timestamp>.trx per framework.
       - name: ubuntu net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 562 -Label 'ubuntu net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 563 -Label 'ubuntu net10.0'
 
       - name: ubuntu offline integration tests
         shell: pwsh
@@ -283,16 +284,16 @@ jobs:
 
       - name: macOS net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 562 -Label 'macOS net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 563 -Label 'macOS net10.0'
 
       - name: Windows net472 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 556 -Label 'Windows net472'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 557 -Label 'Windows net472'
 
       - name: Windows net8.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 561 -Label 'Windows net8.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 562 -Label 'Windows net8.0'
 
       - name: Windows net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 562 -Label 'Windows net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 563 -Label 'Windows net10.0'

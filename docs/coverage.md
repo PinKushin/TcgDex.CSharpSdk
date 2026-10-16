@@ -2,13 +2,13 @@
 
 **Goal: reach and hold ~100% line coverage of hand-written SDK code.**
 
-**Current (2026-10-15, all three target frameworks merged): 99.74% line (1545/1549) and 96.36%
-branch (583/605).** Both are gated in CI across every target framework since 0.6.3. The earlier
-figures below were measured on net10.0 alone. The 4 uncovered lines on this run, as
+**Current (2026-10-15, all three target frameworks merged): 99.81% line (1546/1549) and 96.53%
+branch (584/605).** Both are gated in CI across every target framework since 0.6.3. The earlier
+figures below were measured on net10.0 alone. The 3 uncovered lines on this run, as
 `Check-Coverage.ps1` names them: `ExpressionTranslator.cs` 293–294 (provably unreachable — see
 [Why not 100%](#why-not-100) below) and `TcgDexCachingHandler.cs` 272 (the coalesced waiter's
-cancellation on the `netstandard2.0` build). The fourth, `BoundedLru.cs` 175 (a lost-race
-retry), is timing-dependent and is covered on some runs only.
+cancellation on the `netstandard2.0` build). `BoundedLru.cs` 175 (a lost-race retry) is
+timing-dependent: covered on this run, uncovered on some others.
 
 | | Line | Branch | Unit tests | Integration tests |
 |---|---|---|---|---|
