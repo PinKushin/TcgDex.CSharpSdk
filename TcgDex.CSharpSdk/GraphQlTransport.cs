@@ -169,25 +169,50 @@ internal sealed class GraphQlTransport(
 
     private async Task<GraphQlCardsResponse> PostAsync(string query, CancellationToken cancellationToken)
     {
+        // The same ceiling the REST path has had all along. Without it this
+        // path inherited HttpClient's 100-second default — the value
+        // TcgDexOptions.Timeout exists to replace — and then reported the
+        // expiry as "the GraphQL request timed out", naming a limit the SDK
+        // had not set. With a caller-supplied client configured for
+        // InfiniteTimeSpan there was no ceiling at all.
+        //
+        // Outside the try: the cancellation catch needs both the budget and
+        // the caller's own token to tell the three cancellers apart.
+        using CancellationTokenSource? budget =
+            RequestBudget.Create(_options.Timeout, cancellationToken);
+
+        CancellationToken deadline = budget?.Token ?? cancellationToken;
+
+        try
+        {
+            return await PostUnderBudgetAsync(query, deadline).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex)
+            when (!cancellationToken.IsCancellationRequested || ex.CancellationToken != cancellationToken)
+        {
+            // The same three-way split as TcgDexTransport.GetAsync.
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw RequestBudget.CallerCancelled(ex, cancellationToken);
+            }
+
+            if (budget?.IsCancellationRequested == true)
+            {
+                throw new TcgDexApiException("The GraphQL request timed out.", ex);
+            }
+
+            throw RequestBudget.PipelineCancelled(_options.GraphQlEndpoint, ex);
+        }
+    }
+
+    /// <summary>The body of <see cref="PostAsync"/> that runs under the budget.</summary>
+    private async Task<GraphQlCardsResponse> PostUnderBudgetAsync(string query, CancellationToken deadline)
+    {
         try
         {
             using JsonContent content = JsonContent.Create(
                 new GraphQlRequest(query),
                 GraphQlJsonContext.Default.GraphQlRequest);
-
-            // The same ceiling the REST path has had all along. Without it this
-            // path inherited HttpClient's 100-second default — the value
-            // TcgDexOptions.Timeout exists to replace — and then reported the
-            // expiry as "the GraphQL request timed out", naming a limit the SDK
-            // had not set. With a caller-supplied client configured for
-            // InfiniteTimeSpan there was no ceiling at all.
-            //
-            // The caller's own token is kept for the filters below: only it can
-            // tell a budget expiry from the caller asking to stop.
-            using CancellationTokenSource? budget =
-                RequestBudget.Create(_options.Timeout, cancellationToken);
-
-            CancellationToken deadline = budget?.Token ?? cancellationToken;
 
             using HttpRequestMessage httpRequest =
                 new(HttpMethod.Post, _options.GraphQlEndpoint) { Content = content };
@@ -203,6 +228,15 @@ internal sealed class GraphQlTransport(
                 .SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, deadline)
                 .ConfigureAwait(false);
 
+            // The status is checked before the body is read: an error body was
+            // never used, and one that reset or was oversized hid the status.
+            if (!httpResponse.IsSuccessStatusCode)
+            {
+                throw new TcgDexApiException(
+                    $"The TCGdex GraphQL endpoint returned {(int)httpResponse.StatusCode}.",
+                    httpResponse.StatusCode);
+            }
+
             ArraySegment<byte> body = await BoundedContent
                 .ReadAsBytesAsync(
                     httpResponse.Content,
@@ -210,13 +244,6 @@ internal sealed class GraphQlTransport(
                     _options.GraphQlEndpoint,
                     deadline)
                 .ConfigureAwait(false);
-
-            if (!httpResponse.IsSuccessStatusCode)
-            {
-                throw new TcgDexApiException(
-                    $"The TCGdex GraphQL endpoint returned {(int)httpResponse.StatusCode}.",
-                    httpResponse.StatusCode);
-            }
 
             return JsonSerializer.Deserialize(
                     new ReadOnlySpan<byte>(body.Array, body.Offset, body.Count),
@@ -230,10 +257,6 @@ internal sealed class GraphQlTransport(
         catch (JsonException ex)
         {
             throw new TcgDexApiException("The GraphQL response was not valid JSON.", HttpStatusCode.OK, null, ex);
-        }
-        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new TcgDexApiException("The GraphQL request timed out.", ex);
         }
     }
 }

@@ -35,6 +35,15 @@ using System.Net.Http.Headers;
 /// transport, so it is transparent to every resource client and composes with
 /// any other handler a caller adds.
 /// </para>
+/// <para>
+/// <b>Exceptions.</b> A body larger than the configured limit, or one whose
+/// connection fails mid-read, throws <see cref="TcgDexApiException"/> out of
+/// this handler rather than <see cref="HttpRequestException"/>. This is
+/// deliberate: retry policies such as <c>AddStandardResilienceHandler</c> retry
+/// <see cref="HttpRequestException"/>, and re-downloading a body that is too
+/// large will only fail the same way again. Callers going through
+/// <see cref="TcgDexClient"/> see <see cref="TcgDexApiException"/> either way.
+/// </para>
 /// </remarks>
 public sealed class TcgDexCachingHandler : DelegatingHandler
 {
@@ -100,6 +109,12 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
     {
         Guard.NotNull(request);
 
+        // A re-sent message still carries the tag an earlier send added, which
+        // may no longer be our ETag. It comes off on every path — a fresh hit
+        // or a non-GET would otherwise leave it on the message — and before any
+        // check, so it is never mistaken for the caller's.
+        RemoveAddedETag(request);
+
         if (request.Method != HttpMethod.Get || request.RequestUri is null)
         {
             return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -115,7 +130,11 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             return BuildResponse(request, cached, HttpStatusCode.OK);
         }
 
-        FetchResult result = _options.CoalesceConcurrentRequests
+        // A caller's own If-None-Match (or `*`) makes the outcome specific to
+        // that request, so it neither leads nor joins a shared fetch: whichever
+        // validator went out would otherwise decide the answer for both.
+        // Contains, not IfNoneMatch.Count, so an unparsable caller value counts.
+        FetchResult result = _options.CoalesceConcurrentRequests && !request.Headers.Contains("If-None-Match")
             ? await FetchCoalescedAsync(key, request, cached, timeToLive, cancellationToken).ConfigureAwait(false)
             : await FetchAsync(key, request, cached, timeToLive, cancellationToken).ConfigureAwait(false);
 
@@ -257,6 +276,73 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
 #endif
     }
 
+    private const string AddedETagKey = "TcgDex.CachingHandler.AddedETag";
+
+    /// <summary>
+    /// Weak comparison (RFC 9110 §13.1.2 / §8.8.3.2), which If-None-Match uses: <c>W/"a"</c>
+    /// and <c>"a"</c> match. An absent tag never matches anything, so a 304
+    /// without an ETag is not tied to an entry stored without one.
+    /// </summary>
+    private static bool SameTag(string? a, string? b)
+    {
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
+        {
+            return false;
+        }
+
+        // An unparsable tag is not an entity-tag, so it matches nothing — not
+        // even an identical string.
+        return EntityTagHeaderValue.TryParse(a, out EntityTagHeaderValue? x)
+            && EntityTagHeaderValue.TryParse(b, out EntityTagHeaderValue? y)
+            && string.Equals(x.Tag, y.Tag, StringComparison.Ordinal);
+    }
+
+    /// <summary>Removes, and forgets, the tag an earlier send of this message added.</summary>
+    /// <remarks>
+    /// Ours is the exact instance we added — the collection keeps the instances
+    /// it is given — so a caller's textually identical tag is never taken for
+    /// it. <see cref="HttpHeaderValueCollection{T}.Remove"/> matches by
+    /// <c>Equals</c> and could take the caller's, so every equal value comes off
+    /// and the caller's are put back.
+    /// </remarks>
+    private static void RemoveAddedETag(HttpRequestMessage request)
+    {
+#if NET5_0_OR_GREATER
+        HttpRequestOptionsKey<EntityTagHeaderValue> key = new(AddedETagKey);
+        _ = request.Options.TryGetValue(key, out EntityTagHeaderValue? added);
+        ((IDictionary<string, object?>)request.Options).Remove(AddedETagKey);
+#else
+        _ = request.Properties.TryGetValue(AddedETagKey, out object? value);
+        _ = request.Properties.Remove(AddedETagKey);
+        EntityTagHeaderValue? added = value as EntityTagHeaderValue;
+#endif
+        HttpHeaderValueCollection<EntityTagHeaderValue> tags = request.Headers.IfNoneMatch;
+        if (added is null || !tags.Any(t => ReferenceEquals(t, added)))
+        {
+            return;
+        }
+
+        List<EntityTagHeaderValue> callers = [.. tags.Where(t => !ReferenceEquals(t, added) && t.Equals(added))];
+        for (int i = 0; i <= callers.Count; i++)
+        {
+            _ = tags.Remove(added);
+        }
+
+        foreach (EntityTagHeaderValue tag in callers)
+        {
+            tags.Add(tag);
+        }
+    }
+
+    private static void SetAddedETag(HttpRequestMessage request, EntityTagHeaderValue etag)
+    {
+#if NET5_0_OR_GREATER
+        request.Options.Set(new HttpRequestOptionsKey<EntityTagHeaderValue>(AddedETagKey), etag);
+#else
+        request.Properties[AddedETagKey] = etag;
+#endif
+    }
+
     private async Task<FetchResult> FetchAsync(
         string key,
         HttpRequestMessage request,
@@ -266,24 +352,61 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
     {
         // A stale entry with a validator is worth revalidating: an unchanged
         // resource comes back as 304 with no body.
-        if (cached?.ETag is { Length: > 0 } etag)
+        //
+        // Added only when absent: a handler above this one may send the same
+        // message again, and adding each time sent the validator twice. Any
+        // validator the caller set is theirs and stays (owner: "only remove our
+        // own value").
+        //
+        // A caller's `*` is never combined with ours: the grammar is
+        // "*" / #entity-tag (RFC 9110 §13.1.2), and a 304 answering `*` says
+        // nothing about our copy.
+        bool callerWildcard = request.Headers.IfNoneMatch.Any(
+            t => string.Equals(t.Tag, "*", StringComparison.Ordinal));
+        string? ourETag = cached?.ETag is { Length: > 0 } e ? e : null;
+        bool callerValidator = request.Headers.IfNoneMatch.Any(t => !SameTag(t.ToString(), ourETag));
+
+        // The instance itself is remembered, so a later send removes exactly the
+        // value that went into the collection and never the caller's twin.
+        if (!callerWildcard
+            && EntityTagHeaderValue.TryParse(ourETag, out EntityTagHeaderValue? ours)
+            && !request.Headers.IfNoneMatch.Any(t => SameTag(t.ToString(), ourETag)))
         {
-            request.Headers.IfNoneMatch.TryParseAdd(etag);
+            request.Headers.IfNoneMatch.Add(ours);
+            SetAddedETag(request, ours);
         }
 
         // Not disposed with `using`: a non-cacheable response is returned to the
         // caller, who owns it from then on.
         HttpResponseMessage response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        string? renewedETag = response.Headers.ETag?.ToString();
 
-        if (response.StatusCode == HttpStatusCode.NotModified && cached is not null)
+        // A 304 is ours only if it cannot be validating the caller's copy: with
+        // no caller validator every 304 answers our ETag, so a new ETag on it
+        // renews ours (RFC 9110 §15.4.5); with one, only a 304 naming our cached
+        // ETag is ours, and a different or absent ETag goes back untouched.
+        if (response.StatusCode == HttpStatusCode.NotModified && cached is not null && !callerWildcard
+            && (!callerValidator || SameTag(renewedETag, cached.ETag)))
         {
+            // Taking a renewed ETag also moves the transport's parsed-model
+            // cache, which is keyed by this same ETag, onto the new value.
             response.Dispose();
             Interlocked.Increment(ref _revalidations);
 
-            CachedResponse refreshed = cached with { StoredAt = _timeProvider.GetUtcNow() };
+            CachedResponse refreshed = cached with
+            {
+                StoredAt = _timeProvider.GetUtcNow(),
+                ETag = renewedETag ?? cached.ETag,
+            };
             await _cache.SetAsync(key, refreshed, timeToLive, cancellationToken).ConfigureAwait(false);
 
             return FetchResult.FromCache(refreshed);
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotModified)
+        {
+            // The caller's 304: neither served from nor evicted from our entry.
+            return FetchResult.FromResponse(response);
         }
 
         if (!response.IsSuccessStatusCode)
@@ -291,7 +414,18 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             // Errors are never cached: a 404 now must not suppress a card that
             // appears later, and a 5xx blip must not become a persistent outage
             // for the caller. The real response goes back untouched.
-            await _cache.RemoveAsync(key, cancellationToken).ConfigureAwait(false);
+            //
+            // The response is not the caller's until it is returned, so a
+            // custom cache whose eviction throws must not leak it.
+            try
+            {
+                await _cache.RemoveAsync(key, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                response.Dispose();
+                throw;
+            }
 
             return FetchResult.FromResponse(response);
         }

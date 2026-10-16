@@ -40,16 +40,16 @@ public sealed class TransportFailureTests
     }
 
     [Test]
-    public void Rest_WhenRequestTimesOut_ReportsATimeout()
+    public void Rest_WhenThePipelineCancels_ReportsACancellationNotATimeout()
     {
-        // A TaskCanceledException with no cancellation requested is a client-side
-        // timeout, which is a fault rather than the caller's own cancellation.
-        RecordingHandler handler = Throwing(new TaskCanceledException("timed out"));
+        // A TaskCanceledException the caller did not ask for is a fault, but the
+        // SDK's budget did not fire either, so it must not be called a timeout.
+        RecordingHandler handler = Throwing(new TaskCanceledException("cancelled"));
 
         TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler).Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
 
-        exception.Message.ShouldContain("timed out");
+        exception.Message.ShouldContain("cancelled by the HTTP pipeline");
     }
 
     [TestCase(HttpStatusCode.InternalServerError)]
@@ -120,14 +120,14 @@ public sealed class TransportFailureTests
     }
 
     [Test]
-    public void GraphQl_WhenRequestTimesOut_ReportsATimeout()
+    public void GraphQl_WhenThePipelineCancels_ReportsACancellationNotATimeout()
     {
-        RecordingHandler handler = Throwing(new TaskCanceledException("timed out"));
+        RecordingHandler handler = Throwing(new TaskCanceledException("cancelled"));
 
         Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(handler).Cards.SearchDetailedAsync(
                 new CardFilter { Name = "Furret" }, cancellationToken: CancellationToken.None))
-            .Result.Message.ShouldContain("timed out");
+            .Result.Message.ShouldContain("cancelled by the HTTP pipeline");
     }
 
     [Test]

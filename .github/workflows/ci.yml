@@ -145,9 +145,12 @@ jobs:
   #
   # A separate Windows job rather than a matrix on the job above: net472 needs
   # mono off Windows, GitHub's ubuntu runners do not have it, and vstest aborts
-  # the whole run rather than skipping that one framework. Coverage is collected
-  # on ubuntu only — coverlet does not instrument the .NET Framework run — so
-  # this job asserts behaviour and the other one holds the gate.
+  # the whole run rather than skipping that one framework.
+  #
+  # This job runs ALL three test frameworks with coverage and holds the same
+  # gate as the local command in CLAUDE.md. Gating on net10.0 alone (the ubuntu
+  # job) never counts netstandard2.0-only code: main sat at 99.45% locally
+  # while CI passed (2026-10-15). net8.0 also ran nowhere in CI before this.
   framework-test:
     name: Unit test on .NET Framework
     runs-on: windows-latest
@@ -166,15 +169,24 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore -warnaserror
 
-      # net472 explicitly. The net8.0 and net10.0 runs are the ubuntu job's
-      # responsibility, and repeating them here would double CI time to
-      # re-prove what is already proven.
-      - name: Unit tests
+      # Every framework, so this matches the local gate exactly. The suite is a
+      # few seconds per framework.
+      - name: Unit tests (all frameworks, with coverage)
         run: >
           dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj
-          --configuration Release --no-build --framework net472
-          --logger "trx;LogFileName=framework-tests.trx"
+          --configuration Release
+          --logger "trx;LogFilePrefix=framework-tests"
+          --collect:"XPlat Code Coverage"
+          --settings coverlet.runsettings
           --results-directory ./TestResults
+
+      - name: Enforce coverage thresholds (all frameworks)
+        shell: pwsh
+        run: >
+          ./scripts/Check-Coverage.ps1
+          -ResultsDirectory ./TestResults
+          -Threshold 99.5
+          -BranchThreshold 95
 
       # Distinct artifact name from the ubuntu job's. Two jobs uploading to the
       # same name is an error on upload-artifact v4+, and this job produces no
@@ -255,12 +267,16 @@ jobs:
       # which this mirrors). Lower a floor only when tests were deliberately
       # removed, and say why in the same commit; raise it whenever they grow.
       #
-      # Measured 2026-09-11 locally (net10.0/net472 dotnet test): 522 / 11 / 522 / 517.
-      # Same figures the CI lanes themselves produce - ubuntu and macOS both run
-      # net10.0, and windows runs net472, exactly as measured here.
+      # Measured 2026-10-15 locally: net10.0 563, net8.0 562, net472 557, offline 11.
+      # Raised by three across the sixth review round:
+      # AResentRequest_KeepsTheCallersTagIdenticalToOurs,
+      # ARequestWithItsOwnValidator_IsNotCoalescedWithAPlainOne and
+      # AnEmptiedIfNoneMatch_IsNoLongerPresent.
+      # Windows now runs all three frameworks; LogFilePrefix writes one
+      # framework-tests_<tfm>_<timestamp>.trx per framework.
       - name: ubuntu net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 522 -Label 'ubuntu net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 563 -Label 'ubuntu net10.0'
 
       - name: ubuntu offline integration tests
         shell: pwsh
@@ -268,8 +284,16 @@ jobs:
 
       - name: macOS net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 522 -Label 'macOS net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 563 -Label 'macOS net10.0'
 
       - name: Windows net472 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName framework-tests.trx -Floor 517 -Label 'Windows net472'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 557 -Label 'Windows net472'
+
+      - name: Windows net8.0 unit tests
+        shell: pwsh
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 562 -Label 'Windows net8.0'
+
+      - name: Windows net10.0 unit tests
+        shell: pwsh
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 563 -Label 'Windows net10.0'

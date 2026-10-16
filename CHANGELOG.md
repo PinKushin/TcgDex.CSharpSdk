@@ -15,6 +15,55 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-10-15
+
+### Fixed
+
+- A connection that drops partway through a response body now throws `TcgDexApiException` instead
+  of a raw `IOException`. Successful responses, GraphQL and `TcgDexCachingHandler` carry the
+  original failure as `InnerException`. Error responses report their status code instead.
+- A `404` whose body cannot be read (reset or larger than `MaxResponseBytes`) now throws
+  `TcgDexApiException` with `StatusCode` `404` instead of returning `null`, with the read failure as
+  `InnerException`. Only the body tells a missing resource apart from an unsupported language.
+- A GraphQL error response now reports its status code even when its body resets or is too large.
+- Cancelling a request now always surfaces as `OperationCanceledException`, including on a
+  platform that reports the cancelled body read as an `IOException`.
+- On REST requests, a body that fails to read, or is not valid JSON, is now logged and marks the
+  request's `Activity` as failed, like other failures.
+- `TcgDexCachingHandler` keeps an `If-None-Match` the caller set, adding its own `ETag` beside it,
+  instead of replacing it. A `304 Not Modified` is served from the cache when the caller sent no
+  validator of their own, or when the 304 names the cached `ETag` (weak or strong form); otherwise
+  it is returned to the caller untouched, rather than serving the stale cached body as current. A
+  request message sent again after the cached `ETag` changed carries only the current one.
+- `TcgDexCachingHandler` no longer adds its `ETag` beside a caller's `If-None-Match: *`, which
+  produced an invalid header; a `304` answering `*` is returned to the caller untouched.
+- With `CoalesceConcurrentRequests`, a request carrying its own `If-None-Match` is no longer
+  merged with a concurrent request for the same URL, so it gets the answer to its own validator
+  rather than the other request's.
+- A request cancelled by the HTTP pipeline, such as a shorter `HttpClient.Timeout`, now throws
+  `TcgDexApiException` saying so, instead of reporting that `TcgDexOptions.Timeout` expired. The
+  "timed out" message is reserved for the SDK's own timeout.
+- When the caller cancels a request, the `OperationCanceledException` now carries the caller's own
+  token, so `catch (OperationCanceledException ex) when (ex.CancellationToken == token)` matches.
+- An error response (such as a 500) whose body stalls past `TcgDexOptions.Timeout` now throws
+  `TcgDexApiException` (timed out) instead of a raw cancellation exception.
+- `TcgDexCachingHandler` now stores the new `ETag` when a `304 Not Modified` carries one, so the
+  next revalidation uses the server's current validator.
+- `TcgDexCachingHandler` no longer sends `If-None-Match` twice when a handler above it re-sends the
+  same request.
+- `TcgDexCachingHandler` disposes an error response if a custom cache's `RemoveAsync` throws.
+- A response declaring a large `Content-Length` with a small body no longer pre-allocates the
+  declared size. The initial buffer is capped at 1 MiB and grows as needed.
+
+### Changed
+
+- Documented: on .NET Framework, `TcgDexOptions.Timeout` may not end a response body that stalls
+  after its headers arrive, because that platform's `HttpClientHandler` does not cancel an
+  in-progress read. This is known platform behaviour, not measured by this SDK's tests.
+- `TcgDexCachingHandler` now throws `TcgDexApiException` for a body whose connection fails mid-read,
+  where it previously threw a raw `IOException`. An oversized body already threw
+  `TcgDexApiException`. That choice is deliberate, so retry policies do not re-download it.
+
 ## [0.6.2] - 2026-10-15
 
 ### Changed
@@ -348,7 +397,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.5.0...v0.6.0

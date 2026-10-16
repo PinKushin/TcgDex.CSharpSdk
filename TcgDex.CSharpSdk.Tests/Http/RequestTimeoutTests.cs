@@ -63,17 +63,20 @@ public sealed class RequestTimeoutTests
     /// indefinitely rather than failing, which is worse than not having it.
     /// </para>
     /// <para>
-    /// That overload is .NET 5+, so this pair is scoped to the modern targets.
-    /// The behaviour under test is target-independent — it comes from passing
-    /// the deadline into <c>BoundedContent</c> — so proving it here is enough.
+    /// That overload is .NET 5+, so these are scoped to the modern targets.
+    /// The SDK's half is target-independent — it passes the deadline into
+    /// <c>BoundedContent</c> — but the outcome is not: .NET Framework's
+    /// <c>HttpClientHandler</c> ignores the token on an in-flight body read, so
+    /// there a stalled body ends at its five-minute <c>ReadWriteTimeout</c>
+    /// instead. Documented on <see cref="TcgDexOptions.Timeout"/>.
     /// </para>
     /// </remarks>
-    private sealed class StallingBodyHandler : HttpMessageHandler
+    private sealed class StallingBodyHandler(HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
-            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            => Task.FromResult(new HttpResponseMessage(status)
             {
                 Content = new StreamContent(new StallingStream()),
             });
@@ -214,6 +217,22 @@ public sealed class RequestTimeoutTests
             () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
     }
 
+    [Test]
+    [CancelAfter(15000)]
+    public void AStalledErrorBody_AlsoTimesOut()
+    {
+        // The problem-document read on a 500 runs under the same deadline, and
+        // its expiry escaped raw out of the failure path.
+        using TcgDexClient client = Client(
+            new StallingBodyHandler(HttpStatusCode.InternalServerError),
+            TimeSpan.FromMilliseconds(200));
+
+        TcgDexApiException error = Should.Throw<TcgDexApiException>(
+            () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
+
+        error.Message.ShouldContain("timed out", Case.Insensitive);
+    }
+
 #endif
 
     [Test]
@@ -229,6 +248,88 @@ public sealed class RequestTimeoutTests
 
         Should.Throw<OperationCanceledException>(
             () => client.Cards.GetAsync("swsh3-136", cancelled.Token).GetAwaiter().GetResult());
+    }
+
+    /// <summary>
+    /// A client whose own <see cref="HttpClient.Timeout"/> (100 ms) is far
+    /// shorter than the SDK's (5 minutes): only the pipeline can end the call.
+    /// </summary>
+    private static TcgDexClient PipelineTimeoutClient(out HttpClient http)
+    {
+        http = new HttpClient(new HangingHandler()) { Timeout = TimeSpan.FromMilliseconds(100) };
+        return new TcgDexClient(http, new TcgDexOptions { Timeout = TimeSpan.FromMinutes(5) });
+    }
+
+    private static void ShouldNotNameTheSdkTimeout(TcgDexApiException error)
+    {
+        // The SDK's 5-minute budget did not fire, so naming it sends the
+        // reader to raise a limit that was never reached.
+        error.Message.ShouldNotContain("timed out", Case.Insensitive);
+        error.Message.ShouldNotContain("00:05:00");
+        error.Message.ShouldNotContain($"{nameof(TcgDexOptions)}.{nameof(TcgDexOptions.Timeout)}");
+        error.InnerException.ShouldBeAssignableTo<OperationCanceledException>();
+    }
+
+    [Test]
+    [CancelAfter(15000)]
+    public void APipelineTimeout_IsNotReportedAsTheSdkTimeout()
+    {
+        using TcgDexClient client = PipelineTimeoutClient(out HttpClient http);
+        using HttpClient _ = http;
+
+        TcgDexApiException error = Should.Throw<TcgDexApiException>(
+            () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
+
+        ShouldNotNameTheSdkTimeout(error);
+    }
+
+    [Test]
+    [CancelAfter(15000)]
+    public async Task AGraphQlPipelineTimeout_IsNotReportedAsTheSdkTimeout()
+    {
+        using TcgDexClient client = PipelineTimeoutClient(out HttpClient http);
+        using HttpClient _ = http;
+
+        TcgDexApiException error = await Should.ThrowAsync<TcgDexApiException>(
+            () => client.Cards.SearchDetailedAsync(
+                new CardFilter { Name = "Furret" },
+                cancellationToken: CancellationToken.None));
+
+        ShouldNotNameTheSdkTimeout(error);
+    }
+
+    [Test]
+    public void CallerCancellation_CarriesTheCallersToken()
+    {
+        // The escaping exception carried the SDK's linked deadline token, so
+        // `catch (OperationCanceledException ex) when (ex.CancellationToken == mine)`
+        // never matched.
+        using TcgDexClient client = Client(new HangingHandler(), TimeSpan.FromMinutes(5));
+        using CancellationTokenSource cancelled = new();
+
+        cancelled.CancelAfter(TimeSpan.FromMilliseconds(100));
+
+        OperationCanceledException error = Should.Throw<OperationCanceledException>(
+            () => client.Cards.GetAsync("swsh3-136", cancelled.Token).GetAwaiter().GetResult());
+
+        error.CancellationToken.ShouldBe(cancelled.Token);
+    }
+
+    [Test]
+    public async Task GraphQlCallerCancellation_CarriesTheCallersToken()
+    {
+        using HttpClient http = new(new HangingHandler()) { Timeout = Timeout.InfiniteTimeSpan };
+        using TcgDexClient client = new(http, new TcgDexOptions { Timeout = TimeSpan.FromMinutes(5) });
+        using CancellationTokenSource cancelled = new();
+
+        cancelled.CancelAfter(TimeSpan.FromMilliseconds(100));
+
+        OperationCanceledException error = await Should.ThrowAsync<OperationCanceledException>(
+            () => client.Cards.SearchDetailedAsync(
+                new CardFilter { Name = "Furret" },
+                cancellationToken: cancelled.Token));
+
+        error.CancellationToken.ShouldBe(cancelled.Token);
     }
 
     [Test]

@@ -2,21 +2,23 @@
 
 **Goal: reach and hold ~100% line coverage of hand-written SDK code.**
 
-**Current: 99.77% line (882/884) and 96.60% branch (455/471).** Both are gated in
-CI. The 2 uncovered lines are provably unreachable — see [Why not 100%](#why-not-100) below.
+**Current (2026-10-15, all three target frameworks merged): 99.81% line (1546/1549) and 96.53%
+branch (584/605).** Both are gated in CI across every target framework since 0.6.3. The earlier
+figures below were measured on net10.0 alone. The 3 uncovered lines on this run, as
+`Check-Coverage.ps1` names them: `ExpressionTranslator.cs` 293–294 (provably unreachable — see
+[Why not 100%](#why-not-100) below) and `TcgDexCachingHandler.cs` 272 (the coalesced waiter's
+cancellation on the `netstandard2.0` build). `BoundedLru.cs` 175 (a lost-race retry) is
+timing-dependent: covered on this run, uncovered on some others.
 
 | | Line | Branch | Unit tests | Integration tests |
 |---|---|---|---|---|
 | Baseline (`f45e496`) | 83.2% | — | 113 | 22 |
-| Now | **99.77%** | **96.60%** | **447** | **149** |
+| Now | **99.74%** | **96.36%** | **562** (net10.0) | **149** |
 
-The unit tests run on `net472`, `net8.0` and `net10.0` — 1341 executions of 447
-tests. Coverage is collected from the `net8.0` and `net10.0` runs only: coverlet
-does not instrument the .NET Framework run, so **code compiled solely for
-`netstandard2.0` is invisible to the gate**. That is why such code is kept to a
-minimum and why `HttpContentExtensions` is scoped with `#if NETSTANDARD2_0`
-rather than shipped on every target, where it would be unreachable and would
-read as an uncoverable hole.
+The unit tests run on `net472`, `net8.0` and `net10.0` — 1679 executions (562,
+561 and 556 per framework). Coverage is collected from all three runs and
+merged: the `net472` run produces its own cobertura file, so code compiled
+solely for `netstandard2.0` is measured by the gate too.
 
 ---
 
@@ -183,8 +185,8 @@ a valid form. Testing those proves the `??` operator works.
 
 ### Why 99.5 and not 100
 
-The ceiling is **99.76%** — the two provably unreachable lines are 0.24% of the
-total. A gate at 100 could never pass.
+The ceiling is **99.87%** — the two provably unreachable lines are 0.13% of the
+1482-line total. A gate at 100 could never pass.
 
 99.5 sits just under the ceiling, leaving those two lines of headroom and
 essentially nothing else. That is deliberate: it was 98 while the unreachable set

@@ -2,6 +2,7 @@ namespace TcgDex.Tests.Caching;
 
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using TcgDex.Caching;
@@ -104,6 +105,476 @@ public sealed class CachingHandlerTests
         // The 304 carries no body, so this can only have come from the cache.
         second.ShouldBe("""{"id":"swsh3-136"}""");
         handler.Revalidations.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task ANewETagOnA304_IsTheValidatorUsedNextTime()
+    {
+        // RFC 9110 §15.4.5 lets a 304 carry an updated ETag. Keeping the old one
+        // revalidates against a validator the server has already replaced.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler _, HttpClient? client, CountingHandler? inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"x"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"b\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"b\"");
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+        await GetAsync(client);
+
+        inner.Requests[2].Headers.IfNoneMatch.ToString().ShouldBe("\"b\"");
+    }
+
+    /// <summary>Re-sends the same request message once if the first attempt fails.</summary>
+    private sealed class RetryOnceHandler : DelegatingHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await base.SendAsync(request, cancellationToken);
+            }
+            catch (HttpRequestException)
+            {
+                return await base.SendAsync(request, cancellationToken);
+            }
+        }
+    }
+
+    [Test]
+    public async Task AResentRequest_CarriesOneIfNoneMatch()
+    {
+        // A handler above this one may send the same message twice. Each fetch
+        // added the validator again, so the retry went out as `"a", "a"`.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, HttpClient _, CountingHandler inner) = Build(time);
+        using HttpClient client = new(new RetryOnceHandler { InnerHandler = handler });
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"x"}""", Etag);
+        inner.Throw(new HttpRequestException("reset"));
+        inner.Respond(HttpStatusCode.NotModified, "", Etag);
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+        await GetAsync(client);
+
+        inner.Requests.Count.ShouldBe(3);
+        inner.Requests[2].Headers.IfNoneMatch.Count.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task ACallerSetIfNoneMatch_SurvivesRevalidation()
+    {
+        // Only the handler's own validator is the handler's to manage; clearing
+        // the collection dropped one the caller had set.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler _, HttpClient? client, CountingHandler? inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"x"}""", Etag);
+        inner.Respond(HttpStatusCode.NotModified, "", Etag);
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("\"x\"");
+        using HttpResponseMessage _ = await client.SendAsync(request, CancellationToken.None);
+
+        string[] sent = inner.Requests[1].Headers.IfNoneMatch.Select(t => t.ToString()).ToArray();
+        sent.ShouldBe(["\"x\"", Etag], ignoreOrder: true);
+    }
+
+    [Test]
+    public async Task A304ValidatingTheCallersETag_IsPassedThroughNotServedFromCache()
+    {
+        // The caller's "x" and our stale "a" go out together. A 304 naming "x"
+        // validates the caller's copy, not ours: serving "a"'s body would hand
+        // back a stale representation as current.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"x\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("\"x\"");
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        (await response.Content.ReadAsStringAsync(CancellationToken.None)).ShouldBeEmpty();
+        handler.Revalidations.ShouldBe(0);
+
+        // The entry is untouched: still stale, still validated by "a".
+        string next = await GetAsync(client);
+        inner.Requests[2].Headers.IfNoneMatch.ToString().ShouldBe("\"a\"");
+        next.ShouldBe("""{"id":"old"}""");
+    }
+
+    [Test]
+    public async Task A304WithoutETag_WhenTheCallerAlsoSentOne_IsPassedThrough()
+    {
+        // Ambiguous: it may validate the caller's copy rather than ours.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", null);
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("\"x\"");
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        handler.Revalidations.ShouldBe(0);
+
+        // Not evicted either: the next request still revalidates with "a".
+        // Before the 304 branch existed, this response fell into the error
+        // path, which also passed through but evicted.
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+        string next = await GetAsync(client);
+        inner.Requests[2].Headers.IfNoneMatch.ToString().ShouldBe("\"a\"");
+        next.ShouldBe("""{"id":"old"}""");
+    }
+
+    [Test]
+    public async Task A304WithAWeakFormOfOurETag_WhenTheCallerAlsoSentOne_IsServedFromCache()
+    {
+        // If-None-Match uses weak comparison (RFC 9110 §13.1.2 / §8.8.3.2): W/"a" names "a".
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "W/\"a\"");
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("\"x\"");
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync(CancellationToken.None)).ShouldBe("""{"id":"old"}""");
+        handler.Revalidations.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task ACallersWeakFormOfOurETag_IsNotSentTwice()
+    {
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler _, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("W/\"a\"");
+        using HttpResponseMessage _ = await client.SendAsync(request, CancellationToken.None);
+
+        inner.Requests[1].Headers.IfNoneMatch.Count.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task A304WithoutETag_ForAnEntryStoredWithoutOne_WhenTheCallerSentOne_IsPassedThrough()
+    {
+        // Both ETags absent is not a match: nothing ties the 304 to our entry.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", null);
+        inner.Respond(HttpStatusCode.NotModified, "", null);
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("\"x\"");
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        handler.Revalidations.ShouldBe(0);
+    }
+
+    /// <summary>Sends the same message twice, running a hook in between.</summary>
+    private sealed class ResendAfterHookHandler(Func<Task> between) : DelegatingHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await base.SendAsync(request, cancellationToken);
+            }
+            catch (HttpRequestException)
+            {
+                await between();
+                return await base.SendAsync(request, cancellationToken);
+            }
+        }
+    }
+
+    [Test]
+    public async Task AResentRequest_AfterOurETagChanged_DropsTheOldTagWeAdded()
+    {
+        // The first send added "a". Before the resend the entry was renewed to
+        // "b"; "a" is still on the message, but it is ours, not the caller's.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, HttpClient plain, CountingHandler inner) = Build(time);
+        using HttpClient client = new(new ResendAfterHookHandler(async () =>
+        {
+            await GetAsync(plain);
+            time.Advance(TimeSpan.FromMinutes(10));
+        })
+        {
+            InnerHandler = handler,
+        });
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", "\"a\"");
+        inner.Throw(new HttpRequestException("reset"));
+        inner.Respond(HttpStatusCode.NotModified, "", "\"b\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"b\"");
+
+        await GetAsync(plain);
+        time.Advance(TimeSpan.FromMinutes(10));
+        string body = await GetAsync(client);
+
+        inner.Requests.Count.ShouldBe(4);
+        inner.Requests[3].Headers.IfNoneMatch.ToString().ShouldBe("\"b\"");
+        body.ShouldBe("""{"id":"old"}""");
+        handler.Revalidations.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task AResentRequest_KeepsTheCallersTagIdenticalToOurs()
+    {
+        // Between sends the caller puts its own "a" ahead of the "a" we added.
+        // Matching by text removed the first "a" found — the caller's. Only the
+        // instance we added is ours (owner: "only remove our own value").
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, MemoryTcgDexResponseCache cache, CountingHandler inner) = BuildSeeded(time);
+        await SeedAsync(cache, time, "\"a\"");
+        time.Advance(TimeSpan.FromMinutes(10));
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+
+        using HttpMessageInvoker invoker = new(handler);
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        (await invoker.SendAsync(request, CancellationToken.None)).Dispose();
+
+        EntityTagHeaderValue callers = new("\"a\"");
+        List<EntityTagHeaderValue> ours = [.. request.Headers.IfNoneMatch];
+        request.Headers.IfNoneMatch.Clear();
+        request.Headers.IfNoneMatch.Add(callers);
+        foreach (EntityTagHeaderValue tag in ours)
+        {
+            request.Headers.IfNoneMatch.Add(tag);
+        }
+
+        // Precondition: the collection keeps the instances it is given, on
+        // every TFM — otherwise there is no "ours" to tell apart.
+        request.Headers.IfNoneMatch.ShouldContain(t => ReferenceEquals(t, callers));
+        request.Headers.IfNoneMatch.ShouldContain(t => ReferenceEquals(t, ours[0]));
+
+        time.Advance(TimeSpan.FromMinutes(10));
+        (await invoker.SendAsync(request, CancellationToken.None)).Dispose();
+
+        request.Headers.IfNoneMatch.ShouldContain(t => ReferenceEquals(t, callers));
+        inner.Requests[1].Headers.IfNoneMatch.ToString().ShouldBe("\"a\"");
+    }
+
+    /// <summary>A handler over a cache the test seeds directly, as a custom cache could.</summary>
+    private static (TcgDexCachingHandler Handler, MemoryTcgDexResponseCache Cache, CountingHandler Inner) BuildSeeded(
+        FakeTimeProvider time)
+    {
+        CountingHandler inner = new();
+        MemoryTcgDexResponseCache cache = new(timeProvider: time);
+        TcgDexCachingHandler handler = new(cache, new TcgDexCacheOptions(), time) { InnerHandler = inner };
+        return (handler, cache, inner);
+    }
+
+    private static ValueTask SeedAsync(MemoryTcgDexResponseCache cache, FakeTimeProvider time, string? etag)
+        => cache.SetAsync(
+            CardUrl,
+            new CachedResponse { Body = "{\"id\":\"old\"}"u8.ToArray(), ETag = etag, StoredAt = time.GetUtcNow() },
+            TimeSpan.FromHours(1));
+
+    [Test]
+    public async Task ACallersWildcardIfNoneMatch_IsSentAlone_AndIts304PassesThrough()
+    {
+        // RFC 9110 §13.1.2: If-None-Match is "*" / #entity-tag, never both.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("*");
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        inner.Requests[1].Headers.GetValues("If-None-Match").ShouldBe(["*"]);
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        handler.Revalidations.ShouldBe(0);
+
+        // Untouched: still stale, still validated by "a".
+        (await GetAsync(client)).ShouldBe("""{"id":"old"}""");
+        inner.Requests[2].Headers.IfNoneMatch.ToString().ShouldBe("\"a\"");
+    }
+
+    [Test]
+    public async Task AResentRequest_WithANonCanonicalCachedETag_DropsTheOldTagWeAdded()
+    {
+        // " \"a\"" is stored as a custom cache might hold it; the header
+        // normalises it to "\"a\"", so removing by the raw string missed it.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, MemoryTcgDexResponseCache cache, CountingHandler inner) = BuildSeeded(time);
+        await SeedAsync(cache, time, " \"a\"");
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpClient client = new(new ResendAfterHookHandler(async () =>
+        {
+            await SeedAsync(cache, time, "\"b\"");
+            time.Advance(TimeSpan.FromMinutes(10));
+        })
+        {
+            InnerHandler = handler,
+        });
+
+        inner.Throw(new HttpRequestException("reset"));
+        inner.Respond(HttpStatusCode.NotModified, "", "\"b\"");
+
+        await GetAsync(client);
+
+        inner.Requests[1].Headers.IfNoneMatch.ToString().ShouldBe("\"b\"");
+    }
+
+    [Test]
+    public async Task AResentRequest_ServedFresh_NoLongerCarriesTheTagWeAdded()
+    {
+        // The first send added "a"; the resend is a fresh hit and never fetches,
+        // so only clearing on every path takes "a" back off the message.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, MemoryTcgDexResponseCache cache, CountingHandler inner) = BuildSeeded(time);
+        await SeedAsync(cache, time, "\"a\"");
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpClient client = new(new ResendAfterHookHandler(() => SeedAsync(cache, time, "\"b\"").AsTask())
+        {
+            InnerHandler = handler,
+        });
+
+        inner.Throw(new HttpRequestException("reset"));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        inner.Requests.Count.ShouldBe(1);
+        handler.FreshHits.ShouldBe(1);
+        request.Headers.IfNoneMatch.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task AnEntryStoredWithAnEmptyETag_IsRefetchedWithoutAValidator()
+    {
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, MemoryTcgDexResponseCache cache, CountingHandler inner) = BuildSeeded(time);
+        await SeedAsync(cache, time, "");
+        time.Advance(TimeSpan.FromMinutes(10));
+        inner.Respond(HttpStatusCode.OK, """{"id":"new"}""", null);
+
+        using HttpClient client = new(handler);
+        string body = await GetAsync(client);
+
+        inner.Requests[0].Headers.IfNoneMatch.ShouldBeEmpty();
+        body.ShouldBe("""{"id":"new"}""");
+    }
+
+    [Test]
+    public async Task AnUnparsableStoredETag_IsNeverSent_AndNeverMatchesA304()
+    {
+        // "abc" has no quotes, so it is not an entity-tag. It cannot be added to
+        // If-None-Match, and the caller's 304 is not ours.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler handler, MemoryTcgDexResponseCache cache, CountingHandler inner) = BuildSeeded(time);
+        await SeedAsync(cache, time, "abc");
+        time.Advance(TimeSpan.FromMinutes(10));
+        inner.Respond(HttpStatusCode.NotModified, "", "\"x\"");
+
+        using HttpClient client = new(handler);
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.IfNoneMatch.ParseAdd("\"x\"");
+        using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
+
+        inner.Requests[0].Headers.GetValues("If-None-Match").ShouldBe(["\"x\""]);
+        response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        handler.Revalidations.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task AnUnparsableCallerIfNoneMatch_IsKeptBesideOurs()
+    {
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler _, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"old"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", "\"a\"");
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+
+        using HttpRequestMessage request = new(HttpMethod.Get, CardUrl);
+        request.Headers.TryAddWithoutValidation("If-None-Match", "abc").ShouldBeTrue();
+        using HttpResponseMessage _ = await client.SendAsync(request, CancellationToken.None);
+
+        string.Join(",", inner.Requests[1].Headers.GetValues("If-None-Match")).ShouldContain("abc");
+        string.Join(",", inner.Requests[1].Headers.GetValues("If-None-Match")).ShouldContain("\"a\"");
+    }
+
+    /// <summary>A cache whose eviction fails.</summary>
+    private sealed class ThrowingRemoveCache : ITcgDexResponseCache
+    {
+        public ValueTask<CachedResponse?> GetAsync(string key, CancellationToken cancellationToken = default)
+            => new((CachedResponse?)null);
+
+        public ValueTask SetAsync(string key, CachedResponse response, TimeSpan timeToLive, CancellationToken cancellationToken = default)
+            => default;
+
+        public ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("cache backend down");
+    }
+
+    [Test]
+    public async Task AFailingEviction_StillDisposesTheErrorResponse()
+    {
+        CountingHandler inner = new();
+        TrackedResponse tracked = new(HttpStatusCode.InternalServerError);
+        inner.RespondTracked(tracked, "", null);
+
+        using HttpClient client = new(new TcgDexCachingHandler(new ThrowingRemoveCache()) { InnerHandler = inner });
+
+        await Should.ThrowAsync<InvalidOperationException>(() => client.GetAsync(CardUrl, CancellationToken.None));
+
+        tracked.WasDisposed.ShouldBeTrue();
     }
 
     [Test]
