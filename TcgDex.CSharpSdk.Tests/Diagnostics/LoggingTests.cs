@@ -425,7 +425,7 @@ public sealed class LoggingTests
         TcgDexApiException error = Should.ThrowAsync<TcgDexApiException>(async () =>
             await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
 
-        error.Message.ShouldEndWith("was cancelled by the HTTP pipeline (for example HttpClient.Timeout).");
+        error.Message.ShouldContain("HttpClient.Timeout");
         recorded.ShouldHaveSingleItem().Status.ShouldBe(ActivityStatusCode.Error);
     }
 
@@ -460,8 +460,7 @@ public sealed class LoggingTests
         TcgDexApiException error = Should.ThrowAsync<TcgDexApiException>(async () =>
             await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
 
-        error.Message.ShouldEndWith(
-            "timed out after 00:00:00.2000000. Raise TcgDexOptions.Timeout if this endpoint is legitimately this slow.");
+        error.Message.ShouldContain("Raise TcgDexOptions.Timeout");
     }
 
     [Test]

@@ -51,14 +51,32 @@ public sealed class ContextCaptureTests
         }
     }
 
+    /// <summary>
+    /// Whether the counting context was still current when a gated operation started,
+    /// for the flow of the test that set it. Per async flow, so parallel tests cannot mix.
+    /// </summary>
+    private static readonly AsyncLocal<System.Runtime.CompilerServices.StrongBox<bool?>?> ContextAtGate = new();
+
+    private static void NoteContextAtGate()
+    {
+        // The first gated call only: a stream's later reads come after the SDK
+        // has correctly left the caller's context.
+        if (ContextAtGate.Value is { Value: null } box)
+        {
+            box.Value = SynchronizationContext.Current is CountingContext;
+        }
+    }
+
     private static async Task<T> AfterAsync<T>(Task gate, Func<Task<T>> next)
     {
+        NoteContextAtGate();
         await gate.ConfigureAwait(false);
         return await next().ConfigureAwait(false);
     }
 
     private static async Task AfterAsync(Task gate, Func<Task> next)
     {
+        NoteContextAtGate();
         await gate.ConfigureAwait(false);
         await next().ConfigureAwait(false);
     }
@@ -73,6 +91,8 @@ public sealed class ContextCaptureTests
         SynchronizationContext? previous = SynchronizationContext.Current;
         Task work;
 
+        System.Runtime.CompilerServices.StrongBox<bool?> atGate = new(null);
+        ContextAtGate.Value = atGate;
         SynchronizationContext.SetSynchronizationContext(context);
         try
         {
@@ -81,6 +101,7 @@ public sealed class ContextCaptureTests
         finally
         {
             SynchronizationContext.SetSynchronizationContext(previous);
+            ContextAtGate.Value = null;
         }
 
         // The control: if nothing was pending, no await suspended, and a zero
@@ -90,6 +111,12 @@ public sealed class ContextCaptureTests
         gate.SetResult(true);
         _ = await Task.WhenAny(work).ConfigureAwait(false);
 
+        // The second control, read once the work is done so a gated operation
+        // reached late has recorded itself: an earlier step that became genuinely
+        // async would drop the context before the gated await, and every SDK
+        // await after it would pass untested. (Null: this flow's gate is another
+        // caller's, as for a coalesced waiter.)
+        atGate.Value.ShouldNotBe(false, "the caller's context was gone before the gated operation started");
         context.Posts.ShouldBe(0, "an SDK continuation resumed on the caller's context");
         return work;
     }
