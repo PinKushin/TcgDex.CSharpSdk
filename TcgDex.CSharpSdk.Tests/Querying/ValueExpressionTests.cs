@@ -180,6 +180,18 @@ public sealed class ValueExpressionTests
     }
 
     [Test]
+    public void ALiftedOperatorOnANullValue_IsNotInvoked()
+    {
+        // C# lifts S -> int over S?: a null operand yields null without calling
+        // the operator. Reflection would pass default(S) instead and send the
+        // operator's answer for a value the caller never had.
+        Level? none = null;
+
+        Outcome(() => Query(c => c.Hp == (int?)none))
+            .ShouldBe(Outcome(() => Query(c => c.Hp == (int?)null)));
+    }
+
+    [Test]
     public void AThrowingOperator_SurfacesTheCallersException()
     {
         Wrapper wrapper = new(null);
@@ -229,6 +241,27 @@ public sealed class ValueExpressionTests
         public string Boom() => throw new InvalidOperationException(_message);
 
         public string Bang => throw new InvalidOperationException(_message);
+    }
+
+    /// <summary>The query string, or the exception type when building it fails.</summary>
+    private static string Outcome(Func<string> build)
+    {
+        try
+        {
+            return build();
+        }
+        catch (Exception exception) when (exception is NotSupportedException or ArgumentException or InvalidOperationException)
+        {
+            return exception.GetType().Name;
+        }
+    }
+
+    private readonly struct Level(int value)
+    {
+        public static explicit operator int(Level level)
+            => level._value != 0 ? level._value : throw new InvalidOperationException("called with a default Level");
+
+        private readonly int _value = value;
     }
 
     private sealed class Wrapper(string? value)

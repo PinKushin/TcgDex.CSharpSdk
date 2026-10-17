@@ -282,7 +282,14 @@ internal static class ExpressionTranslator
             // A user-defined implicit or explicit operator is a static method of
             // one argument; invoking it is what the cast means.
             case UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked, Method: not null } convert:
-                return Invoke(convert.Method, instance: null, [Evaluate(convert.Operand)]);
+                {
+                    // A lifted conversion of a null operand is null without calling
+                    // the operator; reflection would pass default(S) instead.
+                    object? operand = Evaluate(convert.Operand);
+                    return operand is null && convert.IsLifted
+                        ? null
+                        : Invoke(convert.Method, instance: null, [operand]);
+                }
 
             case UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert:
                 return ConvertValue(Evaluate(convert.Operand), convert);
