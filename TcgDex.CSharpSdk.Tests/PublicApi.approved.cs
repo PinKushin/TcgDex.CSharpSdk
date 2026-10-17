@@ -66,8 +66,11 @@ namespace TcgDex
         public TcgDexApiException(string message) { }
         public TcgDexApiException(string message, System.Exception? innerException) { }
         public TcgDexApiException(string message, System.Net.HttpStatusCode statusCode, TcgDex.Models.TcgDexProblem? problem = null, System.Exception? innerException = null) { }
+        public TcgDexApiException(string message, TcgDex.TcgDexErrorKind kind, System.Uri? requestUri, System.Net.HttpStatusCode? statusCode = default, TcgDex.Models.TcgDexProblem? problem = null, System.Exception? innerException = null) { }
         public bool IsLanguageError { get; }
+        public TcgDex.TcgDexErrorKind Kind { get; }
         public TcgDex.Models.TcgDexProblem? Problem { get; }
+        public System.Uri? RequestUri { get; }
         public System.Net.HttpStatusCode? StatusCode { get; }
     }
     public sealed class TcgDexClient : System.IDisposable, TcgDex.ITcgDexClient
@@ -81,6 +84,17 @@ namespace TcgDex
         public TcgDex.Resources.ISetResource Sets { get; }
         public void Dispose() { }
         public static TcgDex.TcgDexClient Create(TcgDex.TcgDexOptions? options = null, System.Action<TcgDex.Caching.TcgDexCacheOptions>? configureCache = null, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory = null) { }
+    }
+    public enum TcgDexErrorKind
+    {
+        Unspecified = 0,
+        HttpStatus = 1,
+        Network = 2,
+        Timeout = 3,
+        Canceled = 4,
+        ResponseTooLarge = 5,
+        InvalidResponse = 6,
+        GraphQlError = 7,
     }
     public static class TcgDexLanguages
     {

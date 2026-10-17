@@ -52,6 +52,34 @@ public sealed class TcgDexApiException : Exception
         Problem = problem;
     }
 
+    /// <summary>Creates an exception classified by what failed, and where.</summary>
+    /// <param name="message">The error description.</param>
+    /// <param name="kind">What went wrong.</param>
+    /// <param name="requestUri">The request that failed, when known.</param>
+    /// <param name="statusCode">The HTTP status returned, when there was a response.</param>
+    /// <param name="problem">The parsed problem document, when the body contained one.</param>
+    /// <param name="innerException">The underlying cause, if any.</param>
+    public TcgDexApiException(
+        string message,
+        TcgDexErrorKind kind,
+        Uri? requestUri,
+        HttpStatusCode? statusCode = null,
+        TcgDexProblem? problem = null,
+        Exception? innerException = null)
+        : base(message, innerException)
+    {
+        Kind = kind;
+        RequestUri = requestUri;
+        StatusCode = statusCode;
+        Problem = problem;
+    }
+
+    /// <summary>What went wrong.</summary>
+    public TcgDexErrorKind Kind { get; }
+
+    /// <summary>The request that failed, when known.</summary>
+    public Uri? RequestUri { get; }
+
     /// <summary>The HTTP status code the API returned, when there was a response.</summary>
     public HttpStatusCode? StatusCode { get; }
 

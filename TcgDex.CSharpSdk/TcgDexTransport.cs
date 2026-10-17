@@ -236,7 +236,9 @@ internal sealed class TcgDexTransport
 
         return result ?? throw new TcgDexApiException(
             $"The TCGdex API returned no content for '{relativePath}', which is " +
-            "expected always to be available.");
+            "expected always to be available.",
+            TcgDexErrorKind.InvalidResponse,
+            new Uri(_languageBase, relativePath));
     }
 
     /// <summary>
@@ -261,7 +263,9 @@ internal sealed class TcgDexTransport
             $"The request to '{uri}' timed out after {_timeout}. Raise " +
             $"{nameof(TcgDexOptions)}.{nameof(TcgDexOptions.Timeout)} if this endpoint " +
             "is legitimately this slow.",
-            ex);
+            TcgDexErrorKind.Timeout,
+            uri,
+            innerException: ex);
     }
 
     /// <summary>
@@ -302,7 +306,11 @@ internal sealed class TcgDexTransport
         {
             Errored(uri, activity, ex);
 
-            throw new TcgDexApiException($"The request to '{uri}' could not be completed.", ex);
+            throw new TcgDexApiException(
+                $"The request to '{uri}' could not be completed.",
+                TcgDexErrorKind.Network,
+                uri,
+                innerException: ex);
         }
         catch (TcgDexApiException ex)
         {
@@ -375,6 +383,8 @@ internal sealed class TcgDexTransport
 
         TcgDexApiException exception = new(
             $"The TCGdex API returned {(int)response.StatusCode} for '{uri}': {description}",
+            TcgDexErrorKind.HttpStatus,
+            uri,
             response.StatusCode,
             problem,
             innerException);
@@ -478,8 +488,9 @@ internal sealed class TcgDexTransport
             // as an API failure rather than leaking JsonException.
             throw new TcgDexApiException(
                 $"The response from '{uri}' was not valid JSON for {typeof(T).Name}.",
+                TcgDexErrorKind.InvalidResponse,
+                uri,
                 HttpStatusCode.OK,
-                problem: null,
                 innerException: ex);
         }
     }

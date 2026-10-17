@@ -104,7 +104,11 @@ internal sealed class GraphQlTransport(
 
             _logger.GraphQlErrors(messages);
 
-            throw new TcgDexApiException($"The TCGdex GraphQL endpoint reported errors: {messages}");
+            throw new TcgDexApiException(
+                $"The TCGdex GraphQL endpoint reported errors: {messages}",
+                TcgDexErrorKind.GraphQlError,
+                _endpoint,
+                HttpStatusCode.OK);
         }
 
         IReadOnlyList<Card?>? cards = response.Data?.Cards;
@@ -204,7 +208,11 @@ internal sealed class GraphQlTransport(
 
             if (budget?.IsCancellationRequested == true)
             {
-                throw new TcgDexApiException("The GraphQL request timed out.", ex);
+                throw new TcgDexApiException(
+                    $"The GraphQL request timed out after {_timeout}.",
+                    TcgDexErrorKind.Timeout,
+                    _endpoint,
+                    innerException: ex);
             }
 
             throw RequestBudget.PipelineCancelled(_endpoint, ex);
@@ -240,6 +248,8 @@ internal sealed class GraphQlTransport(
             {
                 throw new TcgDexApiException(
                     $"The TCGdex GraphQL endpoint returned {(int)httpResponse.StatusCode}.",
+                    TcgDexErrorKind.HttpStatus,
+                    _endpoint,
                     httpResponse.StatusCode);
             }
 
@@ -254,15 +264,28 @@ internal sealed class GraphQlTransport(
             return JsonSerializer.Deserialize(
                     new ReadOnlySpan<byte>(body.Array, body.Offset, body.Count),
                     GraphQlJsonContext.Default.GraphQlCardsResponse)
-                ?? throw new TcgDexApiException("The GraphQL endpoint returned an empty response.");
+                ?? throw new TcgDexApiException(
+                    "The GraphQL endpoint returned an empty response.",
+                    TcgDexErrorKind.InvalidResponse,
+                    _endpoint,
+                    HttpStatusCode.OK);
         }
         catch (HttpRequestException ex)
         {
-            throw new TcgDexApiException("The GraphQL request could not be completed.", ex);
+            throw new TcgDexApiException(
+                "The GraphQL request could not be completed.",
+                TcgDexErrorKind.Network,
+                _endpoint,
+                innerException: ex);
         }
         catch (JsonException ex)
         {
-            throw new TcgDexApiException("The GraphQL response was not valid JSON.", HttpStatusCode.OK, null, ex);
+            throw new TcgDexApiException(
+                "The GraphQL response was not valid JSON.",
+                TcgDexErrorKind.InvalidResponse,
+                _endpoint,
+                HttpStatusCode.OK,
+                innerException: ex);
         }
     }
 }
