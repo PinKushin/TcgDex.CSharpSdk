@@ -42,13 +42,8 @@ internal sealed class ReleaseDateConverter : JsonConverter<DateTime?>
     {
         Guard.NotNull(writer);
 
-        if (value is { } date)
-        {
-            writer.WriteStringValue(date.ToString(Format, CultureInfo.InvariantCulture));
-        }
-        else
-        {
-            writer.WriteNullValue();
-        }
+        // No null branch: HandleNull defaults to false for Nullable<T>, so
+        // System.Text.Json writes null itself and never passes one here.
+        writer.WriteStringValue(value.GetValueOrDefault().ToString(Format, CultureInfo.InvariantCulture));
     }
 }

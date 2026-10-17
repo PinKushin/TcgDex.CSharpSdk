@@ -15,6 +15,38 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-10-17
+
+### Changed
+
+- **Breaking:** `Set.ReleaseDate` and `Serie.ReleaseDate` are now `DateTime?` instead of `string?`,
+  on every target framework. The value is a date of kind `Unspecified` with no time component.
+  An absent or malformed date reads as `null` rather than failing the set or series.
+- **Breaking:** `TcgDexJsonContext` is no longer public. Deserialize models through the client, or
+  through your own `JsonSerializerContext` if you serialize them yourself.
+- `Where` now accepts array elements, indexers and parameterless instance methods on the value
+  side, such as `c.Id == ids[i]` or `c.Name == name.Trim()`, and applies casts with C# semantics.
+  It still never compiles the expression, so Native AOT is unaffected.
+- `DeserializePricing = false` now also skips the pricing on every `VariantsDetailed` entry, not
+  only `Card.Pricing`.
+
+### Fixed
+
+- A card whose TCGplayer pricing carries a key with a non-object value (for example
+  `"currency": "USD"`) no longer throws `JsonException`; the key is ignored.
+- `Contains`, `StartsWith` and `EndsWith` send the value as written. Before, `Contains("%2A")` was
+  decoded to `*` and matched every card.
+- `SearchDetailedAsync` throws `ArgumentOutOfRangeException` for a `page` or `itemsPerPage` below
+  one, as the REST query does, instead of sending it.
+- A GraphQL search result whose `set` is null is dropped and logged, like a null entry, instead of
+  being returned with a null `Set`.
+- `TcgDexLanguages.All` can no longer be modified by casting it to a mutable list.
+
+### Documentation
+
+- `Where` documents that a `*` at the start or end of a value, and any `|`, are interpreted by the
+  server as a wildcard and an OR, and cannot be matched literally.
+
 ## [0.6.3] - 2026-10-15
 
 ### Fixed

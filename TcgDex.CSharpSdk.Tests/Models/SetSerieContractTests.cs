@@ -165,6 +165,21 @@ public sealed class SetSerieContractTests
     }
 
     [Test]
+    public void ReleaseDate_Null_IsWrittenAsNullWhenNotIgnored()
+    {
+        // The SDK's options omit nulls; a caller's options that do not must
+        // still get `null`, which System.Text.Json writes without the converter.
+        JsonSerializer.Serialize(new Serie { Id = "x", Name = "x" }, NeverIgnoreNulls)
+            .ShouldContain("\"releaseDate\":null");
+    }
+
+    private static readonly JsonSerializerOptions NeverIgnoreNulls =
+        new(TcgDex.Serialization.TcgDexJsonContext.Default.Options)
+        {
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never,
+        };
+
+    [Test]
     public void ReleaseDate_Null_IsOmittedWhenSerialized()
         => JsonSerializer.Serialize(
                 new Serie { Id = "x", Name = "x" },
