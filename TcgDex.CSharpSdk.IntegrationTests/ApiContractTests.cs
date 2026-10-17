@@ -303,4 +303,20 @@ public sealed class ApiContractTests : LiveApiFixture
         // rather than silently ignored.
         card.Name.ShouldBe("Fouinar");
     }
+
+    [Test]
+    public async Task GetSet_WithAPlusInItsId_Resolves()
+    {
+        // A raw `+` in the path is read as a space and 404s; only `%2B`
+        // resolves. Proves the escaped segment survives Uri construction.
+        using HttpClient httpClient = new();
+        TcgDexClient client = new(
+            httpClient,
+            new TcgDexOptions { Language = TcgDexLanguages.Japanese });
+
+        Set? set = await client.Sets.GetAsync("SM1+", Timeout);
+
+        set.ShouldNotBeNull().Id.ShouldBe("SM1+");
+        set.ReleaseDate.ShouldNotBeNull();
+    }
 }
