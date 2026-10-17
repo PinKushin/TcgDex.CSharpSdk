@@ -552,3 +552,25 @@ soft bar, we do need to raise those scores if they can be."*
    equivalent, or untestable for a stated reason, is acceptable once written down.
 3. **CI and the local gate measure the same thing.** Met on 2026-10-15: CI now gates coverage across
    all three target frameworks.
+
+## 20. `TcgDexJsonContext` becomes internal before 1.0
+
+The Fable full-library review (2026-10-17) flagged that the source-generated `TcgDexJsonContext` is
+public. That makes every generated `JsonTypeInfo<T>` property part of the pinned public API, so after
+1.0 renaming or removing a model would break twice. Offered: make it internal, or keep it public on
+purpose. The owner, 2026-10-17: *"internal"*. No further reasoning given.
+
+Pending in 0.6.4. `PublicApi.approved.cs` shrinks accordingly, and tests reach the context through
+`InternalsVisibleTo` if they need it.
+
+## 21. `DeserializePricing = false` also skips per-variant pricing — CORRECTION
+
+`DeserializePricing` was documented as skipping `Card.Pricing`, and the code did exactly that. But the
+pricing inside each `variants_detailed[]` entry was still parsed, so an application that turned
+pricing off to save the work still paid for it on every printing. The second mutation round
+(2026-10-17) pinned the old behaviour with a test and asked which was intended. The owner:
+*"fix that deserialized bug too"*. So it is a bug: the option means no pricing is parsed anywhere on
+a card.
+
+Pending in 0.6.4. The pinning test `WhenTurnedOff_PerVariantPricingIsStillPopulated` is inverted, and
+the option's docs and CHANGELOG say so.
