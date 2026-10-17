@@ -51,7 +51,19 @@ internal sealed class TcgDexTransport
     /// </summary>
     private readonly DeserializedResponseCache? _deserialized;
 
-    internal TcgDexTransport(HttpClient httpClient, TcgDexOptions options, ILogger? logger = null)
+    /// <summary>Creates a transport, reading the options once.</summary>
+    /// <param name="httpClient">Sends the requests.</param>
+    /// <param name="options">Read once, here.</param>
+    /// <param name="logger">Where log messages go.</param>
+    /// <param name="sharedDeserialized">
+    /// A parsed-model cache shared with other clients, as <c>AddTcgDex</c>
+    /// supplies; otherwise this transport builds its own.
+    /// </param>
+    internal TcgDexTransport(
+        HttpClient httpClient,
+        TcgDexOptions options,
+        ILogger? logger = null,
+        DeserializedResponseCache? sharedDeserialized = null)
     {
         Guard.NotNull(httpClient);
         Guard.NotNull(options);
@@ -72,7 +84,7 @@ internal sealed class TcgDexTransport
         _jsonOptions = TcgDexJsonContracts.For(options);
 
         _deserialized = options.MaxDeserializedCacheEntries > 0
-            ? new DeserializedResponseCache(options.MaxDeserializedCacheEntries)
+            ? sharedDeserialized ?? new DeserializedResponseCache(options.MaxDeserializedCacheEntries)
             : null;
 
         // Both endpoints are checked here rather than in Validate(): this is

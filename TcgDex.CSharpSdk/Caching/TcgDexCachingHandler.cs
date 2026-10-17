@@ -1,8 +1,10 @@
 namespace TcgDex.Caching;
 
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using TcgDex.Diagnostics;
 
 /// <summary>
 /// Serves repeated reads from a cache, and revalidates with the API rather than
@@ -51,13 +53,13 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
     private readonly TcgDexCacheOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly long _maxResponseBytes;
+    private readonly ILogger _logger;
 
     /// <summary>
-    /// Tracks requests currently in flight so concurrent callers asking for the
-    /// same URL share one response instead of each issuing their own.
+    /// The counters and in-flight requests, which outlive this instance under
+    /// <c>IHttpClientFactory</c>. See <see cref="TcgDexCachingState"/>.
     /// </summary>
-    private readonly ConcurrentDictionary<string, Task<CachedResponse?>> _inFlight =
-        new(StringComparer.Ordinal);
+    private readonly TcgDexCachingState _state;
 
     /// <summary>Creates the handler.</summary>
     /// <param name="cache">Where responses are stored.</param>
@@ -79,6 +81,22 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         TcgDexCacheOptions? options = null,
         TimeProvider? timeProvider = null,
         long maxResponseBytes = 32L * 1024 * 1024)
+        : this(cache, options, timeProvider, maxResponseBytes, new TcgDexCachingState(), logger: null)
+    {
+    }
+
+    /// <summary>
+    /// Creates a handler over state shared with every other handler built for
+    /// the same client, which is how <c>AddTcgDexWithCaching</c> and
+    /// <see cref="TcgDexClient.Create"/> construct it.
+    /// </summary>
+    internal TcgDexCachingHandler(
+        ITcgDexResponseCache cache,
+        TcgDexCacheOptions? options,
+        TimeProvider? timeProvider,
+        long maxResponseBytes,
+        TcgDexCachingState state,
+        ILogger? logger)
     {
         Guard.NotNull(cache);
 
@@ -86,21 +104,24 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         _options = options ?? new TcgDexCacheOptions();
         _timeProvider = timeProvider ?? TimeProvider.System;
         _maxResponseBytes = maxResponseBytes;
+        _state = state;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     /// <summary>Number of responses served without any network request.</summary>
-    /// <remarks>Useful for confirming the cache is doing what you expect.</remarks>
-    public long FreshHits => _freshHits;
+    /// <remarks>
+    /// Useful for confirming the cache is doing what you expect. Under
+    /// <c>AddTcgDexWithCaching</c> this counts across every handler the factory
+    /// has built; inject <see cref="TcgDexCacheStatistics"/> to read it without
+    /// a handler.
+    /// </remarks>
+    public long FreshHits => _state.Statistics.FreshHits;
 
     /// <summary>Number of entries refreshed by a <c>304</c> instead of a re-download.</summary>
-    public long Revalidations => _revalidations;
+    public long Revalidations => _state.Statistics.Revalidations;
 
     /// <summary>Number of requests that went to the API in full.</summary>
-    public long Misses => _misses;
-
-    private long _freshHits;
-    private long _revalidations;
-    private long _misses;
+    public long Misses => _state.Statistics.Misses;
 
     /// <inheritdoc />
     protected override async Task<HttpResponseMessage> SendAsync(
@@ -126,7 +147,8 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
 
         if (cached is not null && cached.IsFresh(_timeProvider.GetUtcNow(), timeToLive))
         {
-            Interlocked.Increment(ref _freshHits);
+            _state.Statistics.RecordFreshHit();
+            _logger.CacheHit(key);
             return BuildResponse(request, cached, HttpStatusCode.OK);
         }
 
@@ -194,10 +216,12 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         // HttpResponseMessage has a single content stream, so it cannot be
         // handed to several waiters.
         TaskCompletionSource<CachedResponse?> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        Task<CachedResponse?> pending = _inFlight.GetOrAdd(key, tcs.Task);
+        Task<CachedResponse?> pending = _state.InFlight.GetOrAdd(key, tcs.Task);
 
         if (!ReferenceEquals(pending, tcs.Task))
         {
+            _logger.RequestCoalesced(key);
+
             // Someone else is already fetching this URL.
             //
             // Awaited through THIS caller's token, not bare. Waiting on the
@@ -236,7 +260,7 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         }
         finally
         {
-            _inFlight.TryRemove(key, out _);
+            _state.InFlight.TryRemove(key, out _);
         }
     }
 
@@ -391,7 +415,8 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             // Taking a renewed ETag also moves the transport's parsed-model
             // cache, which is keyed by this same ETag, onto the new value.
             response.Dispose();
-            Interlocked.Increment(ref _revalidations);
+            _state.Statistics.RecordRevalidation();
+            _logger.CacheRevalidated(key);
 
             CachedResponse refreshed = cached with
             {
@@ -411,26 +436,10 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
 
         if (!response.IsSuccessStatusCode)
         {
-            // Errors are never cached: a 404 now must not suppress a card that
-            // appears later, and a 5xx blip must not become a persistent outage
-            // for the caller. The real response goes back untouched.
-            //
-            // The response is not the caller's until it is returned, so a
-            // custom cache whose eviction throws must not leak it.
-            try
-            {
-                await _cache.RemoveAsync(key, cancellationToken).ConfigureAwait(false);
-            }
-            catch
-            {
-                response.Dispose();
-                throw;
-            }
-
-            return FetchResult.FromResponse(response);
+            return await EvictAfterFailureAsync(key, response, cached, cancellationToken).ConfigureAwait(false);
         }
 
-        Interlocked.Increment(ref _misses);
+        _state.Statistics.RecordMiss();
 
         // Ownership passes here. Every path that hands `response` back to the
         // caller has already returned above, so from this point it is ours — and
@@ -472,8 +481,45 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         };
 
         await _cache.SetAsync(key, stored, timeToLive, cancellationToken).ConfigureAwait(false);
+        _logger.CacheMiss(key, stored.Body.Length);
 
         return FetchResult.FromCache(stored);
+    }
+
+    /// <summary>
+    /// Drops the entry for a URL that just failed, and hands the failure back.
+    /// </summary>
+    /// <remarks>
+    /// Errors are never cached: a 404 now must not suppress a card that
+    /// appears later, and a 5xx blip must not become a persistent outage for
+    /// the caller. The real response goes back untouched.
+    /// </remarks>
+    private async Task<FetchResult> EvictAfterFailureAsync(
+        string key,
+        HttpResponseMessage response,
+        CachedResponse? cached,
+        CancellationToken cancellationToken)
+    {
+        // The response is not the caller's until it is returned, so a custom
+        // cache whose eviction throws must not leak it.
+        try
+        {
+            await _cache.RemoveAsync(key, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
+
+        // Logged only when there was an entry to evict; a failure on a URL
+        // never cached evicts nothing.
+        if (cached is not null)
+        {
+            _logger.CacheEvicted(key);
+        }
+
+        return FetchResult.FromResponse(response);
     }
 
     /// <summary>

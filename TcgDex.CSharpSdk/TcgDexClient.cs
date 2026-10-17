@@ -100,11 +100,25 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
     {
     }
 
+    /// <summary>
+    /// The container's constructor: the parsed-model cache comes from the
+    /// container too, so it outlives this transient instance.
+    /// </summary>
+    internal TcgDexClient(
+        HttpClient httpClient,
+        TcgDexOptions options,
+        ILoggerFactory? loggerFactory,
+        DeserializedResponseCache? sharedDeserialized)
+        : this(httpClient, options, ownsHttpClient: false, loggerFactory, sharedDeserialized)
+    {
+    }
+
     private TcgDexClient(
         HttpClient httpClient,
         TcgDexOptions? options,
         bool ownsHttpClient,
-        ILoggerFactory? loggerFactory)
+        ILoggerFactory? loggerFactory,
+        DeserializedResponseCache? sharedDeserialized = null)
     {
         _ownedHttpClient = ownsHttpClient ? httpClient : null;
 
@@ -112,9 +126,9 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
 
         // One category for the whole SDK, so a consumer can filter everything it
         // emits with a single rule on "TcgDex".
-        ILogger logger = loggerFactory?.CreateLogger("TcgDex") ?? NullLogger.Instance;
+        ILogger logger = loggerFactory?.CreateLogger(TcgDexLog.Category) ?? NullLogger.Instance;
 
-        TcgDexTransport transport = new(httpClient, resolved, logger);
+        TcgDexTransport transport = new(httpClient, resolved, logger, sharedDeserialized);
         GraphQlTransport graphQl = new(httpClient, resolved, logger);
 
         logger.ClientConfigured(resolved.Language, resolved.BaseAddress);
@@ -261,7 +275,9 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
                 new MemoryTcgDexResponseCache(cacheOptions.MaxEntries),
                 cacheOptions,
                 timeProvider: null,
-                maxResponseBytes: resolved.MaxResponseBytes)
+                maxResponseBytes: resolved.MaxResponseBytes,
+                new TcgDexCachingState(),
+                loggerFactory?.CreateLogger(TcgDexLog.Category))
             {
                 InnerHandler = handler,
             };

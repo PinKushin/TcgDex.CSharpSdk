@@ -34,6 +34,12 @@ namespace TcgDex.Caching
         public System.TimeSpan PricingTimeToLive { get; set; }
         public virtual System.TimeSpan GetTimeToLive(System.Uri requestUri) { }
     }
+    public sealed class TcgDexCacheStatistics
+    {
+        public long FreshHits { get; }
+        public long Misses { get; }
+        public long Revalidations { get; }
+    }
     public sealed class TcgDexCachingHandler : System.Net.Http.DelegatingHandler
     {
         public TcgDexCachingHandler(TcgDex.Caching.ITcgDexResponseCache cache, TcgDex.Caching.TcgDexCacheOptions? options = null, System.TimeProvider? timeProvider = null, long maxResponseBytes = 33554432) { }
