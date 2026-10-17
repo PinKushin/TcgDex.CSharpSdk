@@ -184,15 +184,16 @@ internal static class ExpressionTranslator
         }
 
         string field = FieldName(member);
-        string? argument = Evaluate(node.Arguments[0])?.ToString();
 
-        if (string.IsNullOrEmpty(argument))
+        // Taken as written. QueryFilter escapes it exactly once; unescaping here
+        // first turned a literal `%2A` into a `*` wildcard matching every card.
+        // A pattern rather than string.IsNullOrEmpty, whose netstandard2.0
+        // signature carries no NotNullWhen.
+        if (Evaluate(node.Arguments[0])?.ToString() is not { Length: > 0 } value)
         {
             throw new NotSupportedException(
                 $"'{node.Method.Name}' needs a non-empty value to build a filter for '{field}'.");
         }
-
-        string value = Uri.UnescapeDataString(argument);
 
         return node.Method.Name switch
         {
@@ -252,37 +253,91 @@ internal static class ExpressionTranslator
     }
 
     /// <summary>
-    /// Reads a constant or captured value out of the tree without compiling it.
+    /// Reads a value out of the tree by interpreting it, without compiling it.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// A captured local becomes a field on a compiler-generated closure, so it
-    /// is read reflectively. This is a metadata read, not code generation, and
-    /// so remains valid under Native AOT — unlike
-    /// <see cref="LambdaExpression.Compile()"/>.
+    /// is read reflectively. Beyond that, the common value shapes are
+    /// interpreted: array elements, indexers (<c>list[i]</c>), parameterless
+    /// instance methods (<c>name.Trim()</c>) and conversions. Each is a
+    /// metadata read or a <see cref="MethodBase.Invoke(object, object[])"/> of a
+    /// method the caller's code already references — never code generation —
+    /// so it stays valid under Native AOT, unlike
+    /// <see cref="LambdaExpression.Compile()"/> (DECISIONS #4).
+    /// </para>
+    /// <para>
+    /// Static method calls and methods taking arguments stay unsupported: hoist
+    /// them into a local first.
+    /// </para>
     /// </remarks>
     private static object? Evaluate(Expression expression)
     {
-        Expression current = expression;
-
-        while (current is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
-        {
-            current = convert.Operand;
-        }
-
-        switch (current)
+        switch (expression)
         {
             case ConstantExpression constant:
                 return constant.Value;
+
+            case UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert:
+                return ConvertValue(Evaluate(convert.Operand), convert.Type);
 
             case MemberExpression { Expression: null } staticMember:
                 return ReadMember(staticMember.Member, instance: null);
 
             case MemberExpression member:
-                return ReadMember(member.Member, Evaluate(member.Expression));
+                return ReadMember(member.Member, Receiver(member.Expression, expression));
+
+            case BinaryExpression { NodeType: ExpressionType.ArrayIndex } index:
+                return ((Array)Receiver(index.Left, expression)).GetValue(Convert.ToInt64(Evaluate(index.Right), CultureInfo.InvariantCulture));
+
+            case MethodCallExpression { Object: not null } call
+                when call.Arguments.Count == 0 || call.Method.IsSpecialName && string.Equals(call.Method.Name, "get_Item", StringComparison.Ordinal):
+                return Invoke(call.Method, Receiver(call.Object, expression), call.Arguments.Select(Evaluate).ToArray());
 
             default:
                 throw Unsupported(expression);
         }
+    }
+
+    /// <summary>Evaluates the object a member, index or call is applied to, rejecting null.</summary>
+    private static object Receiver(Expression receiver, Expression node)
+        => Evaluate(receiver) ?? throw new NotSupportedException(
+            $"Cannot evaluate '{node}' while building a filter: '{receiver}' is null.");
+
+    /// <summary>Invokes a method, surfacing the caller's own exception rather than the reflection wrapper.</summary>
+    private static object? Invoke(MethodInfo method, object instance, object?[] arguments)
+    {
+        try
+        {
+            return method.Invoke(instance, arguments);
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Applies a conversion with C# cast semantics for the numeric cases a
+    /// filter value can take: a floating value cast to an integral type is
+    /// truncated, not rounded.
+    /// </summary>
+    private static object? ConvertValue(object? value, Type type)
+    {
+        Type target = Nullable.GetUnderlyingType(type) ?? type;
+
+        if (value is null || target.IsInstanceOfType(value) || value is not IConvertible)
+        {
+            return value;
+        }
+
+        if (value is double or float or decimal && target.IsPrimitive && target != typeof(double) && target != typeof(float))
+        {
+            value = decimal.Truncate(Convert.ToDecimal(value, CultureInfo.InvariantCulture));
+        }
+
+        return Convert.ChangeType(value, target, CultureInfo.InvariantCulture);
     }
 
     private static object? ReadMember(MemberInfo member, object? instance)

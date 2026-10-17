@@ -68,6 +68,22 @@ public sealed class CardQuery
     /// </summary>
     /// <param name="predicate">The condition to translate.</param>
     /// <returns>A new query including this filter.</returns>
+    /// <remarks>
+    /// <para>
+    /// The value side may be a constant, a captured variable, an array element
+    /// or indexer (<c>ids[i]</c>), a parameterless instance method
+    /// (<c>name.Trim()</c>), or a cast. It is read without compiling the
+    /// expression, so this stays Native AOT safe. Static method calls and
+    /// methods taking arguments are not evaluated: assign them to a local first.
+    /// </para>
+    /// <para>
+    /// <b>Two characters cannot be matched literally.</b> A <c>*</c> at the start
+    /// or end of a value becomes a wildcard, and a <c>|</c> anywhere becomes an
+    /// OR between alternatives. The SDK escapes both, but the server decodes the
+    /// value before interpreting it, so this cannot be fixed client-side. Every
+    /// other character, <c>%</c> included, is sent as written.
+    /// </para>
+    /// </remarks>
     /// <exception cref="NotSupportedException">
     /// The predicate has no equivalent in the API's filter syntax. The message
     /// names the offending expression and lists the supported forms.

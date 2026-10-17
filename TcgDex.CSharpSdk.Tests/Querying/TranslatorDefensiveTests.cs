@@ -163,23 +163,11 @@ public sealed class TranslatorDefensiveTests
     [Test]
     public void AMethodCallAsTheComparedValue_IsRejected()
     {
-        // Evaluating this would mean invoking caller code during translation,
-        // which the translator deliberately never does.
+        // Only parameterless instance methods and indexers are interpreted
+        // (ValueExpressionTests); a static call is still rejected by name.
         NotSupportedException exception = Rejects(p => p.Name == MakeName());
 
         Names(exception, "MakeName()");
-    }
-
-    [Test]
-    public void AnArrayIndexAsTheComparedValue_IsRejected()
-    {
-        string[] names = new[] { "a", "b" };
-
-        // The indexer only, not the whole rendered expression: a captured local
-        // is reached through a compiler-generated closure, so the full text
-        // carries a display-class name that would change if this test method
-        // were renamed.
-        Names(Rejects(p => p.Name == names[0]), "names[0]");
     }
 
     // ----- the part of the message that is the same every time -----
