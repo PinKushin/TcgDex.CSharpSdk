@@ -560,7 +560,7 @@ public. That makes every generated `JsonTypeInfo<T>` property part of the pinned
 1.0 renaming or removing a model would break twice. Offered: make it internal, or keep it public on
 purpose. The owner, 2026-10-17: *"internal"*. No further reasoning given.
 
-Pending in 0.6.4. `PublicApi.approved.cs` shrinks accordingly, and tests reach the context through
+Done in 0.6.4. `PublicApi.approved.cs` shrinks accordingly, and tests reach the context through
 `InternalsVisibleTo` if they need it.
 
 ## 21. `DeserializePricing = false` also skips per-variant pricing — CORRECTION
@@ -572,5 +572,38 @@ pricing off to save the work still paid for it on every printing. The second mut
 *"fix that deserialized bug too"*. So it is a bug: the option means no pricing is parsed anywhere on
 a card.
 
-Pending in 0.6.4. The pinning test `WhenTurnedOff_PerVariantPricingIsStillPopulated` is inverted, and
-the option's docs and CHANGELOG say so.
+Done in 0.6.4. The old behaviour had not reached `main` as a pinning test, so the test written is
+`WhenTurnedOff_PerVariantPricingIsNullToo`. The option's docs and CHANGELOG say so.
+
+## 22. .NET conventions everywhere; `ReleaseDate` becomes `DateTime?`
+
+The owner, 2026-10-17, approving `ReleaseDate` changing from `string?` to a date type: *"i want .net
+conventions everywhere, thats the point int he sdk really"*. The SDK exists to give .NET developers
+idiomatic types, so where the JSON's shape and .NET convention differ, convention wins. Before 1.0
+that applies even when the change is breaking.
+
+`ReleaseDate` is `DateTime?` (date only, kind `Unspecified`) on every target. The modern convention
+for a calendar date is `DateOnly`, but netstandard2.0 (Unity, .NET Framework) lacks it, and public
+types that differ by target framework are ruled out. A string had been kept on the assumption of
+partial dates. That assumption was wrong: on 2026-10-17 all 606 sets (en 220, fr 202, ja 184) had a
+full `YYYY-MM-DD`. An absent or malformed value reads as null rather than failing the set.
+
+## 23. 1.0 review notes, decided
+
+The Fable full-library review (2026-10-17) raised notes that would be breaking or awkward to change
+after 1.0. Each was put to the owner, who said *"do 8, and 9, fix 12 too that seems like a bug, and
+support 11, 1-6 are obviously fixed"*. All are done in 0.6.4:
+
+- **#8, failure kind:** `TcgDexApiException` gains `Kind` (a `TcgDexErrorKind`) and `RequestUri`, so
+  callers branch on the failure instead of parsing the message. A language 404 stays `HttpStatus`
+  with `IsLanguageError` set, so that fact lives in one place. `GraphQlError` exists because GraphQL
+  errors arrive as `200`.
+- **#9, options:** options are read once, when the client is created, on REST and GraphQL alike.
+- **#11, value expressions:** `Where` evaluates indexers, array elements, parameterless instance
+  methods and casts on the value side by interpretation, never `Expression.Compile()` (#4).
+- **#12, handler rotation:** a bug, as the owner said. The caching handler's coalescing and counters
+  live in a singleton (`TcgDexCacheStatistics`) and survive `IHttpClientFactory` rebuilding handlers.
+- **Also decided in the same pass:** a second `AddTcgDex` throws rather than silently keeping the
+  first options. `#13`, a server page-size cap, was measured, not assumed: there is none (5000
+  returned 5000).
+

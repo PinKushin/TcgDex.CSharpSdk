@@ -153,7 +153,18 @@ mutable is shared.
 
 ## Checking it works
 
-The handler counts what it did:
+With dependency injection, inject `TcgDexCacheStatistics`, registered by
+`AddTcgDexWithCaching`. Its counts survive `IHttpClientFactory` rebuilding handlers:
+
+```csharp
+public sealed class CacheReport(TcgDexCacheStatistics stats)
+{
+    public string Describe() =>
+        $"{stats.FreshHits} fresh, {stats.Revalidations} revalidated, {stats.Misses} fetched";
+}
+```
+
+Without a container, the handler counts what it did:
 
 ```csharp
 TcgDexCachingHandler handler = new(new MemoryTcgDexResponseCache());
