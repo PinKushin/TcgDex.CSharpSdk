@@ -20,7 +20,7 @@ observed behaviour is documented and the discrepancy is called out.
 | Auth | None. Public API. |
 | HTTPS | Required; HTTP redirects to HTTPS. |
 | CORS | `Access-Control-Allow-Origin: *` |
-| Caching | Responses send `Cache-Control: no-cache, no-store, must-revalidate` and a weak `ETag`. |
+| Caching | Responses send `Cache-Control: no-cache, no-store, must-revalidate` and a weak `ETag`; `If-None-Match` gets `304`. The header is added in front of the Express app, not by it, and was present by 2024-10. TCGdex Discord, 2026-10-17: "likely just never set", cache control is "up to the user to manage". Pricing updates once a day, and an `Expires` header aligned to that update is being considered. |
 
 There is **no** `/v2/{lang}` index endpoint — it returns 404.
 

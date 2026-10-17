@@ -5,8 +5,9 @@ namespace TcgDex.Caching;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The API sends <c>Cache-Control: no-cache, no-store, must-revalidate</c>,
-/// which is aimed at shared and intermediary caches. This SDK's cache is an
+/// The API sends <c>Cache-Control: no-cache, no-store, must-revalidate</c>, which
+/// TCGdex has said was likely never set deliberately: caching is left to the
+/// application, and pricing updates once a day. This SDK's cache is an
 /// opt-in, application-level cache: it keeps entries for the freshness window
 /// and then revalidates them with <c>If-None-Match</c>, which the API answers
 /// with <c>304</c> and no body when nothing changed. Time-to-live therefore
