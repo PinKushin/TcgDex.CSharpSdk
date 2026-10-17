@@ -2,6 +2,7 @@ namespace TcgDex.Tests.Models;
 
 using System.Net;
 using System.Net.Http;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using TcgDex;
@@ -96,6 +97,35 @@ public sealed class PricingOptOutTests
         card.Set.ShouldNotBeNull().Id.ShouldBe("swsh3");
         card.Attacks.ShouldNotBeNull().ShouldNotBeEmpty();
         card.Variants.ShouldNotBeNull();
+    }
+
+    [Test]
+    public async Task WhenTurnedOff_PerVariantPricingIsStillPopulated()
+    {
+        // The option is documented as covering Card.Pricing only, and the
+        // contract modifier returns early for every type but Card. DetailedVariant
+        // has a "pricing" property of its own, so without that early return the
+        // skip converter would be attached to it too. This pins the documented
+        // scope: swsh3-136 carries a per-printing pricing block, and it survives.
+        using TcgDexClient client = CreateClient(deserializePricing: false);
+
+        Card card = (await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).ShouldNotBeNull();
+
+        card.Pricing.ShouldBeNull();
+        card.VariantsDetailed[0].Pricing.ShouldNotBeNull()
+            .Cardmarket.ShouldNotBeNull().Avg.ShouldBe(0.08m);
+    }
+
+    [Test]
+    public void WhenTurnedOff_TheSkipConverter_RejectsANullWriter()
+    {
+        JsonSerializerOptions contract = TcgDexJsonContracts.For(new TcgDexOptions { DeserializePricing = false });
+        JsonConverter<Pricing?> converter = (JsonConverter<Pricing?>)contract.GetTypeInfo(typeof(Card))
+            .Properties.Single(p => p.Name == "pricing").CustomConverter.ShouldNotBeNull();
+
+        // Without the guard this is a NullReferenceException from WriteNullValue.
+        Should.Throw<ArgumentNullException>(() => converter.Write(null!, null, contract))
+            .ParamName.ShouldBe("writer");
     }
 
     [Test]

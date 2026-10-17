@@ -233,14 +233,19 @@ public sealed class ClientTests
         // A public extension method on IServiceCollection, so this guard is
         // contract rather than internal defensiveness — and it was untested on
         // both overloads.
-        Should.Throw<ArgumentNullException>(() => TcgDexServiceCollectionExtensions.AddTcgDex(null!));
+        //
+        // The parameter name is asserted because without the guard the call still
+        // throws ArgumentNullException, from TryAddSingleton, naming "collection".
+        Should.Throw<ArgumentNullException>(() => TcgDexServiceCollectionExtensions.AddTcgDex(null!))
+            .ParamName.ShouldBe("services");
     }
 
     [Test]
     public void AddTcgDexWithCaching_WithNullServices_Throws()
     {
         Should.Throw<ArgumentNullException>(
-            () => TcgDexServiceCollectionExtensions.AddTcgDexWithCaching(null!));
+            () => TcgDexServiceCollectionExtensions.AddTcgDexWithCaching(null!))
+            .ParamName.ShouldBe("services");
     }
 
     [Test]

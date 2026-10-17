@@ -37,6 +37,35 @@ public sealed class TcgDexOptionsTests
         // The message has to name the fix, because the symptom a caller sees is
         // "no cards found" — nothing that points at a URI at all.
         error.Message.ShouldContain("must end with '/'");
+        error.Message.ShouldContain(
+            "Without it the last path segment is replaced rather than appended to, " +
+            "so requests would silently lose the API root.");
+    }
+
+    // The next three pin the whole message, not a keyword: each names the value it
+    // rejected and the setting that removes the limit, and that is the part a caller
+    // reading the exception needs.
+
+    [Test]
+    public void Timeout_OfZero_Throws_AndNamesTheInfiniteAlternative()
+        => Should.Throw<ArgumentException>(new TcgDexOptions { Timeout = TimeSpan.Zero }.Validate)
+            .Message.ShouldContain(
+                "Timeout must be positive, but was 00:00:00. Use Timeout.InfiniteTimeSpan to remove the limit.");
+
+    [Test]
+    public void MaxDeserializedCacheEntries_Negative_Throws_AndNamesZero()
+        => Should.Throw<ArgumentException>(new TcgDexOptions { MaxDeserializedCacheEntries = -1 }.Validate)
+            .Message.ShouldContain(
+                "MaxDeserializedCacheEntries cannot be negative, but was -1. Use zero to disable the cache.");
+
+    [Test]
+    public void Language_Unsupported_Throws_AndListsTheLanguagesCommaSeparated()
+    {
+        string message = Should.Throw<ArgumentException>(new TcgDexOptions { Language = "xx" }.Validate).Message;
+
+        message.ShouldContain("Language 'xx' is not supported by the TCGdex API.");
+        message.ShouldContain($"Supported languages are: {string.Join(", ", TcgDexLanguages.All)}.");
+        message.ShouldContain("en, fr", Case.Sensitive, "the list must be readable, not run together");
     }
 
     [Test]
