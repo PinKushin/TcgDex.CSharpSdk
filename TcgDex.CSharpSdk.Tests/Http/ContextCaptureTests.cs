@@ -176,7 +176,15 @@ public sealed class ContextCaptureTests
             set => throw new NotSupportedException();
         }
 
-        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+        // Gated too. .NET Framework buffers an unbounded read through BeginRead,
+        // which lands here on a pool thread; ungated, that read could finish
+        // before the test's "still pending" control looked, failing it about one
+        // run in six on net472.
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            gate.Wait();
+            return _inner.Read(buffer, offset, count);
+        }
 
         public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
             => AfterAsync(gate, () => Task.FromResult(_inner.Read(buffer, offset, count)));
