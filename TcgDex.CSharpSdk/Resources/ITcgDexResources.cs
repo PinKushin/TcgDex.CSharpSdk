@@ -45,6 +45,7 @@ public interface ICardResource
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The matching cards, fully populated.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="filter"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="page"/> or <paramref name="itemsPerPage"/> is less than one.</exception>
     /// <exception cref="TcgDexApiException">The query failed or the server reported errors.</exception>
     /// <remarks>
     /// <para>

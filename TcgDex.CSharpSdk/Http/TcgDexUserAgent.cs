@@ -42,10 +42,20 @@ using System.Reflection;
 internal static class TcgDexUserAgent
 {
     /// <summary>
+    /// The SDK's <c>Major.Minor.Build</c> version. Also the tracing source's version
+    /// (<see cref="Diagnostics.TcgDexActivity"/>), so the two cannot disagree.
+    /// </summary>
+    /// <remarks>
+    /// Declared above <see cref="s_product"/> on purpose: static initializers run in textual
+    /// order, and that field reads this one.
+    /// </remarks>
+    internal static string ProductVersion { get; } = BuildProductVersion();
+
+    /// <summary>
     /// Computed once. A per-request allocation here would be wasted work — every request from a
     /// given process sends the identical value.
     /// </summary>
-    private static readonly ProductInfoHeaderValue s_product = BuildProduct();
+    private static readonly ProductInfoHeaderValue s_product = new("TcgDex.CSharpSdk", ProductVersion);
 
     /// <summary>
     /// Sets the <c>User-Agent</c> header on <paramref name="request"/>.
@@ -54,7 +64,7 @@ internal static class TcgDexUserAgent
     internal static void Apply(HttpRequestMessage request)
         => request.Headers.UserAgent.Add(s_product);
 
-    private static ProductInfoHeaderValue BuildProduct()
+    private static string BuildProductVersion()
     {
         Version? version = typeof(TcgDexUserAgent).Assembly.GetName().Version;
 
@@ -64,13 +74,11 @@ internal static class TcgDexUserAgent
         //
         // The null branch is not unit-tested and left that way deliberately: Assembly.GetName()
         // .Version is null only for a dynamically-emitted assembly with no version ever set, which
-        // this compiled library can never be. Making BuildProduct internal purely to reflection-
+        // this compiled library can never be. Making BuildProductVersion internal purely to reflection-
         // invoke it with a fabricated null would trade a genuinely private implementation detail
         // for coverage of a branch with no realistic path to firing.
-        string productVersion = version is null
+        return version is null
             ? "unknown"
             : $"{version.Major}.{version.Minor}.{version.Build}";
-
-        return new ProductInfoHeaderValue("TcgDex.CSharpSdk", productVersion);
     }
 }

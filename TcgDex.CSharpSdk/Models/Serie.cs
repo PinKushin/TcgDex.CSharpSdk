@@ -34,8 +34,13 @@ public sealed record Serie
     /// <summary>Logo image URL, without file extension.</summary>
     public string? Logo { get; init; }
 
-    /// <summary>Release date of the series' first set, in <c>yyyy-MM-dd</c> form.</summary>
-    public string? ReleaseDate { get; init; }
+    /// <summary>
+    /// Release date of the series' first set, as a date of kind
+    /// <see cref="DateTimeKind.Unspecified"/> with no time component;
+    /// <see langword="null"/> when absent or not a full <c>yyyy-MM-dd</c> date.
+    /// </summary>
+    [JsonConverter(typeof(Serialization.ReleaseDateConverter))]
+    public DateTime? ReleaseDate { get; init; }
 
     /// <summary>The earliest set in the series.</summary>
     public SetBrief? FirstSet { get; init; }

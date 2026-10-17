@@ -6,3 +6,9 @@
 // contract is the point, and doing that through the public resource clients
 // would test two things at once.
 [assembly: InternalsVisibleTo("TcgDex.CSharpSdk.Tests")]
+
+// TcgDexJsonContext is internal (DECISIONS #20). The AOT smoke test and the
+// benchmarks deserialize through it directly — that is what they measure —
+// so they are granted access rather than the context being public API.
+[assembly: InternalsVisibleTo("TcgDex.CSharpSdk.AotSmokeTest")]
+[assembly: InternalsVisibleTo("TcgDex.CSharpSdk.Benchmarks")]

@@ -15,6 +15,66 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-10-17
+
+### Added
+
+- `TcgDexApiException.Kind` (a new `TcgDexErrorKind`: `HttpStatus`, `Network`, `Timeout`,
+  `Canceled`, `ResponseTooLarge`, `InvalidResponse`, `GraphQlError`) and
+  `TcgDexApiException.RequestUri`, set on every exception the SDK throws, so a caller can branch on
+  the failure without reading the message.
+- `TcgDexCacheStatistics`, registered by `AddTcgDexWithCaching`: inject it to read the cache's
+  fresh hits, revalidations and misses.
+- The cache log events 1100–1104 (hit, revalidated, miss, coalesced, evicted) are now emitted. They
+  were documented but never written.
+
+### Changed
+
+- **Breaking:** `Set.ReleaseDate` and `Serie.ReleaseDate` are now `DateTime?` instead of `string?`,
+  on every target framework. The value is a date of kind `Unspecified` with no time component.
+  An absent or malformed date reads as `null` rather than failing the set or series.
+- **Breaking:** `TcgDexJsonContext` is no longer public. Deserialize models through the client, or
+  through your own `JsonSerializerContext` if you serialize them yourself.
+- `Where` now accepts array elements, indexers and parameterless instance methods on the value
+  side, such as `c.Id == ids[i]` or `c.Name == name.Trim()`, and applies casts with C# semantics.
+  It still never compiles the expression, so Native AOT is unaffected.
+- `DeserializePricing = false` now also skips the pricing on every `VariantsDetailed` entry, not
+  only `Card.Pricing`.
+- Options are read once, when the client is created. GraphQL searches used to pick up later changes
+  to `GraphQlEndpoint`, `Timeout` and `MaxResponseBytes`; they no longer do, matching REST.
+- Calling `AddTcgDex` or `AddTcgDexWithCaching` a second time on one service collection now throws
+  `InvalidOperationException`. The second call's options used to be silently ignored.
+
+### Fixed
+
+- The in-memory caches could throw `ArgumentException` ("IComparer.Compare() method returns
+  inconsistent results") from a cache write when entries were evicted while other threads read
+  them.
+- `IOptions<TcgDexOptions>`, `IOptionsSnapshot` and `IOptionsMonitor` now see every configured
+  property. Only `BaseAddress`, `Language` and `GraphQlEndpoint` used to reach them.
+- Under `AddTcgDex`, the parsed-model cache (`MaxDeserializedCacheEntries`) is now shared by every
+  resolved client. Each resolution used to get an empty cache, so it never hit.
+- Under `AddTcgDexWithCaching`, the cache counters and request coalescing now survive
+  `IHttpClientFactory` rebuilding its handlers (every two minutes by default). Both used to reset.
+- `TcgDexOptions.Validate` now rejects a relative `GraphQlEndpoint` with `ArgumentException`.
+- The `ActivitySource` now reports the SDK's version instead of `0.1.0`.
+- `MemoryTcgDexResponseCache` no longer throws, or stores an entry already expired, for a very large
+  time-to-live.
+- A card whose TCGplayer pricing carries a key with a non-object value (for example
+  `"currency": "USD"`) no longer throws `JsonException`; the key is ignored.
+- `Contains`, `StartsWith` and `EndsWith` send the value as written. Before, `Contains("%2A")` was
+  decoded to `*` and matched every card.
+- `SearchDetailedAsync` throws `ArgumentOutOfRangeException` for a `page` or `itemsPerPage` below
+  one, as the REST query does, instead of sending it.
+- A GraphQL search result whose `set` is null is dropped and logged, like a null entry, instead of
+  being returned with a null `Set`.
+- `TcgDexLanguages.All` can no longer be modified by casting it to a mutable list.
+
+### Documentation
+
+- `Where` documents that a `*` at the start or end of a value, and any `|`, are interpreted by the
+  server as a wildcard and an OR, and cannot be matched literally.
+
 ## [0.6.3] - 2026-10-15
 
 ### Fixed
@@ -397,7 +457,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.0...v0.6.1

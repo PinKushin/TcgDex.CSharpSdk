@@ -66,12 +66,18 @@ public static class TcgDexLanguages
     public const string ChineseSimplified = "zh-cn";
 
     /// <summary>Every supported language code.</summary>
-    public static IReadOnlyList<string> All { get; } =
+    /// <remarks>
+    /// Wrapped explicitly. A bare collection expression is read-only today only
+    /// because of the type Roslyn happens to synthesize; the language leaves that
+    /// choice open, and an array behind the interface could be cast back and
+    /// written, changing the list for every client in the process.
+    /// </remarks>
+    public static IReadOnlyList<string> All { get; } = Array.AsReadOnly<string>(
     [
         English, French, Spanish, SpanishMexico, Italian, Portuguese,
         PortugueseBrazil, PortuguesePortugal, German, Dutch, Polish, Russian,
         Japanese, Korean, ChineseTraditional, Indonesian, Thai, ChineseSimplified,
-    ];
+    ]);
 
     /// <summary>
     /// Whether the API supports <paramref name="language"/>. Comparison ignores

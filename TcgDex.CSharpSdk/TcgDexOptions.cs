@@ -3,6 +3,11 @@ namespace TcgDex;
 /// <summary>
 /// Configuration for the TCGdex client.
 /// </summary>
+/// <remarks>
+/// <b>Options are read once, when the client is created.</b> Changing a property
+/// afterwards has no effect on a client that already exists; create a new client
+/// to apply new settings.
+/// </remarks>
 public sealed class TcgDexOptions
 {
     /// <summary>
@@ -131,7 +136,8 @@ public sealed class TcgDexOptions
     /// Set to <see langword="false"/> in an application that never reads
     /// prices. The property is dropped from the deserialization contract, so
     /// System.Text.Json skips the block as an unknown field rather than building
-    /// it and discarding it.
+    /// it and discarding it. This covers <see cref="Models.DetailedVariant.Pricing"/>
+    /// on every <c>variants_detailed</c> entry as well as <c>card.Pricing</c>.
     /// </para>
     /// <para>
     /// <b>It defaults to on, and the reason is not performance.</b> With it off,
@@ -189,8 +195,8 @@ public sealed class TcgDexOptions
     /// Throws when the options cannot produce valid requests.
     /// </summary>
     /// <exception cref="ArgumentException">
-    /// The language is not one the API accepts, or the base address is not
-    /// absolute.
+    /// The language is not one the API accepts, or the base address or GraphQL
+    /// endpoint is not absolute.
     /// </exception>
     /// <remarks>
     /// Validating up front turns a typo'd language into an immediate, readable
@@ -213,6 +219,13 @@ public sealed class TcgDexOptions
             throw new ArgumentException(
                 $"BaseAddress must be an absolute URI, but was '{BaseAddress}'.",
                 nameof(BaseAddress));
+        }
+
+        if (!GraphQlEndpoint.IsAbsoluteUri)
+        {
+            throw new ArgumentException(
+                $"GraphQlEndpoint must be an absolute URI, but was '{GraphQlEndpoint}'.",
+                nameof(GraphQlEndpoint));
         }
 
         // A missing trailing slash is not cosmetic. Request paths are resolved

@@ -76,8 +76,13 @@ public sealed record Set
     /// <summary>The set's card counts.</summary>
     public CardCount? CardCount { get; init; }
 
-    /// <summary>Release date in <c>yyyy-MM-dd</c> form.</summary>
-    public string? ReleaseDate { get; init; }
+    /// <summary>
+    /// Release date, as a date of kind <see cref="DateTimeKind.Unspecified"/>
+    /// with no time component; <see langword="null"/> when the API sends none
+    /// or sends something other than a full <c>yyyy-MM-dd</c> date.
+    /// </summary>
+    [JsonConverter(typeof(Serialization.ReleaseDateConverter))]
+    public DateTime? ReleaseDate { get; init; }
 
     /// <summary>Tournament legality for the set as a whole.</summary>
     public Legality? Legal { get; init; }

@@ -89,11 +89,26 @@ public sealed class MemoryTcgDexResponseCache : ITcgDexResponseCache
         // FromTicks rather than `timeToLive * multiplier`: the TimeSpan
         // multiplication operator is .NET Core 3.0+ and this also builds for
         // netstandard2.0. Same arithmetic.
-        TimeSpan absoluteLifetime = timeToLive > TimeSpan.Zero
-            ? TimeSpan.FromTicks(timeToLive.Ticks * RevalidationLifetimeMultiplier)
-            : TimeSpan.FromMinutes(1);
+        //
+        // Both steps clamp rather than overflow: twelve times a huge TTL wraps
+        // negative ticks (an entry born expired), and now + lifetime can pass
+        // DateTimeOffset.MaxValue (an ArgumentOutOfRangeException from a cache
+        // write). A huge TTL means "keep it", so MaxValue is the honest answer.
+        TimeSpan absoluteLifetime = TimeSpan.FromMinutes(1);
 
-        _entries.Set(key, (response, _timeProvider.GetUtcNow() + absoluteLifetime));
+        if (timeToLive > TimeSpan.Zero)
+        {
+            absoluteLifetime = timeToLive.Ticks > TimeSpan.MaxValue.Ticks / RevalidationLifetimeMultiplier
+                ? TimeSpan.MaxValue
+                : TimeSpan.FromTicks(timeToLive.Ticks * RevalidationLifetimeMultiplier);
+        }
+
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        DateTimeOffset expiresAt = absoluteLifetime > DateTimeOffset.MaxValue - now
+            ? DateTimeOffset.MaxValue
+            : now + absoluteLifetime;
+
+        _entries.Set(key, (response, expiresAt));
 
         return default;
     }
