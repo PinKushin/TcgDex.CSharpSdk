@@ -10,6 +10,8 @@ using TcgDex.Models;
 /// Generating the metadata at compile time keeps the SDK trim- and AOT-safe and
 /// avoids the reflection cost on the first call for each type. Any model added
 /// to the SDK must be registered here or it will fail to serialize at runtime.
+/// Internal (DECISIONS #20): public, every generated <c>JsonTypeInfo</c>
+/// property would be pinned API, so renaming a model would break callers twice.
 /// </remarks>
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -42,6 +44,6 @@ using TcgDex.Models;
 [JsonSerializable(typeof(TcgDexProblem))]
 [JsonSerializable(typeof(IReadOnlyList<string>))]
 [JsonSerializable(typeof(IReadOnlyList<int>))]
-public sealed partial class TcgDexJsonContext : JsonSerializerContext
+internal sealed partial class TcgDexJsonContext : JsonSerializerContext
 {
 }

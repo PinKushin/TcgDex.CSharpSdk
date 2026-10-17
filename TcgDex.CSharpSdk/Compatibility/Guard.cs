@@ -62,9 +62,12 @@ internal static class Guard
         }
     }
 
-    /// <summary>Throws <see cref="ArgumentOutOfRangeException"/> if <paramref name="value"/> is below <paramref name="minimum"/>.</summary>
+    /// <summary>
+    /// Throws <see cref="ArgumentOutOfRangeException"/> if <paramref name="value"/> is below
+    /// <paramref name="minimum"/>. A null value is "not supplied" and passes.
+    /// </summary>
     internal static void NotLessThan(
-        int value,
+        int? value,
         int minimum,
         [CallerArgumentExpression(nameof(value))] string? paramName = null)
     {

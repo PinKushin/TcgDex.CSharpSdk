@@ -160,6 +160,10 @@ resolution is `releaseDate > localId > id`.
 
 `pagination:page={n}` (default 1) and `pagination:itemsPerPage={n}` (default 100 when paginating).
 
+> **No page-size cap.** Measured 2026-10-17: `itemsPerPage` of 50, 250, 500, 1000 and 5000 each
+> returned exactly that many cards. The server does not clamp it, so a caller choosing a large page
+> gets a correspondingly large response.
+
 > **No total count is exposed.** List responses are bare arrays with no envelope, and no
 > `X-Total-Count`/`Content-Range` pagination headers are sent. A client cannot compute the number
 > of pages up front; iterate until a short page is returned.
@@ -330,6 +334,15 @@ but not necessarily both at once for the same card —
 
 `id`, `name`, `logo`, `symbol`, `abbreviation`, `cardCount`, `releaseDate`, `legal`, `serie`,
 `tcgOnline`, `cards` (`CardBrief[]`).
+
+`releaseDate` is a full `YYYY-MM-DD` on every set: measured 2026-10-17 across all 606 sets
+(en 220, fr 202, ja 184). The SDK exposes it as `DateTime?` (kind `Unspecified`, date only) on
+`Set` and `Serie`, and reads anything else — absent, partial, malformed — as `null` rather than
+failing the object.
+
+**Set ids can contain `+`.** Japanese has `SM1+`, `sm2+`, `SM3+`, `SM4+` and `SM5+`. A raw `+` in
+the path is read as a space and 404s; only `%2B` resolves (`/v2/ja/sets/SM1%2B`). The SDK
+percent-encodes path segments, so `Sets.GetAsync("SM1+")` works.
 
 ### SetBrief — embedded in a card
 `id`, `name`, `logo`, `symbol`, `cardCount`.

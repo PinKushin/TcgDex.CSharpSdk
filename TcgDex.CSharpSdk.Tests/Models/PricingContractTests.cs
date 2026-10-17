@@ -159,4 +159,27 @@ public sealed class PricingContractTests
         ids.Cardtrader.ShouldBe(991234);
     }
 
+    [Test]
+    public void Deserialize_TcgPlayer_SkipsNonObjectKeysItDoesNotKnow()
+    {
+        // Every unrecognised key under `tcgplayer` is a printing name, but only
+        // when its value is an object. A new scalar such as `currency` must be
+        // ignored, not parsed as a price block — that failed every card with
+        // TCGplayer pricing.
+        const string Original = "\"tcgplayer\":{\"unit\":\"USD\",";
+        string json = Fixture.ReadText("card-pokemon-full.json");
+        json.ShouldContain(Original);
+        json = json.Replace(
+            Original,
+            "\"tcgplayer\":{\"currency\":\"USD\",\"count\":2,\"live\":true,\"tags\":[\"a\",{\"b\":1}],\"unit\":\"USD\",");
+
+        Card card = Fixture.Parse<Card>(json);
+
+        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+        tcgplayer.Unit.ShouldBe("USD");
+        tcgplayer.Printings.Keys.ShouldBe(["normal", "reverse-holofoil"], ignoreOrder: true);
+        tcgplayer["normal"].ShouldNotBeNull().ProductId.ShouldBe(219333);
+        card.VariantsDetailed[0].Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull()
+            .Printings.Count.ShouldBe(2);
+    }
 }

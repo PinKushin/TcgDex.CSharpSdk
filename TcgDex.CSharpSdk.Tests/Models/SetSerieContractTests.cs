@@ -15,7 +15,8 @@ public sealed class SetSerieContractTests
 
         set.Id.ShouldBe("swsh3");
         set.Name.ShouldBe("Darkness Ablaze");
-        set.ReleaseDate.ShouldBe("2020-08-14");
+        set.ReleaseDate.ShouldBe(new DateTime(2020, 8, 14));
+        set.ReleaseDate!.Value.Kind.ShouldBe(DateTimeKind.Unspecified, "a calendar date, not an instant");
         set.TcgOnline.ShouldBe("DAA");
         set.Abbreviation.ShouldNotBeNull().Official.ShouldBe("DAA");
         set.Serie.ShouldNotBeNull().Id.ShouldBe("swsh");
@@ -53,7 +54,7 @@ public sealed class SetSerieContractTests
 
         serie.Id.ShouldBe("swsh");
         serie.Name.ShouldBe("Sword & Shield");
-        serie.ReleaseDate.ShouldBe("2019-11-15");
+        serie.ReleaseDate.ShouldBe(new DateTime(2019, 11, 15));
         serie.FirstSet.ShouldNotBeNull().Id.ShouldBe("swshp");
         serie.LastSet.ShouldNotBeNull();
         serie.Sets.ShouldNotBeEmpty();
@@ -129,4 +130,59 @@ public sealed class SetSerieContractTests
         problem.Lang.ShouldBe("zz");
         problem.Describe().ShouldContain("zz");
     }
+
+    // ----- releaseDate is tolerant: anything but a full date becomes null -----
+
+    [TestCase("""{"id":"x","name":"x","releaseDate":"not a date"}""", TestName = "ReleaseDate_Unparsable_IsNull")]
+    [TestCase("""{"id":"x","name":"x","releaseDate":"2020-08"}""", TestName = "ReleaseDate_PartialDate_IsNull")]
+    [TestCase("""{"id":"x","name":"x","releaseDate":"2020-02-30"}""", TestName = "ReleaseDate_ImpossibleDate_IsNull")]
+    [TestCase("""{"id":"x","name":"x","releaseDate":"2020-08-14T10:00:00Z"}""", TestName = "ReleaseDate_DateTime_IsNull")]
+    [TestCase("""{"id":"x","name":"x","releaseDate":20200814}""", TestName = "ReleaseDate_Number_IsNull")]
+    [TestCase("""{"id":"x","name":"x","releaseDate":{"y":2020}}""", TestName = "ReleaseDate_Object_IsNull")]
+    [TestCase("""{"id":"x","name":"x","releaseDate":null}""", TestName = "ReleaseDate_Null_IsNull")]
+    [TestCase("""{"id":"x","name":"x"}""", TestName = "ReleaseDate_Absent_IsNull")]
+    public void ReleaseDate_AnythingButAFullDate_IsNullNotAThrow(string json)
+    {
+        Serie serie = Fixture.Parse<Serie>(json);
+
+        serie.ReleaseDate.ShouldBeNull();
+        serie.Id.ShouldBe("x", "the rest of the object still deserializes");
+    }
+
+    [Test]
+    public void ReleaseDate_Set_IsTolerantToo()
+        => Fixture.Parse<Set>("""{"id":"x","name":"x","releaseDate":"soon"}""").ReleaseDate.ShouldBeNull();
+
+    [Test]
+    public void ReleaseDate_Serializes_AsTheApiSendsIt()
+    {
+        Serie serie = Fixture.Load<Serie>("serie-full.json");
+
+        string json = JsonSerializer.Serialize(serie, TcgDex.Serialization.TcgDexJsonContext.Default.Serie);
+
+        json.ShouldContain("\"releaseDate\":\"2019-11-15\"");
+        Fixture.Parse<Serie>(json).ReleaseDate.ShouldBe(serie.ReleaseDate);
+    }
+
+    [Test]
+    public void ReleaseDate_Null_IsWrittenAsNullWhenNotIgnored()
+    {
+        // The SDK's options omit nulls; a caller's options that do not must
+        // still get `null`, which System.Text.Json writes without the converter.
+        JsonSerializer.Serialize(new Serie { Id = "x", Name = "x" }, NeverIgnoreNulls)
+            .ShouldContain("\"releaseDate\":null");
+    }
+
+    private static readonly JsonSerializerOptions NeverIgnoreNulls =
+        new(TcgDex.Serialization.TcgDexJsonContext.Default.Options)
+        {
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never,
+        };
+
+    [Test]
+    public void ReleaseDate_Null_IsOmittedWhenSerialized()
+        => JsonSerializer.Serialize(
+                new Serie { Id = "x", Name = "x" },
+                TcgDex.Serialization.TcgDexJsonContext.Default.Serie)
+            .ShouldNotContain("releaseDate");
 }

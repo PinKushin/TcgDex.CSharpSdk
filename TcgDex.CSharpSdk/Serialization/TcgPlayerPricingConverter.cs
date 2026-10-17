@@ -77,10 +77,14 @@ internal sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing
                 continue;
             }
 
-            // Any other property is a printing name, and its value is a price
-            // block (or null when the source has no data for it).
-            if (reader.TokenType == JsonTokenType.Null)
+            // Any other property is a printing name only when its value is a
+            // price block. Null (no data) and any other shape — a scalar or
+            // array the API adds later, such as `currency` — are skipped rather
+            // than failing the whole card. Skip is a no-op on a scalar token and
+            // walks past an array.
+            if (reader.TokenType != JsonTokenType.StartObject)
             {
+                reader.Skip();
                 continue;
             }
 

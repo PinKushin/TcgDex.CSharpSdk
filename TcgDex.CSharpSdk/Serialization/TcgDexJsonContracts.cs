@@ -99,7 +99,9 @@ internal static class TcgDexJsonContracts
         IJsonTypeInfoResolver resolver = TcgDexJsonContext.Default
             .WithAddedModifier(static typeInfo =>
             {
-                if (typeInfo.Type != typeof(Card))
+                // Card and every variants_detailed entry carry their own
+                // pricing; the option skips both (DECISIONS #21).
+                if (typeInfo.Type != typeof(Card) && typeInfo.Type != typeof(DetailedVariant))
                 {
                     return;
                 }
