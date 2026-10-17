@@ -85,7 +85,10 @@ public sealed class ContextCaptureTests
     /// Starts <paramref name="start"/> under a counting context, opens the gate
     /// from outside it, and returns the finished work.
     /// </summary>
-    private static async Task<Task> AssertNoPostsAsync(Func<Task> start, TaskCompletionSource<bool> gate)
+    private static async Task<Task> AssertNoPostsAsync(
+        Func<Task> start,
+        TaskCompletionSource<bool> gate,
+        bool gateInThisFlow = true)
     {
         CountingContext context = new();
         SynchronizationContext? previous = SynchronizationContext.Current;
@@ -114,9 +117,16 @@ public sealed class ContextCaptureTests
         // The second control, read once the work is done so a gated operation
         // reached late has recorded itself: an earlier step that became genuinely
         // async would drop the context before the gated await, and every SDK
-        // await after it would pass untested. (Null: this flow's gate is another
-        // caller's, as for a coalesced waiter.)
-        atGate.Value.ShouldNotBe(false, "the caller's context was gone before the gated operation started");
+        // await after it would pass untested. A coalesced waiter's gate is the
+        // leader's, in another flow, so it records nothing here.
+        if (gateInThisFlow)
+        {
+            atGate.Value.ShouldBe(true, "the caller's context was gone before the gated operation started, or the gate was never reached");
+        }
+        else
+        {
+            atGate.Value.ShouldBeNull("the waiter reached a gate of its own; it should have waited on the leader");
+        }
         context.Posts.ShouldBe(0, "an SDK continuation resumed on the caller's context");
         return work;
     }
@@ -295,9 +305,19 @@ public sealed class ContextCaptureTests
         byte[] payload = System.Text.Encoding.UTF8.GetBytes(CardJson);
         using StreamContent content = new(new GatedStream(payload, gate.Task));
 
+        // .NET Framework buffers the unbounded read through StreamContent's
+        // BeginRead, which calls the synchronous Read on a pool thread: the read
+        // still suspends the SDK's await, but not at this gate.
+#if NETFRAMEWORK
+        bool gateInThisFlow = maxBytes != 0;
+#else
+        bool gateInThisFlow = true;
+#endif
+
         Task work = await AssertNoPostsAsync(
             () => BoundedContent.ReadAsBytesAsync(content, maxBytes, Card, CancellationToken.None),
-            gate);
+            gate,
+            gateInThisFlow);
 
         ((Task<ArraySegment<byte>>)work).Result.ToArray().ShouldBe(payload);
     }
@@ -351,7 +371,10 @@ public sealed class ContextCaptureTests
         // The leader starts outside the context; only the waiter is measured.
         Task<HttpResponseMessage> leader = client.GetAsync(Card, CancellationToken.None);
 
-        Task work = await AssertNoPostsAsync(() => client.GetAsync(Card, CancellationToken.None), inner.Gate);
+        Task work = await AssertNoPostsAsync(
+            () => client.GetAsync(Card, CancellationToken.None),
+            inner.Gate,
+            gateInThisFlow: false);
 
         ((Task<HttpResponseMessage>)work).Result.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await leader).StatusCode.ShouldBe(HttpStatusCode.OK);
