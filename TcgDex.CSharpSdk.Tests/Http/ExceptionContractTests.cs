@@ -256,6 +256,7 @@ public sealed class ExceptionContractTests
             () => http.GetAsync(new Uri("https://api.tcgdex.net/v2/en/cards/swsh3-136"), CancellationToken.None));
 
         error.InnerException.ShouldBeAssignableTo<IOException>();
+        error.Message.ShouldContain("could not be read");
     }
 
     [Test]
@@ -275,5 +276,40 @@ public sealed class ExceptionContractTests
 
         body.ToArray().ShouldBe(payload);
         body.Array!.Length.ShouldBeLessThanOrEqualTo(1024 * 1024);
+    }
+
+    [Test]
+    public async Task AnHonestContentLength_AtTheLimit_PreallocatesExactlyThatMuch()
+    {
+        // The pre-size is invisible in the bytes returned, so only the buffer
+        // length can show it happened. A length equal to the limit is the edge
+        // of the `hint <= maxBytes` test; a growing MemoryStream would start at
+        // 256 bytes instead of 10.
+        byte[] payload = System.Text.Encoding.UTF8.GetBytes("""{"id":"a"}""");
+        using StreamContent content = new(new MemoryStream(payload));
+
+        ArraySegment<byte> body = await BoundedContent.ReadAsBytesAsync(
+            content,
+            payload.Length,
+            new Uri("https://api.tcgdex.net/v2/en/cards/a"),
+            CancellationToken.None);
+
+        body.ToArray().ShouldBe(payload);
+        body.Array!.Length.ShouldBe(payload.Length);
+    }
+
+    [Test]
+    public async Task ANullContent_IsRejectedByName()
+    {
+        // Without the guard a null reaches content.Headers and escapes as a
+        // NullReferenceException, which names nothing.
+        ArgumentNullException error = await Should.ThrowAsync<ArgumentNullException>(
+            () => BoundedContent.ReadAsBytesAsync(
+                null!,
+                1024,
+                new Uri("https://api.tcgdex.net/v2/en/cards/a"),
+                CancellationToken.None));
+
+        error.ParamName.ShouldBe("content");
     }
 }

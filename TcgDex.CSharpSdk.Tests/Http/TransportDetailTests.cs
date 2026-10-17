@@ -149,4 +149,20 @@ public sealed class TransportDetailTests
 
         Failing(blank).Message.ShouldContain("Bad Gateway");
     }
+
+    [Test]
+    public void ANullPath_IsRejectedByName()
+    {
+        // No public method passes null, so this is the internal contract only.
+        // Without the guard, Uri reports its own parameter name, or the request
+        // goes out against the bare language root.
+        RecordingHandler handler = new();
+        TcgDexTransport transport = new(new HttpClient(handler), new TcgDexOptions());
+
+        ArgumentNullException error = Should.ThrowAsync<ArgumentNullException>(
+            () => transport.GetAsync<TcgDex.Models.Card>(null!, CancellationToken.None)).Result;
+
+        error.ParamName.ShouldBe("relativePath");
+        handler.Requests.ShouldBeEmpty();
+    }
 }

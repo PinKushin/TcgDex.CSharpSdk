@@ -84,15 +84,47 @@ public sealed class CoalescedWaiterTests
         inner.Requests.ShouldBe(2);
     }
 
+    [Test]
+    public async Task AWaitersOwnErrorResponse_IsHandedBackAsIs()
+    {
+        // The leader produced nothing to share, so the waiter fetched for
+        // itself and got a 503. That response is the waiter's answer; building
+        // a cached response from the absent entry instead throws.
+        GatedHandler inner = new(HttpStatusCode.ServiceUnavailable);
+
+        TcgDexCachingHandler caching = new(
+            new MemoryTcgDexResponseCache(),
+            new TcgDexCacheOptions { CoalesceConcurrentRequests = true })
+        {
+            InnerHandler = inner,
+        };
+
+        using HttpClient client = new(caching);
+
+        Task<HttpResponseMessage> leader = client.GetAsync(Card, CancellationToken.None);
+        await inner.Arrived.Task;
+
+        Task<HttpResponseMessage> waiter = client.GetAsync(Card, CancellationToken.None);
+        inner.Requests.ShouldBe(1);
+
+        inner.Release.SetResult(true);
+        await Should.ThrowAsync<HttpRequestException>(() => leader);
+
+        using HttpResponseMessage response = await waiter;
+
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        inner.Requests.ShouldBe(2);
+    }
+
     /// <summary>
     /// Holds the first request until released, then fails it. Later requests
-    /// succeed.
+    /// answer with the given status.
     /// </summary>
     /// <remarks>
     /// Gated rather than delayed, so the test synchronises on the leader having
     /// arrived rather than on a duration.
     /// </remarks>
-    private sealed class GatedHandler : HttpMessageHandler
+    private sealed class GatedHandler(HttpStatusCode laterStatus = HttpStatusCode.OK) : HttpMessageHandler
     {
         private int _requests;
 
@@ -114,7 +146,7 @@ public sealed class CoalescedWaiterTests
                 throw new HttpRequestException("leader gave up");
             }
 
-            return new HttpResponseMessage(HttpStatusCode.OK)
+            return new HttpResponseMessage(laterStatus)
             {
                 Content = new StringContent(
                     """{"id":"swsh3-136","name":"Furret"}""",

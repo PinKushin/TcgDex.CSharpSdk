@@ -491,6 +491,52 @@ public sealed class CachingHandlerTests
         inner.Requests.Count.ShouldBe(1);
         handler.FreshHits.ShouldBe(1);
         request.Headers.IfNoneMatch.ShouldBeEmpty();
+
+        // The note of which tag was ours comes off too, or the caller's message
+        // keeps the handler's bookkeeping after the call.
+#if NET5_0_OR_GREATER
+        request.Options.ShouldBeEmpty();
+#else
+        request.Properties.ShouldBeEmpty();
+#endif
+    }
+
+    [Test]
+    public async Task A304WithoutAnETag_KeepsTheETagWeHad()
+    {
+        // RFC 9110 §15.4.5: a 304 may omit the ETag. That renews nothing, so the
+        // stored validator must survive into the next revalidation.
+        FakeTimeProvider time = new();
+        (TcgDexCachingHandler _, HttpClient client, CountingHandler inner) = Build(time);
+
+        inner.Respond(HttpStatusCode.OK, """{"id":"x"}""", "\"a\"");
+        inner.Respond(HttpStatusCode.NotModified, "", null);
+        inner.Respond(HttpStatusCode.NotModified, "", null);
+
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+        await GetAsync(client);
+        time.Advance(TimeSpan.FromMinutes(10));
+        (await GetAsync(client)).ShouldBe("""{"id":"x"}""");
+
+        inner.Requests[2].Headers.IfNoneMatch.ToString().ShouldBe("\"a\"");
+    }
+
+    [Test]
+    public async Task ABodyWithoutAContentLength_IsStoredAtItsTrueLength()
+    {
+        // With no declared length the read buffer grows past the body, so the
+        // segment is shorter than its array. Storing the array would serve the
+        // body followed by the buffer's unused tail.
+        (TcgDexCachingHandler _, HttpClient client, CountingHandler inner) = Build();
+
+        byte[] payload = System.Text.Encoding.UTF8.GetBytes("""{"id":"x"}""");
+        StreamContent content = new(new System.IO.MemoryStream(payload));
+        content.Headers.ContentLength = null;
+        inner.Respond(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
+
+        (await GetAsync(client)).ShouldBe("""{"id":"x"}""");
+        (await GetAsync(client)).ShouldBe("""{"id":"x"}""");
     }
 
     [Test]
@@ -572,7 +618,11 @@ public sealed class CachingHandlerTests
 
         using HttpClient client = new(new TcgDexCachingHandler(new ThrowingRemoveCache()) { InnerHandler = inner });
 
-        await Should.ThrowAsync<InvalidOperationException>(() => client.GetAsync(CardUrl, CancellationToken.None));
+        // The message, not just the type: swallowing the eviction failure hands
+        // the disposed response to HttpClient, whose ObjectDisposedException is
+        // also an InvalidOperationException.
+        (await Should.ThrowAsync<InvalidOperationException>(() => client.GetAsync(CardUrl, CancellationToken.None)))
+            .Message.ShouldBe("cache backend down");
 
         tracked.WasDisposed.ShouldBeTrue();
     }

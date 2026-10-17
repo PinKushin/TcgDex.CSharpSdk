@@ -396,4 +396,13 @@ public sealed class RequestTimeoutTests
         error.Message.ShouldContain(nameof(TcgDexOptions.Timeout));
         error.Message.ShouldContain("InfiniteTimeSpan");
     }
+
+    [Test]
+    public void AnInfiniteTimeout_CreatesNoBudget()
+    {
+        // Null is the documented "no limit" result: no timer, no linked source.
+        // Without the early return an infinite source is built instead, which
+        // still never fires, so only the return value can tell the two apart.
+        RequestBudget.Create(Timeout.InfiniteTimeSpan, CancellationToken.None).ShouldBeNull();
+    }
 }
