@@ -3,6 +3,11 @@ namespace TcgDex;
 /// <summary>
 /// Configuration for the TCGdex client.
 /// </summary>
+/// <remarks>
+/// <b>Options are read once, when the client is created.</b> Changing a property
+/// afterwards has no effect on a client that already exists; create a new client
+/// to apply new settings.
+/// </remarks>
 public sealed class TcgDexOptions
 {
     /// <summary>
