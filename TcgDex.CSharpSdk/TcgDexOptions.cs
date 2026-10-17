@@ -131,7 +131,8 @@ public sealed class TcgDexOptions
     /// Set to <see langword="false"/> in an application that never reads
     /// prices. The property is dropped from the deserialization contract, so
     /// System.Text.Json skips the block as an unknown field rather than building
-    /// it and discarding it.
+    /// it and discarding it. This covers <see cref="Models.DetailedVariant.Pricing"/>
+    /// on every <c>variants_detailed</c> entry as well as <c>card.Pricing</c>.
     /// </para>
     /// <para>
     /// <b>It defaults to on, and the reason is not performance.</b> With it off,

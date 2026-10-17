@@ -58,6 +58,30 @@ public sealed class PricingOptOutTests
     }
 
     [Test]
+    public async Task WhenTurnedOff_PerVariantPricingIsNullToo()
+    {
+        // DECISIONS #21: the option means no pricing is parsed anywhere on a
+        // card, including inside each variants_detailed entry.
+        using TcgDexClient client = CreateClient(deserializePricing: false);
+
+        Card card = (await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).ShouldNotBeNull();
+
+        card.VariantsDetailed.Count.ShouldBe(2);
+        card.VariantsDetailed.ShouldAllBe(v => v.Pricing == null);
+        card.VariantsDetailed[0].VariantId.ShouldBe("endfynwn4n10gzq", "the rest of the variant still deserializes");
+    }
+
+    [Test]
+    public async Task ByDefault_PerVariantPricingIsPopulated()
+    {
+        using TcgDexClient client = CreateClient(deserializePricing: true);
+
+        Card card = (await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).ShouldNotBeNull();
+
+        card.VariantsDetailed.ShouldAllBe(v => v.Pricing != null);
+    }
+
+    [Test]
     public async Task WhenTurnedOff_EveryOtherFieldStillDeserializes()
     {
         using TcgDexClient client = CreateClient(deserializePricing: false);
