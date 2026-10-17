@@ -229,6 +229,40 @@ since the API growing a field is worth knowing but is not a breakage.
 adjusting the SDK to a reported change, never before, since a refresh makes the
 check pass whether or not the models were updated.
 
+## Surviving mutants written off
+
+DECISIONS #19 item 2 accepts a surviving mutant only if it is written down with a reason. This is
+that list for the four weakest files, which were at 77% (`TcgDexCachingHandler.cs`), 74%
+(`TcgDexTransport.cs`), 62% (`BoundedContent.cs`) and 60% (`RequestBudget.cs`) in GitHub Actions
+run 39020678854 (commit `ddde9bd`). Every other survivor in that run now has a killing test. Each
+test was checked by hand: apply that exact mutant, watch the test fail, then restore the code.
+If every write-off below is correct, the scores rise to 94%, 89%, 90% and 100%.
+This is a projection from the per-mutant checks. No Stryker run measured it, because
+local runs are limited to an 8000-character span.
+
+Line numbers are those of `ddde9bd`, as printed in the report.
+
+| File:line | Mutator | Why it is not killed |
+|---|---|---|
+| `TcgDexCachingHandler.cs:110` | Statement (guard removed) | Unreachable. The handler is sealed, and `HttpMessageInvoker` and `DelegatingHandler` both reject a null request before this override runs. |
+| `TcgDexCachingHandler.cs:162` | Boolean (`ConfigureAwait(true)`) | Untestable without a seam: not equivalent. Usually the earlier `ConfigureAwait(false)` in `WaitForLeaderAsync` has already left the caller's context. But a waiter that calls `GetOrAdd` after the leader's `SetResult` and before its `TryRemove` gets a completed task, nothing suspends, and this await captures the context. That window is a race no deterministic test can hold open. |
+| `TcgDexCachingHandler.cs:210` | Conditional (false) | Equivalent. `FetchResult.FromCache(null)` and `FetchResult.None` are the same `default` value. |
+| `TcgDexCachingHandler.cs:288` | Logical (`\|\|` to `&&`) | Equivalent. An empty tag on either side still fails `EntityTagHeaderValue.TryParse` below, so the result is `false` either way. |
+| `TcgDexCachingHandler.cs:320` | Logical (`\|\|` to `&&`) | Equivalent. When nothing was added, `Remove(null)` does nothing. When the added tag has already left the header, the loop removes the caller's equal tags and adds them back. The only change is their order within `If-None-Match`, which is a set. All 109 caching tests pass against it. |
+| `TcgDexCachingHandler.cs:466` | Conditional (false) | Equivalent. Copying the segment every time stores the same bytes and only costs an allocation. |
+| `BoundedContent.cs:133` | Equality (`hint >= 0`) | Equivalent. A hint of 0 gives `Math.Min(0, cap)`, which is 0, the same capacity as the original. |
+| `BoundedContent.cs:145` | Conditional (true) | Equivalent. When capacity is 0, `new MemoryStream(0)` behaves the same as `new MemoryStream()`. |
+| `BoundedContent.cs:145` | Equality (`capacity >= 0`) | Equivalent, for the same reason: it differs from the original only at 0. |
+| `BoundedContent.cs:198` | Statement (`ArrayPool.Return` removed) | Not observable. The pool allocates a fresh array when one is not returned, so the only cost is allocation. `ArrayPool.Shared` caches per thread and per core, so asserting that an array is reused would be nondeterministic. |
+| `TcgDexTransport.cs:398` | Arithmetic (`*` to `/`) | Untestable without a clock seam: not equivalent. On Linux, where Stryker runs on CI, `Stopwatch.Frequency` (10⁹) makes the factor 10⁷/10⁹ = 0.01, so `/` divides by it instead of multiplying and logs a duration 10,000 times too large. Only on Windows is the factor 1. The value is logged only, and no test can bound it exactly without injecting the clock. `TheLoggedDuration_IsAPlausibleNumberOfMilliseconds` still catches a gross scale error. |
+| `TcgDexTransport.cs:417` | Conditional (false) | Equivalent. A blank body sent to the deserializer throws `JsonException`. That is caught at line 421 and returns the same `null`, so `IsBlank` is only a fast path. |
+| `TcgDexTransport.cs:422` | Block removal | Equivalent. Removing the block makes it return `default`, which is the same `null`. |
+| `TcgDexTransport.cs:430` | Block removal | Equivalent, for the same reason: it returns `default`, which is `null`. |
+| `TcgDexTransport.cs:444` | Logical (three variants) | Equivalent. When fewer whitespace bytes count as blank, those bodies go to the deserializer instead. It throws `JsonException`, which becomes the same `null`. |
+| `TcgDexTransport.cs:450` | Boolean (`true` to `false`) | Equivalent, for the same reason as line 444. |
+
+`RequestBudget.cs` has no write-offs. Both of its survivors are now killed.
+
 ## What coverage does not tell you
 
 100% line coverage means every line ran, not that behaviour is correct. A suite

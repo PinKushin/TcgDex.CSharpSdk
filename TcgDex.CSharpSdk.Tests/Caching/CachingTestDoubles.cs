@@ -129,6 +129,13 @@ internal sealed class CountingHandler : HttpMessageHandler
         return this;
     }
 
+    /// <summary>Queues a response built by the test, content and headers as given.</summary>
+    internal CountingHandler Respond(HttpResponseMessage response)
+    {
+        _responses.Enqueue(_ => Task.FromResult(response));
+        return this;
+    }
+
     /// <summary>Queues a response whose disposal the caller can observe.</summary>
     internal CountingHandler RespondTracked(TrackedResponse response, string body, string? etag)
     {

@@ -390,6 +390,80 @@ public sealed class LoggingTests
     }
 
     [Test]
+    public async Task ARequest_NamesItsActivityAndLogsItsMethod()
+    {
+        // Both strings are what an operator filters on; blanking either left
+        // every other assertion green.
+        (ActivityListener? listener, List<Activity>? recorded) = ListenForActivities();
+        using ActivityListener _ = listener;
+
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
+
+        (TcgDexClient? client, RecordingLogger? log) = Build(handler);
+        await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+
+        recorded.ShouldHaveSingleItem().DisplayName.ShouldBe("TCGdex Card");
+        log.Entries.Single(e => e.EventId == 1000).Message
+            .ShouldBe("TCGdex request GET https://api.tcgdex.net/v2/en/cards/swsh3-136");
+    }
+
+    [Test]
+    public void APipelineCancellation_MarksTheActivityAsError_AndNamesHttpClientTimeout()
+    {
+        // Neither the caller nor the SDK's budget cancelled: a handler did. That
+        // is its own call site for RecordFailure, and its message must point at
+        // the pipeline rather than at TcgDexOptions.Timeout.
+        (ActivityListener? listener, List<Activity>? recorded) = ListenForActivities();
+        using ActivityListener _ = listener;
+
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWith(_ => throw new TaskCanceledException("a handler gave up"));
+
+        (TcgDexClient? client, RecordingLogger _) = Build(handler);
+
+        TcgDexApiException error = Should.ThrowAsync<TcgDexApiException>(async () =>
+            await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
+
+        error.Message.ShouldContain("HttpClient.Timeout");
+        recorded.ShouldHaveSingleItem().Status.ShouldBe(ActivityStatusCode.Error);
+    }
+
+    [Test]
+    public void AHandlersOwnApiException_IsLoggedAndMarksTheActivityAsError()
+    {
+        // A handler in the pipeline (the caching handler failing a body read)
+        // throws the SDK's own type. It is rethrown as-is, but must still be
+        // reported like every other failure.
+        (ActivityListener? listener, List<Activity>? recorded) = ListenForActivities();
+        using ActivityListener _ = listener;
+
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWith(_ => throw new TcgDexApiException("a handler failed"));
+
+        (TcgDexClient? client, RecordingLogger? log) = Build(handler);
+
+        Should.ThrowAsync<TcgDexApiException>(async () =>
+            await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Result
+            .Message.ShouldBe("a handler failed");
+
+        log.Entries.Where(e => e.Level >= LogLevel.Warning).ShouldHaveSingleItem().EventId.ShouldBe(1004);
+        recorded.ShouldHaveSingleItem().Status.ShouldBe(ActivityStatusCode.Error);
+    }
+
+    [Test]
+    public void ATimeout_TellsTheCallerWhichOptionToRaise()
+    {
+        (TcgDexClient client, RecordingLogger _) = BuildTimingOut();
+        using TcgDexClient __ = client;
+
+        TcgDexApiException error = Should.ThrowAsync<TcgDexApiException>(async () =>
+            await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).Result;
+
+        error.Message.ShouldContain("Raise TcgDexOptions.Timeout");
+    }
+
+    [Test]
     public async Task TheLoggedDuration_IsAPlausibleNumberOfMilliseconds()
     {
         // The elapsed time is computed by hand from Stopwatch timestamps, and
