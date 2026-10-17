@@ -34,7 +34,13 @@ something an application can observe — those live in the commit history.
   on every target framework. The value is a date of kind `Unspecified` with no time component.
   An absent or malformed date reads as `null` rather than failing the set or series.
 - **Breaking:** `TcgDexJsonContext` is no longer public. Deserialize models through the client, or
-  through your own `JsonSerializerContext` if you serialize them yourself.
+  with reflection-based `JsonSerializer` if you serialize them yourself (not Native AOT-safe). Your
+  own source-generated `JsonSerializerContext` cannot be used: the models name internal converters.
+- **Breaking:** invalid `TcgDexOptions` passed to `AddTcgDex` or `AddTcgDexWithCaching` now fail
+  with `OptionsValidationException` when the host starts (`ValidateOnStart`), or on first resolution
+  without a host, instead of `ArgumentException` at registration. Validation now covers the final
+  options from every source, such as `appsettings.json` or another `Configure<TcgDexOptions>` call,
+  and your configure delegate no longer runs an extra time at registration.
 - `Where` now accepts array elements, indexers and parameterless instance methods on the value
   side, such as `c.Id == ids[i]` or `c.Name == name.Trim()`, and applies casts with C# semantics.
   It still never compiles the expression, so Native AOT is unaffected.
@@ -58,6 +64,10 @@ something an application can observe — those live in the commit history.
   `IHttpClientFactory` rebuilding its handlers (every two minutes by default). Both used to reset.
 - `TcgDexOptions.Validate` now rejects a relative `GraphQlEndpoint` with `ArgumentException`.
 - The `ActivitySource` now reports the SDK's version instead of `0.1.0`.
+- In `Where`, a user-defined conversion operator on the value side is now applied; its operand's
+  `ToString()` used to be sent. A throwing property getter now surfaces its own exception rather
+  than `TargetInvocationException`, and a cast that cannot succeed (`(byte)300`,
+  `(int)double.NaN`) throws `NotSupportedException` naming the expression.
 - `MemoryTcgDexResponseCache` no longer throws, or stores an entry already expired, for a very large
   time-to-live.
 - A card whose TCGplayer pricing carries a key with a non-object value (for example

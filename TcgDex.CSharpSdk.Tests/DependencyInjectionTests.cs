@@ -140,6 +140,67 @@ public sealed class DependencyInjectionTests
     }
 
     [Test]
+    public void AddTcgDex_InvalidValueFromASecondConfigure_FailsValidation()
+    {
+        // Validation used to run on a probe built from AddTcgDex's own delegate
+        // only, so a value from appsettings or another Configure call reached
+        // the client unchecked.
+        ServiceCollection services = new();
+        services.AddTcgDex();
+        services.Configure<TcgDexOptions>(o => o.Language = "xx");
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        OptionsValidationException error = Should.Throw<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<TcgDexOptions>>().Value);
+        error.Message.ShouldContain("xx");
+    }
+
+    [Test]
+    public void AddTcgDex_InvalidOptions_FailAtStartupValidation()
+    {
+        // ValidateOnStart: the host runs IStartupValidator when it starts.
+        ServiceCollection services = new();
+        services.AddTcgDex(o => o.BaseAddress = new Uri("https://mirror.example/v2"));
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        Should.Throw<OptionsValidationException>(() => provider.GetRequiredService<IStartupValidator>().Validate())
+            .Message.ShouldContain("must end with '/'");
+    }
+
+    [Test]
+    public void AddTcgDex_ValidOptions_PassStartupValidation()
+    {
+        // The control for the two tests above.
+        ServiceCollection services = new();
+        services.AddTcgDex(o => o.Language = TcgDexLanguages.French);
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        Should.NotThrow(() => provider.GetRequiredService<IStartupValidator>().Validate());
+        provider.GetRequiredService<TcgDexOptions>().Language.ShouldBe("fr");
+    }
+
+    [Test]
+    public void AddTcgDex_ConfigureDelegate_RunsOncePerOptionsBuild()
+    {
+        int calls = 0;
+        ServiceCollection services = new();
+        services.AddTcgDex(_ => calls++);
+
+        calls.ShouldBe(0, "registration must not run the delegate");
+
+        // One build: TcgDexOptions is IOptions<T>.Value. (IOptionsMonitor, which
+        // ValidateOnStart reads, keeps a separate cache and is its own build.)
+        using ServiceProvider provider = services.BuildServiceProvider();
+        _ = provider.GetRequiredService<TcgDexOptions>();
+        _ = provider.GetRequiredService<IOptions<TcgDexOptions>>().Value;
+
+        calls.ShouldBe(1);
+    }
+
+    [Test]
     public void AddTcgDex_CalledTwice_Throws()
     {
         // A second call used to be silently ignored: TryAdd kept the first

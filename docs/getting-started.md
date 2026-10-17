@@ -167,7 +167,8 @@ Eighteen are accepted. Set one at registration:
 builder.Services.AddTcgDex(options => options.Language = TcgDexLanguages.German);
 ```
 
-An unsupported code throws at registration with a message listing the valid set,
+An unsupported code fails with an `OptionsValidationException` when the host starts
+(or on first resolution without a host), with a message listing the valid set,
 rather than surfacing later as a 404 that looks like a missing card.
 
 Two things to know, both properties of the API rather than the SDK:

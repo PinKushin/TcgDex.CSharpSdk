@@ -118,8 +118,9 @@ shallow. Only the flat `cards(filters:)` query returns detail.
 ### DI goes through `IHttpClientFactory`
 
 `AddTcgDex` registers a typed client, so handler lifetime and connection pooling
-are managed properly. Options are validated at registration, so a typo'd
-language fails at startup rather than as a confusing 404 later.
+are managed properly. Options are validated on start (`ValidateOnStart`), after
+every configuration source is merged, so a typo'd language fails as an
+`OptionsValidationException` when the host starts rather than as a confusing 404 later.
 
 `TcgDexClient` has exactly **one** constructor — a second overload also taking
 `HttpClient` makes the typed-client activator ambiguous, which the DI test
