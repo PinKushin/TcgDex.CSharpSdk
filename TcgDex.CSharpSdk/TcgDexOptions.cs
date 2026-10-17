@@ -189,8 +189,8 @@ public sealed class TcgDexOptions
     /// Throws when the options cannot produce valid requests.
     /// </summary>
     /// <exception cref="ArgumentException">
-    /// The language is not one the API accepts, or the base address is not
-    /// absolute.
+    /// The language is not one the API accepts, or the base address or GraphQL
+    /// endpoint is not absolute.
     /// </exception>
     /// <remarks>
     /// Validating up front turns a typo'd language into an immediate, readable
@@ -213,6 +213,13 @@ public sealed class TcgDexOptions
             throw new ArgumentException(
                 $"BaseAddress must be an absolute URI, but was '{BaseAddress}'.",
                 nameof(BaseAddress));
+        }
+
+        if (!GraphQlEndpoint.IsAbsoluteUri)
+        {
+            throw new ArgumentException(
+                $"GraphQlEndpoint must be an absolute URI, but was '{GraphQlEndpoint}'.",
+                nameof(GraphQlEndpoint));
         }
 
         // A missing trailing slash is not cosmetic. Request paths are resolved
