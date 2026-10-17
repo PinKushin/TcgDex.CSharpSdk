@@ -219,6 +219,51 @@ public sealed class GraphQlTests
         cards.ShouldHaveSingleItem().Name.ShouldBe("Furret");
     }
 
+    [Test]
+    public async Task SearchDetailed_DropsACardWithANullSet_KeepingTheRest()
+    {
+        // Set is required, so a card whose set the server could not resolve is
+        // dropped like a null entry rather than failing the whole search.
+        const string Response = """
+            {"data":{"cards":[{"id":"x-1","name":"Ghost","category":"Pokemon","localId":"1","set":null},
+             {"id":"swsh3-136","name":"Furret","category":"Pokemon","localId":"136",
+             "set":{"id":"swsh3","name":"Darkness Ablaze"}}]}}
+            """;
+
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, Response);
+
+        IReadOnlyList<Card> cards = await CreateClient(handler).Cards
+            .SearchDetailedAsync(new CardFilter { Name = "Furret" }, cancellationToken: CancellationToken.None);
+
+        cards.ShouldHaveSingleItem().Id.ShouldBe("swsh3-136");
+    }
+
+    [TestCase(0, null)]
+    [TestCase(-1, null)]
+    [TestCase(null, 0)]
+    [TestCase(null, -5)]
+    public void SearchDetailed_PageOrSizeBelowOne_Throws(int? page, int? itemsPerPage)
+    {
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+
+        Should.ThrowAsync<ArgumentOutOfRangeException>(async () =>
+                await CreateClient(handler).Cards.SearchDetailedAsync(
+                    new CardFilter { Name = "Furret" }, page, itemsPerPage, CancellationToken.None))
+            .Result.ParamName.ShouldBe(page is not null ? "page" : "itemsPerPage");
+
+        handler.Requests.ShouldBeEmpty("validation happens before anything is sent");
+    }
+
+    [Test]
+    public async Task SearchDetailed_PageAndSizeOfOne_AreAccepted()
+    {
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
+
+        string query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret" }, 1, 1);
+
+        query.ShouldContain("pagination:{page:1,itemsPerPage:1}");
+    }
+
     // ----- boundaries that fire on empty collections -----
 
     [Test]

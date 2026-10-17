@@ -87,6 +87,11 @@ internal sealed class GraphQlTransport(
     {
         Guard.NotNull(filter);
 
+        // Validated as REST's CardQuery.Page does, rather than sent for the
+        // server to answer with something arbitrary.
+        Guard.NotLessThan(page, 1);
+        Guard.NotLessThan(itemsPerPage, 1);
+
         string query = BuildQuery(filter, page, itemsPerPage);
         GraphQlCardsResponse response = await PostAsync(query, cancellationToken).ConfigureAwait(false);
 
@@ -111,8 +116,9 @@ internal sealed class GraphQlTransport(
         // A null entry means the server could not resolve a non-nullable field
         // for that card. Dropping it beats handing back a null the caller has to
         // guard on every iteration — but it is logged, so a missing card is
-        // explainable rather than mysterious.
-        Card[] resolved = cards.Where(card => card is not null).Select(card => card!).ToArray();
+        // explainable rather than mysterious. A card with a null `set` is the
+        // same failure one level down — Set is required — and is dropped too.
+        Card[] resolved = cards.Where(card => card?.Set is not null).Select(card => card!).ToArray();
 
         int dropped = cards.Count - resolved.Length;
         if (dropped > 0)
