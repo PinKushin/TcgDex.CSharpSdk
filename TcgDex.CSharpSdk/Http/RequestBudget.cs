@@ -72,5 +72,7 @@ internal static class RequestBudget
         => new(
             $"The request to '{uri}' was cancelled by the HTTP pipeline " +
             "(for example HttpClient.Timeout).",
-            ex);
+            TcgDexErrorKind.Canceled,
+            uri,
+            innerException: ex);
 }

@@ -15,6 +15,42 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-10-17
+
+### Added
+
+- `TcgDexApiException.Kind` (a new `TcgDexErrorKind`: `HttpStatus`, `Network`, `Timeout`,
+  `Canceled`, `ResponseTooLarge`, `InvalidResponse`, `GraphQlError`) and
+  `TcgDexApiException.RequestUri`, set on every exception the SDK throws, so a caller can branch on
+  the failure without reading the message.
+- `TcgDexCacheStatistics`, registered by `AddTcgDexWithCaching`: inject it to read the cache's
+  fresh hits, revalidations and misses.
+- The cache log events 1100–1104 (hit, revalidated, miss, coalesced, evicted) are now emitted. They
+  were documented but never written.
+
+### Changed
+
+- Options are read once, when the client is created. GraphQL searches used to pick up later changes
+  to `GraphQlEndpoint`, `Timeout` and `MaxResponseBytes`; they no longer do, matching REST.
+- Calling `AddTcgDex` or `AddTcgDexWithCaching` a second time on one service collection now throws
+  `InvalidOperationException`. The second call's options used to be silently ignored.
+
+### Fixed
+
+- The in-memory caches could throw `ArgumentException` ("IComparer.Compare() method returns
+  inconsistent results") from a cache write when entries were evicted while other threads read
+  them.
+- `IOptions<TcgDexOptions>`, `IOptionsSnapshot` and `IOptionsMonitor` now see every configured
+  property. Only `BaseAddress`, `Language` and `GraphQlEndpoint` used to reach them.
+- Under `AddTcgDex`, the parsed-model cache (`MaxDeserializedCacheEntries`) is now shared by every
+  resolved client. Each resolution used to get an empty cache, so it never hit.
+- Under `AddTcgDexWithCaching`, the cache counters and request coalescing now survive
+  `IHttpClientFactory` rebuilding its handlers (every two minutes by default). Both used to reset.
+- `TcgDexOptions.Validate` now rejects a relative `GraphQlEndpoint` with `ArgumentException`.
+- The `ActivitySource` now reports the SDK's version instead of `0.1.0`.
+- `MemoryTcgDexResponseCache` no longer throws, or stores an entry already expired, for a very large
+  time-to-live.
+
 ## [0.6.3] - 2026-10-15
 
 ### Fixed

@@ -2,8 +2,11 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 using System;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TcgDex;
 using TcgDex.Caching;
+using TcgDex.Diagnostics;
 
 /// <summary>
 /// Registers the TCGdex client with a dependency-injection container.
@@ -27,11 +30,16 @@ public static class TcgDexServiceCollectionExtensions
     /// <see cref="System.Net.Http.HttpClient"/> by hand per call is the usual
     /// cause of socket exhaustion in SDK consumers.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// <c>AddTcgDex</c> or <c>AddTcgDexWithCaching</c> was already called on
+    /// <paramref name="services"/>.
+    /// </exception>
     public static IHttpClientBuilder AddTcgDex(
         this IServiceCollection services,
         Action<TcgDexOptions>? configure = null)
     {
         Guard.NotNull(services);
+        EnsureFirstRegistration(services);
 
         RegisterOptions(services, configure);
 
@@ -39,45 +47,92 @@ public static class TcgDexServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Builds, validates and registers the options.
+    /// Refuses a second registration rather than ignoring it.
     /// </summary>
-    private static TcgDexOptions RegisterOptions(
+    /// <remarks>
+    /// The second call's options used to be dropped silently (the first
+    /// <c>TryAdd</c> won), so a caller configuring the client in two places got
+    /// whichever ran first with nothing to say so.
+    /// </remarks>
+    private static void EnsureFirstRegistration(IServiceCollection services)
+    {
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(ITcgDexClient)))
+        {
+            throw new InvalidOperationException(
+                "AddTcgDex or AddTcgDexWithCaching has already been called on this service " +
+                "collection. Call one of them once and configure everything in that call; a " +
+                "second call's options would otherwise be ignored.");
+        }
+    }
+
+    /// <summary>
+    /// Validates the options now and registers them through the options system.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The caller's delegate is registered with <c>Configure</c>, the standard
+    /// options pattern, so <c>IOptions</c>, <c>IOptionsSnapshot</c> and
+    /// <c>IOptionsMonitor</c> all see every property. The previous version
+    /// copied properties across by hand and had stopped at three of seven.
+    /// </para>
+    /// <para>
+    /// The delegate also runs once here, on a throwaway instance, so invalid
+    /// options fail at registration rather than on the first request — a
+    /// typo'd language should not surface later as a 404 that reads like a
+    /// missing card.
+    /// </para>
+    /// </remarks>
+    private static void RegisterOptions(
         IServiceCollection services,
         Action<TcgDexOptions>? configure)
     {
-        TcgDexOptions options = new();
-        configure?.Invoke(options);
+        TcgDexOptions probe = new();
+        configure?.Invoke(probe);
+        probe.Validate();
 
-        // Fail here, at registration, rather than on the first request — a
-        // typo'd language should not surface later as a 404 that reads like a
-        // missing card.
-        options.Validate();
+        OptionsBuilder<TcgDexOptions> builder = services.AddOptions<TcgDexOptions>();
 
-        services.TryAddSingleton(options);
-        services.Configure<TcgDexOptions>(configured =>
+        if (configure is not null)
         {
-            configured.BaseAddress = options.BaseAddress;
-            configured.Language = options.Language;
-            configured.GraphQlEndpoint = options.GraphQlEndpoint;
-        });
+            builder.Configure(configure);
+        }
 
-        return options;
+        services.TryAddSingleton(provider => provider.GetRequiredService<IOptions<TcgDexOptions>>().Value);
     }
 
     /// <summary>
     /// Registers the typed client itself, with no handlers attached.
     /// </summary>
     private static IHttpClientBuilder RegisterClient(IServiceCollection services)
+    {
+        // The typed client is transient, as IHttpClientFactory's typed clients
+        // are, so a parsed-model cache it built for itself started empty on
+        // every resolution and never hit. It lives in the container instead,
+        // one per application, and each client borrows it. Keyed by URL, type
+        // and ETag, so sharing it changes nothing but the hit rate.
+        services.TryAddSingleton(provider => new DeserializedResponseCache(
+            provider.GetRequiredService<TcgDexOptions>().MaxDeserializedCacheEntries));
+
         // Constructed explicitly rather than by the typed-client activator, so
-        // TcgDexClient can keep a single constructor and stay ergonomic to
+        // TcgDexClient's public constructors stay unambiguous and ergonomic to
         // `new` up outside a container.
-        => services.AddHttpClient<ITcgDexClient, TcgDexClient>(
-            (httpClient, provider) => new TcgDexClient(
-                httpClient,
-                provider.GetRequiredService<TcgDexOptions>(),
-                // Resolved rather than required: logging is a convenience, and a
-                // container without it should still produce a working client.
-                provider.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()));
+        return services.AddHttpClient<ITcgDexClient, TcgDexClient>(
+            (httpClient, provider) =>
+            {
+                TcgDexOptions options = provider.GetRequiredService<TcgDexOptions>();
+
+                return new TcgDexClient(
+                    httpClient,
+                    options,
+                    // Resolved rather than required: logging is a convenience, and a
+                    // container without it should still produce a working client.
+                    provider.GetService<ILoggerFactory>(),
+                    // Zero disables the cache, and the cache cannot be built at zero.
+                    options.MaxDeserializedCacheEntries > 0
+                        ? provider.GetRequiredService<DeserializedResponseCache>()
+                        : null);
+            });
+    }
 
     /// <summary>
     /// Registers <see cref="ITcgDexClient"/> with response caching enabled.
@@ -90,7 +145,15 @@ public static class TcgDexServiceCollectionExtensions
     /// can attach further handlers.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="services"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// <c>AddTcgDex</c> or <c>AddTcgDexWithCaching</c> was already called on
+    /// <paramref name="services"/>.
+    /// </exception>
     /// <remarks>
+    /// <para>
+    /// Inject <see cref="TcgDexCacheStatistics"/> to see how the cache is
+    /// answering.
+    /// </para>
     /// <para>
     /// Caching is opt-in because the API sends <c>Cache-Control: no-store</c>, so
     /// enabling it is a decision about your own tolerance for stale data rather
@@ -114,6 +177,7 @@ public static class TcgDexServiceCollectionExtensions
         Action<TcgDexCacheOptions>? configureCache = null)
     {
         Guard.NotNull(services);
+        EnsureFirstRegistration(services);
 
         TcgDexCacheOptions cacheOptions = new();
         configureCache?.Invoke(cacheOptions);
@@ -122,13 +186,21 @@ public static class TcgDexServiceCollectionExtensions
         services.TryAddSingleton<ITcgDexResponseCache>(
             _ => new MemoryTcgDexResponseCache(cacheOptions.MaxEntries));
 
-        TcgDexOptions options = RegisterOptions(services, configure);
+        // IHttpClientFactory rebuilds handlers every handler lifetime, so the
+        // counters and the in-flight table live in a singleton the handlers
+        // share, not in the handler (TcgDexCachingState).
+        services.TryAddSingleton(_ => new TcgDexCachingState());
+        services.TryAddSingleton(provider => provider.GetRequiredService<TcgDexCachingState>().Statistics);
+
+        RegisterOptions(services, configure);
 
         return RegisterClient(services)
             .AddHttpMessageHandler(provider => new TcgDexCachingHandler(
                 provider.GetRequiredService<ITcgDexResponseCache>(),
                 provider.GetRequiredService<TcgDexCacheOptions>(),
                 timeProvider: null,
-                maxResponseBytes: options.MaxResponseBytes));
+                provider.GetRequiredService<TcgDexOptions>().MaxResponseBytes,
+                provider.GetRequiredService<TcgDexCachingState>(),
+                provider.GetService<ILoggerFactory>()?.CreateLogger(TcgDexLog.Category)));
     }
 }

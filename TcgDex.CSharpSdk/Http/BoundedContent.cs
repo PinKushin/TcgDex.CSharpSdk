@@ -83,7 +83,11 @@ internal static class BoundedContent
                 throw new OperationCanceledException(ex.Message, ex, cancellationToken);
             }
 
-            throw new TcgDexApiException($"The response body from '{uri}' could not be read.", ex);
+            throw new TcgDexApiException(
+                $"The response body from '{uri}' could not be read.",
+                TcgDexErrorKind.Network,
+                uri,
+                innerException: ex);
         }
     }
 
@@ -208,6 +212,8 @@ internal static class BoundedContent
         return new TcgDexApiException(
             $"The response from '{uri}' {size}, over the {maxBytes} byte limit set by " +
             $"{nameof(TcgDexOptions)}.{nameof(TcgDexOptions.MaxResponseBytes)}. " +
-            "Raise that limit if the endpoint legitimately returns responses this large.");
+            "Raise that limit if the endpoint legitimately returns responses this large.",
+            TcgDexErrorKind.ResponseTooLarge,
+            uri);
     }
 }

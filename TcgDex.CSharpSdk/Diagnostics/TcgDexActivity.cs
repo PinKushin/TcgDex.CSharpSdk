@@ -35,7 +35,7 @@ public static class TcgDexActivity
     public const string SourceName = "TcgDex.CSharpSdk";
 
     /// <summary>The source SDK operations are recorded on.</summary>
-    internal static ActivitySource Source { get; } = new(SourceName, ThisAssemblyVersion);
+    internal static ActivitySource Source { get; } = new(SourceName, TcgDexUserAgent.ProductVersion);
 
     /// <summary>
     /// Starts a client span for an SDK operation.
@@ -61,6 +61,4 @@ public static class TcgDexActivity
         activity.SetStatus(ActivityStatusCode.Error, exception.Message);
         activity.AddTag("error.type", exception.GetType().FullName);
     }
-
-    private const string ThisAssemblyVersion = "0.1.0";
 }

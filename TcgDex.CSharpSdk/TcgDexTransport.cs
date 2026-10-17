@@ -51,7 +51,19 @@ internal sealed class TcgDexTransport
     /// </summary>
     private readonly DeserializedResponseCache? _deserialized;
 
-    internal TcgDexTransport(HttpClient httpClient, TcgDexOptions options, ILogger? logger = null)
+    /// <summary>Creates a transport, reading the options once.</summary>
+    /// <param name="httpClient">Sends the requests.</param>
+    /// <param name="options">Read once, here.</param>
+    /// <param name="logger">Where log messages go.</param>
+    /// <param name="sharedDeserialized">
+    /// A parsed-model cache shared with other clients, as <c>AddTcgDex</c>
+    /// supplies; otherwise this transport builds its own.
+    /// </param>
+    internal TcgDexTransport(
+        HttpClient httpClient,
+        TcgDexOptions options,
+        ILogger? logger = null,
+        DeserializedResponseCache? sharedDeserialized = null)
     {
         Guard.NotNull(httpClient);
         Guard.NotNull(options);
@@ -72,7 +84,7 @@ internal sealed class TcgDexTransport
         _jsonOptions = TcgDexJsonContracts.For(options);
 
         _deserialized = options.MaxDeserializedCacheEntries > 0
-            ? new DeserializedResponseCache(options.MaxDeserializedCacheEntries)
+            ? sharedDeserialized ?? new DeserializedResponseCache(options.MaxDeserializedCacheEntries)
             : null;
 
         // Both endpoints are checked here rather than in Validate(): this is
@@ -236,7 +248,9 @@ internal sealed class TcgDexTransport
 
         return result ?? throw new TcgDexApiException(
             $"The TCGdex API returned no content for '{relativePath}', which is " +
-            "expected always to be available.");
+            "expected always to be available.",
+            TcgDexErrorKind.InvalidResponse,
+            new Uri(_languageBase, relativePath));
     }
 
     /// <summary>
@@ -261,7 +275,9 @@ internal sealed class TcgDexTransport
             $"The request to '{uri}' timed out after {_timeout}. Raise " +
             $"{nameof(TcgDexOptions)}.{nameof(TcgDexOptions.Timeout)} if this endpoint " +
             "is legitimately this slow.",
-            ex);
+            TcgDexErrorKind.Timeout,
+            uri,
+            innerException: ex);
     }
 
     /// <summary>
@@ -302,7 +318,11 @@ internal sealed class TcgDexTransport
         {
             Errored(uri, activity, ex);
 
-            throw new TcgDexApiException($"The request to '{uri}' could not be completed.", ex);
+            throw new TcgDexApiException(
+                $"The request to '{uri}' could not be completed.",
+                TcgDexErrorKind.Network,
+                uri,
+                innerException: ex);
         }
         catch (TcgDexApiException ex)
         {
@@ -375,6 +395,8 @@ internal sealed class TcgDexTransport
 
         TcgDexApiException exception = new(
             $"The TCGdex API returned {(int)response.StatusCode} for '{uri}': {description}",
+            TcgDexErrorKind.HttpStatus,
+            uri,
             response.StatusCode,
             problem,
             innerException);
@@ -478,8 +500,9 @@ internal sealed class TcgDexTransport
             // as an API failure rather than leaking JsonException.
             throw new TcgDexApiException(
                 $"The response from '{uri}' was not valid JSON for {typeof(T).Name}.",
+                TcgDexErrorKind.InvalidResponse,
+                uri,
                 HttpStatusCode.OK,
-                problem: null,
                 innerException: ex);
         }
     }

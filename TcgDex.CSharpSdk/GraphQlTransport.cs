@@ -65,8 +65,14 @@ internal sealed class GraphQlTransport(
     private readonly HttpClient _httpClient = httpClient
         ?? throw new ArgumentNullException(nameof(httpClient));
 
-    private readonly TcgDexOptions _options = options
-        ?? throw new ArgumentNullException(nameof(options));
+    // Copied out at construction, like TcgDexTransport: options are read once,
+    // when the client is built (see TcgDexOptions). Holding the object and
+    // reading it per request let a later mutation change GraphQL and not REST.
+    private readonly Uri _endpoint = (options ?? throw new ArgumentNullException(nameof(options))).GraphQlEndpoint;
+
+    private readonly TimeSpan _timeout = options.Timeout;
+
+    private readonly long _maxResponseBytes = options.MaxResponseBytes;
 
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
 
@@ -98,7 +104,11 @@ internal sealed class GraphQlTransport(
 
             _logger.GraphQlErrors(messages);
 
-            throw new TcgDexApiException($"The TCGdex GraphQL endpoint reported errors: {messages}");
+            throw new TcgDexApiException(
+                $"The TCGdex GraphQL endpoint reported errors: {messages}",
+                TcgDexErrorKind.GraphQlError,
+                _endpoint,
+                HttpStatusCode.OK);
         }
 
         IReadOnlyList<Card?>? cards = response.Data?.Cards;
@@ -179,7 +189,7 @@ internal sealed class GraphQlTransport(
         // Outside the try: the cancellation catch needs both the budget and
         // the caller's own token to tell the three cancellers apart.
         using CancellationTokenSource? budget =
-            RequestBudget.Create(_options.Timeout, cancellationToken);
+            RequestBudget.Create(_timeout, cancellationToken);
 
         CancellationToken deadline = budget?.Token ?? cancellationToken;
 
@@ -198,10 +208,14 @@ internal sealed class GraphQlTransport(
 
             if (budget?.IsCancellationRequested == true)
             {
-                throw new TcgDexApiException("The GraphQL request timed out.", ex);
+                throw new TcgDexApiException(
+                    $"The GraphQL request timed out after {_timeout}.",
+                    TcgDexErrorKind.Timeout,
+                    _endpoint,
+                    innerException: ex);
             }
 
-            throw RequestBudget.PipelineCancelled(_options.GraphQlEndpoint, ex);
+            throw RequestBudget.PipelineCancelled(_endpoint, ex);
         }
     }
 
@@ -215,7 +229,7 @@ internal sealed class GraphQlTransport(
                 GraphQlJsonContext.Default.GraphQlRequest);
 
             using HttpRequestMessage httpRequest =
-                new(HttpMethod.Post, _options.GraphQlEndpoint) { Content = content };
+                new(HttpMethod.Post, _endpoint) { Content = content };
             TcgDexUserAgent.Apply(httpRequest);
 
             // ResponseHeadersRead, not PostAsync. PostAsync defaults to
@@ -234,29 +248,44 @@ internal sealed class GraphQlTransport(
             {
                 throw new TcgDexApiException(
                     $"The TCGdex GraphQL endpoint returned {(int)httpResponse.StatusCode}.",
+                    TcgDexErrorKind.HttpStatus,
+                    _endpoint,
                     httpResponse.StatusCode);
             }
 
             ArraySegment<byte> body = await BoundedContent
                 .ReadAsBytesAsync(
                     httpResponse.Content,
-                    _options.MaxResponseBytes,
-                    _options.GraphQlEndpoint,
+                    _maxResponseBytes,
+                    _endpoint,
                     deadline)
                 .ConfigureAwait(false);
 
             return JsonSerializer.Deserialize(
                     new ReadOnlySpan<byte>(body.Array, body.Offset, body.Count),
                     GraphQlJsonContext.Default.GraphQlCardsResponse)
-                ?? throw new TcgDexApiException("The GraphQL endpoint returned an empty response.");
+                ?? throw new TcgDexApiException(
+                    "The GraphQL endpoint returned an empty response.",
+                    TcgDexErrorKind.InvalidResponse,
+                    _endpoint,
+                    HttpStatusCode.OK);
         }
         catch (HttpRequestException ex)
         {
-            throw new TcgDexApiException("The GraphQL request could not be completed.", ex);
+            throw new TcgDexApiException(
+                "The GraphQL request could not be completed.",
+                TcgDexErrorKind.Network,
+                _endpoint,
+                innerException: ex);
         }
         catch (JsonException ex)
         {
-            throw new TcgDexApiException("The GraphQL response was not valid JSON.", HttpStatusCode.OK, null, ex);
+            throw new TcgDexApiException(
+                "The GraphQL response was not valid JSON.",
+                TcgDexErrorKind.InvalidResponse,
+                _endpoint,
+                HttpStatusCode.OK,
+                innerException: ex);
         }
     }
 }

@@ -34,6 +34,12 @@ using Microsoft.Extensions.Logging;
 /// </remarks>
 internal static partial class TcgDexLog
 {
+    /// <summary>
+    /// The one logger category the whole SDK writes under, so a consumer can
+    /// filter everything it emits with a single rule.
+    /// </summary>
+    internal const string Category = "TcgDex";
+
     // ----- 1000: request lifecycle -----
 
     [LoggerMessage(

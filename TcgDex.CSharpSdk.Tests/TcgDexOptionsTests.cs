@@ -76,4 +76,21 @@ public sealed class TcgDexOptionsTests
         options.BaseAddress.ToString().ShouldBe("https://api.tcgdex.net/v2/");
         options.GraphQlEndpoint.ToString().ShouldBe("https://api.tcgdex.net/v2/graphql");
     }
+
+    [Test]
+    public void GraphQlEndpoint_ThatIsRelative_Throws()
+    {
+        // Unchecked, a relative endpoint escaped as an InvalidOperationException
+        // from Uri.Scheme when the client was built, rather than the
+        // ArgumentException naming the property that Validate promises.
+        TcgDexOptions options = new()
+        {
+            GraphQlEndpoint = new Uri("graphql", UriKind.Relative),
+        };
+
+        ArgumentException error = Should.Throw<ArgumentException>(options.Validate);
+
+        error.ParamName.ShouldBe(nameof(TcgDexOptions.GraphQlEndpoint));
+        error.Message.ShouldContain("absolute URI");
+    }
 }

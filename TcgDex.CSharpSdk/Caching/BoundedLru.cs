@@ -51,8 +51,8 @@ using System.Collections.Concurrent;
 /// <b>Eviction order is approximate, and reads stay lock-free because of it.</b>
 /// An exact LRU would move a node to the head of a list on every <i>read</i>,
 /// which needs a lock on the hot path — trading the common case for the rare
-/// one. Here a read publishes an ordinal unsynchronised; a lost update costs
-/// slightly worse ordering, never correctness.
+/// one. Here a read publishes an ordinal with one atomic store and no lock; a
+/// lost update costs slightly worse ordering, never correctness.
 /// </para>
 /// </remarks>
 internal sealed class BoundedLru<TKey, TValue>
@@ -218,13 +218,26 @@ internal sealed class BoundedLru<TKey, TValue>
         int batch = Math.Max(1, _maxEntries / EvictionBatchDivisor);
         KeyValuePair<TKey, Entry>[] snapshot = _entries.ToArray();
 
-        Array.Sort(snapshot, CompareByLastAccess);
+        // Each ordinal is read ONCE, into a value pair, and the copies are
+        // sorted. Sorting the entries themselves compared LastAccessed live,
+        // while concurrent readers kept writing it: a comparer that answers
+        // differently for the same pair mid-sort is inconsistent, and .NET's
+        // sort detects that and throws out of Set — on every target, reliably,
+        // under a few readers (BoundedLruEvictionRaceTests).
+        (TKey Key, long Ordinal)[] ordered = new (TKey, long)[snapshot.Length];
 
-        int evicting = Math.Min(batch, snapshot.Length);
+        for (int i = 0; i < snapshot.Length; i++)
+        {
+            ordered[i] = (snapshot[i].Key, snapshot[i].Value.LastAccessed);
+        }
+
+        Array.Sort(ordered, CompareByOrdinal);
+
+        int evicting = Math.Min(batch, ordered.Length);
 
         for (int i = 0; i < evicting; i++)
         {
-            _entries.TryRemove(snapshot[i].Key, out _);
+            _entries.TryRemove(ordered[i].Key, out _);
         }
 
         // Re-derived rather than decremented, so any drift the incremental
@@ -234,26 +247,29 @@ internal sealed class BoundedLru<TKey, TValue>
         Interlocked.Exchange(ref _approximateCount, _entries.Count);
     }
 
-    /// <summary>Orders entries oldest-accessed first.</summary>
-    private static readonly Comparison<KeyValuePair<TKey, Entry>> CompareByLastAccess =
-        (x, y) => x.Value.LastAccessed.CompareTo(y.Value.LastAccessed);
+    /// <summary>Orders copied ordinals oldest-accessed first.</summary>
+    private static readonly Comparison<(TKey Key, long Ordinal)> CompareByOrdinal =
+        (x, y) => x.Ordinal.CompareTo(y.Ordinal);
 
     /// <summary>
     /// A stored value with the ordinal of its most recent access.
     /// </summary>
     /// <remarks>
-    /// <see cref="LastAccessed"/> is written without synchronisation, so a
-    /// <see cref="long"/> rather than anything wider: a 64-bit field is written
-    /// atomically on the platforms this runs on, whereas a 16-byte struct can
-    /// tear into a value that was never written. Cheap to compare when sorting,
-    /// and strictly increasing, so no two entries can tie.
+    /// <see cref="LastAccessed"/> is read and written through
+    /// <see cref="Interlocked"/>. A plain 64-bit field is only written
+    /// atomically on a 64-bit process; on a 32-bit one (.NET Framework x86,
+    /// Unity on 32-bit ARM) it is two 32-bit stores, and eviction can read half
+    /// of one ordinal and half of another — a value nothing ever wrote. Strictly
+    /// increasing, so no two entries can tie.
     /// </remarks>
     private sealed class Entry(TValue value, long accessedAt)
     {
+        private long _lastAccessed = accessedAt;
+
         internal TValue Value { get; } = value;
 
-        internal long LastAccessed { get; private set; } = accessedAt;
+        internal long LastAccessed => Interlocked.Read(ref _lastAccessed);
 
-        internal void Touch(long ordinal) => LastAccessed = ordinal;
+        internal void Touch(long ordinal) => Interlocked.Exchange(ref _lastAccessed, ordinal);
     }
 }
