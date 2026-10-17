@@ -560,7 +560,7 @@ public. That makes every generated `JsonTypeInfo<T>` property part of the pinned
 1.0 renaming or removing a model would break twice. Offered: make it internal, or keep it public on
 purpose. The owner, 2026-10-17: *"internal"*. No further reasoning given.
 
-Done in 0.6.4. `PublicApi.approved.cs` shrinks accordingly, and tests reach the context through
+Done in 0.7.0. `PublicApi.approved.cs` shrinks accordingly, and tests reach the context through
 `InternalsVisibleTo` if they need it.
 
 ## 21. `DeserializePricing = false` also skips per-variant pricing — CORRECTION
@@ -572,7 +572,7 @@ pricing off to save the work still paid for it on every printing. The second mut
 *"fix that deserialized bug too"*. So it is a bug: the option means no pricing is parsed anywhere on
 a card.
 
-Done in 0.6.4. The old behaviour had not reached `main` as a pinning test, so the test written is
+Done in 0.7.0. The old behaviour had not reached `main` as a pinning test, so the test written is
 `WhenTurnedOff_PerVariantPricingIsNullToo`. The option's docs and CHANGELOG say so.
 
 ## 22. .NET conventions everywhere; `ReleaseDate` becomes `DateTime?`
@@ -592,7 +592,7 @@ full `YYYY-MM-DD`. An absent or malformed value reads as null rather than failin
 
 The Fable full-library review (2026-10-17) raised notes that would be breaking or awkward to change
 after 1.0. Each was put to the owner, who said *"do 8, and 9, fix 12 too that seems like a bug, and
-support 11, 1-6 are obviously fixed"*. All are done in 0.6.4:
+support 11, 1-6 are obviously fixed"*. All are done in 0.7.0:
 
 - **#8, failure kind:** `TcgDexApiException` gains `Kind` (a `TcgDexErrorKind`) and `RequestUri`, so
   callers branch on the failure instead of parsing the message. A language 404 stays `HttpStatus`
@@ -606,4 +606,15 @@ support 11, 1-6 are obviously fixed"*. All are done in 0.6.4:
 - **Also decided in the same pass:** a second `AddTcgDex` throws rather than silently keeping the
   first options. `#13`, a server page-size cap, was measured, not assumed: there is none (5000
   returned 5000).
+
+## 24. Breaking changes on 0.x bump the minor version
+
+The release prepared as 0.6.4 contained breaking changes (`ReleaseDate` became `DateTime?`,
+`TcgDexJsonContext` became internal, invalid options moved from `ArgumentException` at registration
+to `OptionsValidationException` at start). It was renamed to 0.7.0 before it shipped. The owner,
+2026-10-17: *"yep sounds good"*, agreeing with the proposal that a release with breaking changes
+ships as 0.7.0 rather than 0.6.4, following semver practice for 0.x.
+
+From now on, any breaking change on 0.x bumps the minor version. A patch release contains fixes
+only.
 
