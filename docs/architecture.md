@@ -86,10 +86,11 @@ adding a model; see [`learnings.md`](learnings.md).
 
 ### Two serializer contexts
 
-`TcgDexJsonContext` is public and covers the API models. `GraphQlJsonContext` is
-**internal** and covers the GraphQL envelopes, because the generator emits a
-public property per registered type — registering wire types in the public
-context would make the wire format public API.
+`TcgDexJsonContext` covers the API models and `GraphQlJsonContext` the GraphQL
+envelopes. Both are **internal**, because the generator emits a public property
+per registered type — a public context would pin every model and wire type as
+public API (DECISIONS #20). The AOT smoke test and benchmarks reach
+`TcgDexJsonContext` through `InternalsVisibleTo`.
 
 ### The query builder is not `IQueryable`
 

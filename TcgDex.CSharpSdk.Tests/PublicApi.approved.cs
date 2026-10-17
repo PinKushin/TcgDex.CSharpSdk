@@ -294,7 +294,8 @@ namespace TcgDex.Models
         public TcgDex.Models.SetBrief? LastSet { get; init; }
         public string? Logo { get; init; }
         public required string Name { get; init; }
-        public string? ReleaseDate { get; init; }
+        [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.ReleaseDateConverter))]
+        public System.DateTime? ReleaseDate { get; init; }
         public System.Collections.Generic.IReadOnlyList<TcgDex.Models.SetBrief> Sets { get; init; }
     }
     public sealed class SerieBrief : System.IEquatable<TcgDex.Models.SerieBrief>
@@ -314,7 +315,8 @@ namespace TcgDex.Models
         public TcgDex.Models.Legality? Legal { get; init; }
         public string? Logo { get; init; }
         public required string Name { get; init; }
-        public string? ReleaseDate { get; init; }
+        [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.ReleaseDateConverter?))]
+        public System.DateTime? ReleaseDate { get; init; }
         public TcgDex.Models.SerieBrief? Serie { get; init; }
         public string? Symbol { get; init; }
         public string? TcgOnline { get; init; }
@@ -475,82 +477,5 @@ namespace TcgDex.Resources
     {
         System.Threading.Tasks.Task<TcgDex.Models.Set?> GetAsync(string id, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.SetBrief>> ListAsync(System.Threading.CancellationToken cancellationToken = default);
-    }
-}
-namespace TcgDex.Serialization
-{
-    [System.Text.Json.Serialization.JsonSerializable(typeof(System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardBrief>))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(System.Collections.Generic.IReadOnlyList<TcgDex.Models.SerieBrief>))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(System.Collections.Generic.IReadOnlyList<TcgDex.Models.SetBrief>))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(System.Collections.Generic.IReadOnlyList<int>))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(System.Collections.Generic.IReadOnlyList<string>))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.Ability))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.Attack))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.Booster))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.Card))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.CardBrief))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.CardCount))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.CardmarketPricing))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.DetailedVariant))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.Legality))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.Pricing))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.Serie))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.SerieBrief))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.Set))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.SetAbbreviation))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.SetBrief))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.TcgDexProblem))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.TcgPlayerPrice))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.TcgPlayerPricing))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.ThirdParty))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.Variants))]
-    [System.Text.Json.Serialization.JsonSerializable(typeof(TcgDex.Models.WeaknessOrResistance))]
-    [System.Text.Json.Serialization.JsonSourceGenerationOptions(DefaultIgnoreCondition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull, PropertyNameCaseInsensitive=true, PropertyNamingPolicy=System.Text.Json.Serialization.JsonKnownNamingPolicy.CamelCase, ReadCommentHandling=System.Text.Json.JsonCommentHandling.Disallow)]
-    public sealed class TcgDexJsonContext : System.Text.Json.Serialization.JsonSerializerContext, System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver
-    {
-        public TcgDexJsonContext() { }
-        public TcgDexJsonContext(System.Text.Json.JsonSerializerOptions options) { }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.Ability> Ability { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.Attack> Attack { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<bool> Boolean { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.Booster> Booster { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.Card> Card { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.CardBrief> CardBrief { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.CardCount> CardCount { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.CardmarketPricing> CardmarketPricing { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.DateTimeOffset> DateTimeOffset { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<decimal> Decimal { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.DetailedVariant> DetailedVariant { get; }
-        protected override System.Text.Json.JsonSerializerOptions? GeneratedSerializerOptions { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<TcgDex.Models.Ability>> IReadOnlyListAbility { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<TcgDex.Models.Attack>> IReadOnlyListAttack { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<TcgDex.Models.Booster>> IReadOnlyListBooster { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardBrief>> IReadOnlyListCardBrief { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<TcgDex.Models.DetailedVariant>> IReadOnlyListDetailedVariant { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<int>> IReadOnlyListInt32 { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<TcgDex.Models.SerieBrief>> IReadOnlyListSerieBrief { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<TcgDex.Models.SetBrief>> IReadOnlyListSetBrief { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<string>> IReadOnlyListString { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<TcgDex.Models.WeaknessOrResistance>> IReadOnlyListWeaknessOrResistance { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<int> Int32 { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.Legality> Legality { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.DateTimeOffset?> NullableDateTimeOffset { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<decimal?> NullableDecimal { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<int?> NullableInt32 { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.Pricing> Pricing { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.Serie> Serie { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.SerieBrief> SerieBrief { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.Set> Set { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.SetAbbreviation> SetAbbreviation { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.SetBrief> SetBrief { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<string> String { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.TcgDexProblem> TcgDexProblem { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.TcgPlayerPrice> TcgPlayerPrice { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.TcgPlayerPricing> TcgPlayerPricing { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.ThirdParty> ThirdParty { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.Variants> Variants { get; }
-        public System.Text.Json.Serialization.Metadata.JsonTypeInfo<TcgDex.Models.WeaknessOrResistance> WeaknessOrResistance { get; }
-        public static TcgDex.Serialization.TcgDexJsonContext Default { get; }
-        public override System.Text.Json.Serialization.Metadata.JsonTypeInfo? GetTypeInfo(System.Type type) { }
     }
 }
