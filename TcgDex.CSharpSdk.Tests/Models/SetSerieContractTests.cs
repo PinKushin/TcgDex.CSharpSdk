@@ -173,6 +173,18 @@ public sealed class SetSerieContractTests
             .ShouldContain("\"releaseDate\":null");
     }
 
+    [Test]
+    public void ReleaseDate_NullOnASet_IsWrittenAsNullNotDateTimeMinValue()
+    {
+        // ReleaseDateConverter.Write has no null branch: it relies on
+        // System.Text.Json never handing it a null DateTime?. Were it called,
+        // GetValueOrDefault() would emit "0001-01-01".
+        string json = JsonSerializer.Serialize(new Set { Id = "x", Name = "x" }, NeverIgnoreNulls);
+
+        json.ShouldContain("\"releaseDate\":null");
+        json.ShouldNotContain("0001-01-01");
+    }
+
     private static readonly JsonSerializerOptions NeverIgnoreNulls =
         new(TcgDex.Serialization.TcgDexJsonContext.Default.Options)
         {

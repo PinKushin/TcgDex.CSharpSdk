@@ -288,7 +288,7 @@ jobs:
       # every ConfigureAwait(false) a caller's context could otherwise capture.
       # Windows now runs all three frameworks; LogFilePrefix writes one
       # framework-tests_<tfm>_<timestamp>.trx per framework.
-      # Measured 2026-10-17 locally for 0.6.4 (both parts merged): net10.0 667, net8.0 666,
+      # Measured 2026-10-17 locally for 0.7.0 (both parts merged): net10.0 667, net8.0 666,
       # net472 661, offline 11.
       # Part A runtime fixes: ErrorKindTests (21), DependencyInjectionTests (11),
       # OptionsFrozenTests (2), MemoryCacheLifetimeTests (2), BoundedLruEvictionRaceTests,
@@ -297,9 +297,15 @@ jobs:
       # AnArrayIndexAsTheComparedValue_IsRejected), releaseDate tolerance and
       # serialization (12), GraphQL paging and null-set (6), per-variant pricing (2),
       # tcgplayer scalar keys (1), Languages.All (2).
+      # Then by eleven (net10.0 678, net8.0 677, net472 672, offline 11), the 0.7.0 final
+      # fixes: ValueExpressionTests (6: conversion operators, throwing getter, bad casts),
+      # DependencyInjectionTests (4: ValidateOnStart, merged sources, delegate runs once),
+      # ReleaseDate null on a Set (1).
+      # Then by one (net10.0 679, net8.0 678, net472 673):
+      # ALiftedOperatorOnANullValue_IsNotInvoked.
       - name: ubuntu net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 667 -Label 'ubuntu net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 679 -Label 'ubuntu net10.0'
 
       - name: ubuntu offline integration tests
         shell: pwsh
@@ -307,16 +313,16 @@ jobs:
 
       - name: macOS net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 667 -Label 'macOS net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 679 -Label 'macOS net10.0'
 
       - name: Windows net472 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 661 -Label 'Windows net472'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 673 -Label 'Windows net472'
 
       - name: Windows net8.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 666 -Label 'Windows net8.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 678 -Label 'Windows net8.0'
 
       - name: Windows net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 667 -Label 'Windows net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 679 -Label 'Windows net10.0'

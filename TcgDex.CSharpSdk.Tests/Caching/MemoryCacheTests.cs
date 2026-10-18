@@ -347,11 +347,16 @@ public sealed class MemoryCacheTests
     }
 
     [Test]
-    public void AddTcgDexWithCaching_ValidatesLanguageAtRegistration()
+    public void AddTcgDexWithCaching_ValidatesLanguageOnStart()
     {
         ServiceCollection services = new();
+        services.AddTcgDexWithCaching(o => o.Language = "zz");
 
-        Should.Throw<ArgumentException>(() => services.AddTcgDexWithCaching(o => o.Language = "zz"));
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        Should.Throw<Microsoft.Extensions.Options.OptionsValidationException>(
+                () => provider.GetRequiredService<Microsoft.Extensions.Options.IStartupValidator>().Validate())
+            .Message.ShouldContain("zz");
     }
 
     [Test]

@@ -158,6 +158,80 @@ public sealed class ValueExpressionTests
             .Message.ShouldBe("boom");
     }
 
+    [Test]
+    public void AThrowingGetter_SurfacesTheCallersException()
+    {
+        Thrower thrower = new();
+
+        Should.Throw<InvalidOperationException>(() => Query(c => c.Name == thrower.Bang))
+            .Message.ShouldBe("boom");
+    }
+
+    // ----- user-defined conversion operators -----
+
+    [Test]
+    public void AUserDefinedExplicitOperator_IsInvoked()
+    {
+        // The operand used to pass through unchanged, so ToString() was sent
+        // ("TcgDex...Wrapper") instead of what the operator returns.
+        Wrapper wrapper = new("Furret");
+
+        Query(c => c.Name == (string)wrapper).ShouldBe("name=eq:Furret");
+    }
+
+    [Test]
+    public void ALiftedOperatorOnANullValue_IsNotInvoked()
+    {
+        // C# lifts S -> int over S?: a null operand yields null without calling
+        // the operator. Reflection would pass default(S) instead and send the
+        // operator's answer for a value the caller never had.
+        Level? none = null;
+
+        Outcome(() => Query(c => c.Hp == (int?)none))
+            .ShouldBe(Outcome(() => Query(c => c.Hp == (int?)null)));
+    }
+
+    [Test]
+    public void AThrowingOperator_SurfacesTheCallersException()
+    {
+        Wrapper wrapper = new(null);
+
+        Should.Throw<InvalidOperationException>(() => Query(c => c.Name == (string)wrapper))
+            .Message.ShouldBe("empty");
+    }
+
+    // ----- casts that cannot succeed have one documented exception type -----
+
+    [Test]
+    public void AnOverflowingByteCast_IsRejectedNamingTheNode()
+    {
+        int value = 300;
+
+        NotSupportedException exception = Should.Throw<NotSupportedException>(() => Query(c => c.Hp > (byte)value));
+        exception.Message.ShouldContain("Convert(");
+        exception.InnerException.ShouldBeOfType<OverflowException>();
+    }
+
+    [Test]
+    public void AnOverflowingIntCast_IsRejectedNamingTheNode()
+    {
+        long value = 5_000_000_000L;
+
+        NotSupportedException exception = Should.Throw<NotSupportedException>(() => Query(c => c.Hp > (int)value));
+        exception.Message.ShouldContain("Convert(");
+        exception.InnerException.ShouldBeOfType<OverflowException>();
+    }
+
+    [Test]
+    public void ANaNCast_IsRejectedNamingTheNode()
+    {
+        double value = double.NaN;
+
+        NotSupportedException exception = Should.Throw<NotSupportedException>(() => Query(c => c.Hp > (int)value));
+        exception.Message.ShouldContain("Convert(");
+        exception.InnerException.ShouldBeOfType<OverflowException>();
+    }
+
     private static string MakeName() => "Furret";
 
     private sealed class Thrower
@@ -165,5 +239,36 @@ public sealed class ValueExpressionTests
         private readonly string _message = "boom";
 
         public string Boom() => throw new InvalidOperationException(_message);
+
+        public string Bang => throw new InvalidOperationException(_message);
+    }
+
+    /// <summary>The query string, or the exception type when building it fails.</summary>
+    private static string Outcome(Func<string> build)
+    {
+        try
+        {
+            return build();
+        }
+        catch (Exception exception) when (exception is NotSupportedException or ArgumentException or InvalidOperationException)
+        {
+            return exception.GetType().Name;
+        }
+    }
+
+    private readonly struct Level(int value)
+    {
+        public static explicit operator int(Level level)
+            => level._value != 0 ? level._value : throw new InvalidOperationException("called with a default Level");
+
+        private readonly int _value = value;
+    }
+
+    private sealed class Wrapper(string? value)
+    {
+        public static explicit operator string(Wrapper wrapper)
+            => wrapper.Value ?? throw new InvalidOperationException("empty");
+
+        private string? Value { get; } = value;
     }
 }

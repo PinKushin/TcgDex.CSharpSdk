@@ -66,38 +66,56 @@ public static class TcgDexServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Validates the options now and registers them through the options system.
+    /// Registers the options through the options system, validated on start.
     /// </summary>
     /// <remarks>
     /// <para>
     /// The caller's delegate is registered with <c>Configure</c>, the standard
     /// options pattern, so <c>IOptions</c>, <c>IOptionsSnapshot</c> and
-    /// <c>IOptionsMonitor</c> all see every property. The previous version
-    /// copied properties across by hand and had stopped at three of seven.
+    /// <c>IOptionsMonitor</c> all see every property.
     /// </para>
     /// <para>
-    /// The delegate also runs once here, on a throwaway instance, so invalid
-    /// options fail at registration rather than on the first request — a
-    /// typo'd language should not surface later as a 404 that reads like a
-    /// missing card.
+    /// <see cref="TcgDexOptionsValidator"/> checks the final options, merged from
+    /// every source (appsettings, other <c>Configure</c> calls), and
+    /// <c>ValidateOnStart</c> makes a host fail at start with an
+    /// <see cref="OptionsValidationException"/> rather than on the first request
+    /// — a typo'd language should not surface later as a 404 that reads like a
+    /// missing card. Without a host, the same exception surfaces on first
+    /// resolution.
     /// </para>
     /// </remarks>
     private static void RegisterOptions(
         IServiceCollection services,
         Action<TcgDexOptions>? configure)
     {
-        TcgDexOptions probe = new();
-        configure?.Invoke(probe);
-        probe.Validate();
+        services.AddOptions<TcgDexOptions>()
+            .Configure(configure ?? (static _ => { }))
+            .ValidateOnStart();
 
-        OptionsBuilder<TcgDexOptions> builder = services.AddOptions<TcgDexOptions>();
-
-        if (configure is not null)
-        {
-            builder.Configure(configure);
-        }
-
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<TcgDexOptions>, TcgDexOptionsValidator>());
         services.TryAddSingleton(provider => provider.GetRequiredService<IOptions<TcgDexOptions>>().Value);
+    }
+
+    /// <summary>
+    /// Adapts <see cref="TcgDexOptions.Validate"/> to the options pipeline,
+    /// keeping its messages.
+    /// </summary>
+    private sealed class TcgDexOptionsValidator : IValidateOptions<TcgDexOptions>
+    {
+        public ValidateOptionsResult Validate(string? name, TcgDexOptions options)
+        {
+            try
+            {
+                options.Validate();
+                return ValidateOptionsResult.Success;
+            }
+            catch (ArgumentException exception)
+            {
+                // Handled, not swallowed: the message becomes the failure the
+                // options system raises as OptionsValidationException.
+                return ValidateOptionsResult.Fail(exception.Message);
+            }
+        }
     }
 
     /// <summary>

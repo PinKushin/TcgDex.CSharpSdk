@@ -256,13 +256,18 @@ public sealed class ClientTests
     }
 
     [Test]
-    public void AddTcgDex_WithInvalidLanguage_FailsAtRegistrationNotFirstCall()
+    public void AddTcgDex_WithInvalidLanguage_FailsAtStartNotFirstCall()
     {
         // Surfacing this at startup beats a 404 on the first request that looks
-        // like a missing card.
+        // like a missing card. ValidateOnStart runs IStartupValidator as the host starts.
         ServiceCollection services = new();
+        services.AddTcgDex(o => o.Language = "zz");
 
-        Should.Throw<ArgumentException>(() => services.AddTcgDex(o => o.Language = "zz"));
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        Should.Throw<Microsoft.Extensions.Options.OptionsValidationException>(
+                () => provider.GetRequiredService<Microsoft.Extensions.Options.IStartupValidator>().Validate())
+            .Message.ShouldContain("zz");
     }
 }
 

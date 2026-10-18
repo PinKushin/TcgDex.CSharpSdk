@@ -260,7 +260,8 @@ internal static class ExpressionTranslator
     /// A captured local becomes a field on a compiler-generated closure, so it
     /// is read reflectively. Beyond that, the common value shapes are
     /// interpreted: array elements, indexers (<c>list[i]</c>), parameterless
-    /// instance methods (<c>name.Trim()</c>) and conversions. Each is a
+    /// instance methods (<c>name.Trim()</c>), conversions and user-defined
+    /// conversion operators. Each is a
     /// metadata read or a <see cref="MethodBase.Invoke(object, object[])"/> of a
     /// method the caller's code already references — never code generation —
     /// so it stays valid under Native AOT, unlike
@@ -278,8 +279,20 @@ internal static class ExpressionTranslator
             case ConstantExpression constant:
                 return constant.Value;
 
+            // A user-defined implicit or explicit operator is a static method of
+            // one argument; invoking it is what the cast means.
+            case UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked, Method: not null } convert:
+                {
+                    // A lifted conversion of a null operand is null without calling
+                    // the operator; reflection would pass default(S) instead.
+                    object? operand = Evaluate(convert.Operand);
+                    return operand is null && convert.IsLifted
+                        ? null
+                        : Invoke(convert.Method, instance: null, [operand]);
+                }
+
             case UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert:
-                return ConvertValue(Evaluate(convert.Operand), convert.Type);
+                return ConvertValue(Evaluate(convert.Operand), convert);
 
             case MemberExpression { Expression: null } staticMember:
                 return ReadMember(staticMember.Member, instance: null);
@@ -305,7 +318,7 @@ internal static class ExpressionTranslator
             $"Cannot evaluate '{node}' while building a filter: '{receiver}' is null.");
 
     /// <summary>Invokes a method, surfacing the caller's own exception rather than the reflection wrapper.</summary>
-    private static object? Invoke(MethodInfo method, object instance, object?[] arguments)
+    private static object? Invoke(MethodInfo method, object? instance, object?[] arguments)
     {
         try
         {
@@ -323,28 +336,42 @@ internal static class ExpressionTranslator
     /// filter value can take: a floating value cast to an integral type is
     /// truncated, not rounded.
     /// </summary>
-    private static object? ConvertValue(object? value, Type type)
+    /// <exception cref="NotSupportedException">
+    /// The value does not fit the target type (<c>(byte)300</c>,
+    /// <c>(int)double.NaN</c>), so filter-building errors keep one documented
+    /// type; the conversion's own exception is the inner exception.
+    /// </exception>
+    private static object? ConvertValue(object? value, UnaryExpression convert)
     {
-        Type target = Nullable.GetUnderlyingType(type) ?? type;
+        Type target = Nullable.GetUnderlyingType(convert.Type) ?? convert.Type;
 
         if (value is null || target.IsInstanceOfType(value) || value is not IConvertible)
         {
             return value;
         }
 
-        if (value is double or float or decimal && target.IsPrimitive && target != typeof(double) && target != typeof(float))
+        try
         {
-            value = decimal.Truncate(Convert.ToDecimal(value, CultureInfo.InvariantCulture));
-        }
+            if (value is double or float or decimal && target.IsPrimitive && target != typeof(double) && target != typeof(float))
+            {
+                value = decimal.Truncate(Convert.ToDecimal(value, CultureInfo.InvariantCulture));
+            }
 
-        return Convert.ChangeType(value, target, CultureInfo.InvariantCulture);
+            return Convert.ChangeType(value, target, CultureInfo.InvariantCulture);
+        }
+        catch (Exception exception) when (exception is OverflowException or InvalidCastException or ArgumentException or FormatException)
+        {
+            throw new NotSupportedException(
+                $"Cannot evaluate '{convert}' while building a filter: {exception.Message}",
+                exception);
+        }
     }
 
     private static object? ReadMember(MemberInfo member, object? instance)
         => member switch
         {
             FieldInfo field => field.GetValue(instance),
-            PropertyInfo property => property.GetValue(instance),
+            PropertyInfo property => Invoke(property.GetMethod!, instance, []),
             _ => throw new NotSupportedException(
                 $"Cannot read a value from '{member.Name}' while building a filter."),
         };

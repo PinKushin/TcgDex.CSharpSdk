@@ -60,8 +60,8 @@ translation of someone else's idioms.
 - **One error contract** — a missing resource returns `null`; everything else
   throws `TcgDexApiException`. Not four exception types depending on which
   method you called.
-- **18 languages**, validated at registration rather than failing later as a
-  confusing 404.
+- **18 languages**, validated when the host starts (or, without a host, when the
+  client is first resolved) rather than failing later as a confusing 404.
 - **Opt-in caching** — serves fresh data with no network, and revalidates
   with `If-None-Match` so unchanged data costs 0 bytes instead of a re-download.
 - **Observable** — structured `ILogger` output and `ActivitySource` spans,
