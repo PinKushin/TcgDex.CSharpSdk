@@ -57,7 +57,9 @@ param(
 
     [string]$OutputDir = '.',
 
-    [string]$RepositoryUrl = 'https://github.com/PinKushin/TcgDex.CSharpSdk'
+    [string]$RepositoryUrl = 'https://github.com/PinKushin/TcgDex.CSharpSdk',
+
+    [string]$PackageId = 'TcgDex.CSharpSdk'
 )
 
 Set-StrictMode -Version Latest
@@ -104,8 +106,12 @@ New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 # --- GitHub Release notes: the raw section body, verbatim. GitHub renders the
 #     markdown, and the release title already carries the version. ---
+#     The NuGet page and install command lead it: the release page is what gets
+#     linked, and before 0.8.0 nothing on it pointed at the package itself. ---
+$nugetUrl = "https://www.nuget.org/packages/$PackageId/$Version"
+$install = "dotnet add package $PackageId --version $Version"
 $notesPath = Join-Path $OutputDir 'release-notes.md'
-Set-Content -LiteralPath $notesPath -Value $body -Encoding utf8
+Set-Content -LiteralPath $notesPath -Value (@("**NuGet:** $nugetUrl", '', '```', $install, '```', '') + $body) -Encoding utf8
 
 # --- Discord post: a Keep a Changelog heading becomes an emoji + label, each
 #     hard-wrapped bullet is unwrapped to one line, and the whole thing is capped
@@ -120,7 +126,7 @@ $emoji = @{
 }
 
 $out = [System.Collections.Generic.List[string]]::new()
-$out.Add("**TcgDex.CSharpSdk ``$Version``** $([char]0x2014) now on NuGet `u{1F0CF}")  # em dash, playing card
+$out.Add("**TcgDex.CSharpSdk ``$Version``** $([char]0x2014) now on NuGet `u{1F0CF} <$nugetUrl>")  # em dash, playing card; <> stops Discord's embed
 $pending = ''
 $inLead = $false
 
@@ -162,6 +168,10 @@ if ($pending) { $out.Add($pending) }
 # fit has a link to them.
 $moreUrl = "$RepositoryUrl/releases/tag/v$Version"
 $more = "$([char]0x2192) full notes: $moreUrl"   # rightwards arrow
+
+# The install line rides in the same list element as the link, so the trimming
+# below protects both.
+$more = "``$install```n$more"
 
 $out.Add('')
 $out.Add($more)

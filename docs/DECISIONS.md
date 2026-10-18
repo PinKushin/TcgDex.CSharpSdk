@@ -729,3 +729,20 @@ rejection, and none is supplied here.
 `CardSetBrief`, `CardTrader`, and the plural `DexIds` / `Stamps`. `CardFilter.DexId` stays singular
 because it filters by one id; the 0.8.0 migration table says so.
 
+## 30. 0.8.0 ships as a normal release, not a 1.0 release candidate
+
+The naming pass (#25) was the last item on the 1.0 bar (#19), so it could have shipped as
+`1.0.0-rc.1`. The owner chose `0.8.0`: "it wont be served on nuget natively if we do a rc tag, so
+everyone would be on old stuff, so im leaning towads the 0.8.0 for a little". NuGet hides
+prerelease versions unless a consumer opts in, so an RC would have left every default install on
+0.7.0.
+
+1.0.0 follows on the same code once 0.8.0 has had some use. A published NuGet version cannot be
+renamed, so that is a small version-bump PR (csproj `<Version>` plus a `[1.0.0]` CHANGELOG
+section) and a new `v1.0.0` tag, not a retag of 0.8.0.
+
+Same release: the GitHub Release now carries the published `.nupkg` and `.snupkg`, and its notes
+and the Discord post link the NuGet page and give the install command. The owner had been linking
+the GitHub release on Discord, which until now pointed only at source zips: "people havent
+actually seen a real release lol i think".
+
