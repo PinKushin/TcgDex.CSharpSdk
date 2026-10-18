@@ -243,6 +243,25 @@ public sealed class DependencyInjectionTests
         second.ShouldBeSameAs(first);
     }
 
+    // ----- cache options -----
+
+    [Test]
+    public void CacheOptions_MergeConfigureCallsLikeAnyOtherOptions()
+    {
+        // configureCache and a separate Configure<TcgDexCacheOptions> (or an
+        // appsettings binding) must both reach the options the handler gets.
+        ServiceCollection services = new();
+        services.AddTcgDexWithCaching(configureCache: o => o.MaxEntries = 7);
+        services.Configure<TcgDexCacheOptions>(o => o.DefaultTimeToLive = TimeSpan.FromSeconds(9));
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        TcgDexCacheOptions options = provider.GetRequiredService<TcgDexCacheOptions>();
+
+        options.MaxEntries.ShouldBe(7);
+        options.DefaultTimeToLive.ShouldBe(TimeSpan.FromSeconds(9));
+        provider.GetRequiredService<IOptions<TcgDexCacheOptions>>().Value.ShouldBeSameAs(options);
+    }
+
     // ----- the caching handler across rotations -----
 
     [Test]

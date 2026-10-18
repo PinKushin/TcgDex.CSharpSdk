@@ -197,12 +197,14 @@ public static class TcgDexServiceCollectionExtensions
         Guard.NotNull(services);
         EnsureFirstRegistration(services);
 
-        TcgDexCacheOptions cacheOptions = new();
-        configureCache?.Invoke(cacheOptions);
-
-        services.TryAddSingleton(cacheOptions);
+        // The options pattern, as for TcgDexOptions: configureCache is one
+        // Configure among any others (appsettings, Configure<TcgDexCacheOptions>),
+        // merged when first resolved. A TcgDexCacheOptions registered before
+        // this call, such as a subclass overriding GetTimeToLive, still wins.
+        services.AddOptions<TcgDexCacheOptions>().Configure(configureCache ?? (static _ => { }));
+        services.TryAddSingleton(provider => provider.GetRequiredService<IOptions<TcgDexCacheOptions>>().Value);
         services.TryAddSingleton<ITcgDexResponseCache>(
-            _ => new MemoryTcgDexResponseCache(cacheOptions.MaxEntries));
+            provider => new MemoryTcgDexResponseCache(provider.GetRequiredService<TcgDexCacheOptions>().MaxEntries));
 
         // IHttpClientFactory rebuilds handlers every handler lifetime, so the
         // counters and the in-flight table live in a singleton the handlers
