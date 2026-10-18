@@ -175,7 +175,7 @@ exercised.
 
 That is not hypothetical here. Line coverage sat at 99.76% while branch coverage
 was 91.90%, and the gap included the operand-flipping in
-`ExpressionTranslator`: `100 <= c.Hp` could have emitted the wrong operator with
+`ExpressionTranslator`: `100 <= c.HitPoints` could have emitted the wrong operator with
 the whole suite green. Closing that gap is what took branch coverage to 96.06%.
 
 The branch gate is **95%**. The remaining 17 partial branches are the low-value
