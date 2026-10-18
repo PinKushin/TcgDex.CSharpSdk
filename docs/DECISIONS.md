@@ -687,3 +687,19 @@ cannot be read becomes null rather than an exception. The scheme check also stop
 parsing as a `file://` URI off Windows. An unknown `ImageQuality` or `ImageFormat` still throws,
 because that is a caller's mistake, not the API's.
 
+## 28. JSON converters stay internal
+
+Decided while doing the naming pass (#25); the owner's scope was "internal unless a consumer
+genuinely needs one", and the reasoning is the implementer's.
+
+The SDK's converters (`FlexibleStringConverter`, `ReleaseDateConverter`, `TimestampConverter`,
+`TcgPlayerPricingConverter`) are all internal, and stay so. They are attached to the models with
+`[JsonConverter]`, so they apply under any `JsonSerializerOptions` a consumer uses, including their
+own source-generated context: a consumer serializing a `Card` never names one. Public, each would be
+pinned API with nothing to call. They do appear in `PublicApi.approved.cs`, but only as the type
+argument of those attributes, which is metadata rather than callable surface.
+
+The case that would justify one going public is a consumer modelling their own type with the same
+quirk (a string-or-number field, a tolerant date). None has asked, and making a type public later is
+not breaking, whereas making it internal after 1.0 would be.
+
