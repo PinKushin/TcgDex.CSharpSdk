@@ -14,7 +14,7 @@ using TcgDex.Models;
 /// </para>
 /// <para>
 /// This is deliberately not an <see cref="IQueryable{T}"/>. The API supports
-/// only the operators in <see cref="QueryOperator"/>, so an
+/// only equality, ordering comparisons, substring match and null checks, so an
 /// <c>IQueryable</c> would have to throw for most of LINQ — a partial
 /// implementation that fails at runtime instead of at the call site. A dedicated
 /// builder makes the supported surface explicit.

@@ -454,19 +454,6 @@ namespace TcgDex.Querying
         public string ToQueryString() { }
         public TcgDex.Querying.CardQuery Where(System.Linq.Expressions.Expression<System.Func<TcgDex.Models.Card, bool>> predicate) { }
     }
-    public enum QueryOperator
-    {
-        Like = 0,
-        NotLike = 1,
-        Equal = 2,
-        NotEqual = 3,
-        GreaterThan = 4,
-        GreaterThanOrEqual = 5,
-        LessThan = 6,
-        LessThanOrEqual = 7,
-        Null = 8,
-        NotNull = 9,
-    }
 }
 namespace TcgDex.Resources
 {
