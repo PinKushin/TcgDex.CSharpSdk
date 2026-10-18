@@ -71,7 +71,6 @@ namespace TcgDex
         public TcgDexApiException() { }
         public TcgDexApiException(string message) { }
         public TcgDexApiException(string message, System.Exception? innerException) { }
-        public TcgDexApiException(string message, System.Net.HttpStatusCode statusCode, TcgDex.Models.TcgDexProblem? problem = null, System.Exception? innerException = null) { }
         public TcgDexApiException(string message, TcgDex.TcgDexErrorKind kind, System.Uri? requestUri, System.Net.HttpStatusCode? statusCode = default, TcgDex.Models.TcgDexProblem? problem = null, System.Exception? innerException = null) { }
         public bool IsLanguageError { get; }
         public TcgDex.TcgDexErrorKind Kind { get; }

@@ -252,26 +252,6 @@ public sealed class ErrorKindTests
     public async Task GraphQl_NullDocument_IsInvalidResponse()
         => ShouldBe(await GraphQlFailure(Answer(HttpStatusCode.OK, "null")), TcgDexErrorKind.InvalidResponse, GraphQlUri);
 
-    // ----- the public constructors -----
-
-    [Test]
-    public void TheStatusConstructor_KeepsItsValuesAndIsUnspecified()
-    {
-        // Public, and no longer called by the SDK itself, so only this pins it.
-        TcgDex.Models.TcgDexProblem problem = JsonSerializer.Deserialize(
-            """{"type":"t","title":"x","status":409}""",
-            TcgDex.Serialization.TcgDexJsonContext.Default.TcgDexProblem)!;
-        InvalidOperationException cause = new("cause");
-
-        TcgDexApiException error = new("m", HttpStatusCode.Conflict, problem, cause);
-
-        error.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        error.Problem.ShouldBeSameAs(problem);
-        error.InnerException.ShouldBeSameAs(cause);
-        error.Kind.ShouldBe(TcgDexErrorKind.Unspecified);
-        error.RequestUri.ShouldBeNull();
-    }
-
     // ----- the caching handler, used directly -----
 
     [Test]
