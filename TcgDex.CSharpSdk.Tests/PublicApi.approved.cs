@@ -198,6 +198,7 @@ namespace TcgDex.Models
         public TcgDex.Models.ThirdParty? ThirdParty { get; init; }
         public string? TrainerType { get; init; }
         public System.Collections.Generic.IReadOnlyList<string> Types { get; init; }
+        [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.TimestampConverter?))]
         public System.DateTimeOffset? Updated { get; init; }
         public TcgDex.Models.Variants? Variants { get; init; }
         [System.Text.Json.Serialization.JsonPropertyName("variants_detailed")]
@@ -291,6 +292,7 @@ namespace TcgDex.Models
         [System.Text.Json.Serialization.JsonPropertyName("trend-holo")]
         public decimal? TrendHolo { get; init; }
         public string? Unit { get; init; }
+        [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.TimestampConverter?))]
         public System.DateTimeOffset? Updated { get; init; }
     }
     public sealed class DetailedVariant : System.IEquatable<TcgDex.Models.DetailedVariant>

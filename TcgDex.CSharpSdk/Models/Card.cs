@@ -76,7 +76,11 @@ public sealed record Card
         init => _variantsDetailed = value ?? [];
     }
 
-    /// <summary>When this card's record was last updated.</summary>
+    /// <summary>
+    /// When this card's record was last updated; <see langword="null"/> when
+    /// absent or not a readable timestamp.
+    /// </summary>
+    [JsonConverter(typeof(Serialization.TimestampConverter))]
     public DateTimeOffset? Updated { get; init; }
 
     // ----- common but not guaranteed -----

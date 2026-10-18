@@ -25,7 +25,11 @@ public sealed record Pricing
 /// </remarks>
 public sealed record CardmarketPricing
 {
-    /// <summary>When these prices were last refreshed.</summary>
+    /// <summary>
+    /// When these prices were last refreshed; <see langword="null"/> when
+    /// absent or not a readable timestamp.
+    /// </summary>
+    [JsonConverter(typeof(Serialization.TimestampConverter))]
     public DateTimeOffset? Updated { get; init; }
 
     /// <summary>Currency code; <c>"EUR"</c> for this source.</summary>
@@ -98,7 +102,10 @@ public sealed record TcgPlayerPricing
     /// <summary>Currency code; <c>"USD"</c> for this source.</summary>
     public string? Unit { get; init; }
 
-    /// <summary>When these prices were last refreshed.</summary>
+    /// <summary>
+    /// When these prices were last refreshed; <see langword="null"/> when
+    /// absent or not a readable timestamp.
+    /// </summary>
     public DateTimeOffset? Updated { get; init; }
 
     /// <summary>
