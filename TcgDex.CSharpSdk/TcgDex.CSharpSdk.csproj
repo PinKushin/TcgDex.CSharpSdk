@@ -67,6 +67,9 @@
     -->
     <PackageReleaseNotes>See https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- The card-back icon from the SDK's card on pinkushin.github.io, rendered at 128 px. Per-version, so a later
+         release can swap in a TCGdex-approved icon if they give permission. -->
+    <PackageIcon>icon.png</PackageIcon>
     <RepositoryUrl>https://github.com/PinKushin/TcgDex.CSharpSdk</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/PinKushin/TcgDex.CSharpSdk</PackageProjectUrl>
@@ -79,6 +82,7 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" Visible="false" />
     <None Include="..\LICENSE.txt" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="..\icon.png" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
