@@ -159,8 +159,8 @@ public sealed class CachingTests : LiveApiFixture
             cached.HitPoints.ShouldBe(live.HitPoints);
             cached.Attacks.Count.ShouldBe(live.Attacks.Count);
             cached.Set.Id.ShouldBe(live.Set.Id);
-            int? livePrintings = live.Pricing?.Tcgplayer?.Printings.Count;
-            int? cachedPrintings = cached.Pricing?.Tcgplayer?.Printings.Count;
+            int? livePrintings = live.Pricing?.TcgPlayer?.Printings.Count;
+            int? cachedPrintings = cached.Pricing?.TcgPlayer?.Printings.Count;
             cachedPrintings.ShouldBe(livePrintings);
         }
     }

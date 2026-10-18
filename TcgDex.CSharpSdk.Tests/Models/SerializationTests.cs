@@ -33,6 +33,38 @@ public sealed class SerializationTests
     }
 
     [Test]
+    public void RenamedProperties_AreWrittenUnderTheApiKeys()
+    {
+        // Reading is case-insensitive, so a round trip passes even when a
+        // spelled-out property writes its .NET name. Only the written key shows
+        // whether the [JsonPropertyName] mapping is there.
+        string card = Serialize(Fixture.Load<Card>("card-pokemon-full.json"));
+        string set = Serialize(Fixture.Load<CardSet>("set-full.json"));
+        string problem = Serialize(Fixture.Load<TcgDexProblem>("error-bad-language.json"));
+
+        foreach (string key in new[] { "hp", "idProduct", "avg", "avg1", "avg7", "avg30" })
+        {
+            card.ShouldContain($"\"{key}\":", Case.Sensitive);
+        }
+
+        set.ShouldContain("\"serie\":", Case.Sensitive);
+        set.ShouldContain("\"firstEd\":", Case.Sensitive);
+        problem.ShouldContain("\"lang\":", Case.Sensitive);
+    }
+
+    [Test]
+    public void Pricing_IsWrittenUnderTheApiKeys()
+        // Alone, not inside a card: a card's thirdParty also has a
+        // "tcgplayer" key, which would satisfy a search through the whole card.
+        => Serialize(new Pricing { TcgPlayer = new TcgPlayerPricing() })
+            .ShouldBe("""{"tcgplayer":{}}""");
+
+    [Test]
+    public void ThirdParty_IsWrittenUnderTheApiKeys()
+        => Serialize(new ThirdParty { TcgPlayer = 1, CardTrader = 2 })
+            .ShouldBe("""{"tcgplayer":1,"cardtrader":2}""");
+
+    [Test]
     public void Card_RoundTrips()
     {
         Card original = Fixture.Load<Card>("card-pokemon-full.json");
@@ -102,10 +134,10 @@ public sealed class SerializationTests
         // TcgPlayerPricingConverter.Write: printing names are data, so they must
         // survive being written back out.
         Card original = Fixture.Load<Card>("card-pokemon-full.json");
-        TcgPlayerPricing pricing = original.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+        TcgPlayerPricing pricing = original.Pricing.ShouldNotBeNull().TcgPlayer.ShouldNotBeNull();
 
         TcgPlayerPricing restored = Deserialize<Card>(Serialize(original))
-            .Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+            .Pricing.ShouldNotBeNull().TcgPlayer.ShouldNotBeNull();
 
         restored.Unit.ShouldBe(pricing.Unit);
         restored.Printings.Keys.ShouldBe(pricing.Printings.Keys, ignoreOrder: true);
@@ -144,7 +176,7 @@ public sealed class SerializationTests
     {
         Pricing pricing = Deserialize<Pricing>("""{"tcgplayer":null,"cardmarket":null}""");
 
-        pricing.Tcgplayer.ShouldBeNull();
+        pricing.TcgPlayer.ShouldBeNull();
         pricing.Cardmarket.ShouldBeNull();
     }
 

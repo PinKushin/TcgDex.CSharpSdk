@@ -226,7 +226,8 @@ namespace TcgDex.Models
     public sealed class CardCount : System.IEquatable<TcgDex.Models.CardCount>
     {
         public CardCount() { }
-        public int? FirstEd { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("firstEd")]
+        public int? FirstEdition { get; init; }
         public int? Holo { get; init; }
         public int? Normal { get; init; }
         public int Official { get; init; }
@@ -268,22 +269,27 @@ namespace TcgDex.Models
     public sealed class CardmarketPricing : System.IEquatable<TcgDex.Models.CardmarketPricing>
     {
         public CardmarketPricing() { }
-        public decimal? Avg { get; init; }
-        public decimal? Avg1 { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("avg")]
+        public decimal? Average { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("avg1")]
+        public decimal? Average1Day { get; init; }
         [System.Text.Json.Serialization.JsonPropertyName("avg1-holo")]
-        public decimal? Avg1Holo { get; init; }
-        public decimal? Avg30 { get; init; }
+        public decimal? Average1DayHolo { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("avg30")]
+        public decimal? Average30Days { get; init; }
         [System.Text.Json.Serialization.JsonPropertyName("avg30-holo")]
-        public decimal? Avg30Holo { get; init; }
-        public decimal? Avg7 { get; init; }
+        public decimal? Average30DaysHolo { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("avg7")]
+        public decimal? Average7Days { get; init; }
         [System.Text.Json.Serialization.JsonPropertyName("avg7-holo")]
-        public decimal? Avg7Holo { get; init; }
+        public decimal? Average7DaysHolo { get; init; }
         [System.Text.Json.Serialization.JsonPropertyName("avg-holo")]
-        public decimal? AvgHolo { get; init; }
-        public int? IdProduct { get; init; }
+        public decimal? AverageHolo { get; init; }
         public decimal? Low { get; init; }
         [System.Text.Json.Serialization.JsonPropertyName("low-holo")]
         public decimal? LowHolo { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("idProduct")]
+        public int? ProductId { get; init; }
         public decimal? Trend { get; init; }
         [System.Text.Json.Serialization.JsonPropertyName("trend-holo")]
         public decimal? TrendHolo { get; init; }
@@ -337,7 +343,8 @@ namespace TcgDex.Models
     {
         public Pricing() { }
         public TcgDex.Models.CardmarketPricing? Cardmarket { get; init; }
-        public TcgDex.Models.TcgPlayerPricing? Tcgplayer { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("tcgplayer")]
+        public TcgDex.Models.TcgPlayerPricing? TcgPlayer { get; init; }
     }
     public sealed class Series : System.IEquatable<TcgDex.Models.Series>
     {
@@ -365,7 +372,8 @@ namespace TcgDex.Models
         public string? Endpoint { get; init; }
         public string? Error { get; init; }
         public bool IsLanguageError { get; }
-        public string? Lang { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("lang")]
+        public string? Language { get; init; }
         public string? Method { get; init; }
         public int? Status { get; init; }
         public string? Title { get; init; }
@@ -394,9 +402,11 @@ namespace TcgDex.Models
     public sealed class ThirdParty : System.IEquatable<TcgDex.Models.ThirdParty>
     {
         public ThirdParty() { }
+        [System.Text.Json.Serialization.JsonPropertyName("cardtrader")]
+        public int? CardTrader { get; init; }
         public int? Cardmarket { get; init; }
-        public int? Cardtrader { get; init; }
-        public int? Tcgplayer { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("tcgplayer")]
+        public int? TcgPlayer { get; init; }
     }
     public sealed class Variants : System.IEquatable<TcgDex.Models.Variants>
     {

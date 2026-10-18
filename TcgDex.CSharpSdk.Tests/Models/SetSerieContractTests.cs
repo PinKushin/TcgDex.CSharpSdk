@@ -34,7 +34,7 @@ public sealed class SetSerieContractTests
         count.Normal.ShouldBe(138);
         count.Holo.ShouldBe(69);
         count.Reverse.ShouldBe(157);
-        count.FirstEd.ShouldBe(0);
+        count.FirstEdition.ShouldBe(0);
     }
 
     [Test]
@@ -127,7 +127,7 @@ public sealed class SetSerieContractTests
 
         problem.Status.ShouldBe(404);
         problem.IsLanguageError.ShouldBeTrue();
-        problem.Lang.ShouldBe("zz");
+        problem.Language.ShouldBe("zz");
         problem.Describe().ShouldContain("zz");
     }
 

@@ -179,7 +179,7 @@ public sealed class TranslatorEdgeTests
 
     [Test]
     public void TcgPlayerPricing_WhenExplicitlyNull_ReadsAsNull()
-        => Deserialize<Pricing>("""{"tcgplayer":null}""").Tcgplayer.ShouldBeNull();
+        => Deserialize<Pricing>("""{"tcgplayer":null}""").TcgPlayer.ShouldBeNull();
 
     [Test]
     public void TcgPlayerPricing_WithMalformedContents_ThrowsJsonException()

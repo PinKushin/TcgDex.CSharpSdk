@@ -22,7 +22,8 @@ public sealed record CardCount
     public int? Reverse { get; init; }
 
     /// <summary>Count of cards with a first-edition printing.</summary>
-    public int? FirstEd { get; init; }
+    [JsonPropertyName("firstEd")]
+    public int? FirstEdition { get; init; }
 }
 
 /// <summary>

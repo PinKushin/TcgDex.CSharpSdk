@@ -10,7 +10,8 @@ public sealed record Pricing
     public CardmarketPricing? Cardmarket { get; init; }
 
     /// <summary>TCGplayer pricing, in US dollars.</summary>
-    public TcgPlayerPricing? Tcgplayer { get; init; }
+    [JsonPropertyName("tcgplayer")]
+    public TcgPlayerPricing? TcgPlayer { get; init; }
 }
 
 /// <summary>
@@ -18,8 +19,9 @@ public sealed record Pricing
 /// <see langword="null"/> for a series that has no data rather than omitting it.
 /// </summary>
 /// <remarks>
-/// The holo-suffixed properties map to hyphenated JSON keys (<c>avg-holo</c>),
-/// which is why they carry explicit name mappings.
+/// The API abbreviates these keys (<c>idProduct</c>, <c>avg7</c>,
+/// <c>avg-holo</c>); the properties spell them out and carry explicit name
+/// mappings to the keys.
 /// </remarks>
 public sealed record CardmarketPricing
 {
@@ -30,10 +32,12 @@ public sealed record CardmarketPricing
     public string? Unit { get; init; }
 
     /// <summary>Cardmarket's internal product identifier.</summary>
-    public int? IdProduct { get; init; }
+    [JsonPropertyName("idProduct")]
+    public int? ProductId { get; init; }
 
     /// <summary>Average sale price.</summary>
-    public decimal? Avg { get; init; }
+    [JsonPropertyName("avg")]
+    public decimal? Average { get; init; }
 
     /// <summary>Lowest available price.</summary>
     public decimal? Low { get; init; }
@@ -42,17 +46,20 @@ public sealed record CardmarketPricing
     public decimal? Trend { get; init; }
 
     /// <summary>Average price over the last day.</summary>
-    public decimal? Avg1 { get; init; }
+    [JsonPropertyName("avg1")]
+    public decimal? Average1Day { get; init; }
 
     /// <summary>Average price over the last 7 days.</summary>
-    public decimal? Avg7 { get; init; }
+    [JsonPropertyName("avg7")]
+    public decimal? Average7Days { get; init; }
 
     /// <summary>Average price over the last 30 days.</summary>
-    public decimal? Avg30 { get; init; }
+    [JsonPropertyName("avg30")]
+    public decimal? Average30Days { get; init; }
 
     /// <summary>Average sale price for the holofoil printing.</summary>
     [JsonPropertyName("avg-holo")]
-    public decimal? AvgHolo { get; init; }
+    public decimal? AverageHolo { get; init; }
 
     /// <summary>Lowest available price for the holofoil printing.</summary>
     [JsonPropertyName("low-holo")]
@@ -64,15 +71,15 @@ public sealed record CardmarketPricing
 
     /// <summary>Holofoil average over the last day.</summary>
     [JsonPropertyName("avg1-holo")]
-    public decimal? Avg1Holo { get; init; }
+    public decimal? Average1DayHolo { get; init; }
 
     /// <summary>Holofoil average over the last 7 days.</summary>
     [JsonPropertyName("avg7-holo")]
-    public decimal? Avg7Holo { get; init; }
+    public decimal? Average7DaysHolo { get; init; }
 
     /// <summary>Holofoil average over the last 30 days.</summary>
     [JsonPropertyName("avg30-holo")]
-    public decimal? Avg30Holo { get; init; }
+    public decimal? Average30DaysHolo { get; init; }
 }
 
 /// <summary>
@@ -113,7 +120,7 @@ public sealed record TcgPlayerPricing
 
 /// <summary>
 /// External marketplace product identifiers for a card or printing — what
-/// builds a direct link to that listing on Cardmarket, TCGplayer or Cardtrader.
+/// builds a direct link to that listing on Cardmarket, TCGplayer or CardTrader.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -128,7 +135,7 @@ public sealed record TcgPlayerPricing
 /// mirroring exactly how <see cref="Pricing"/> is placed at both levels: a card
 /// with several distinctly-priced printings carries the ids per variant, while
 /// a card with a single undifferentiated printing carries them at the root
-/// instead. Every id is independently nullable — <see cref="Cardtrader"/> in
+/// instead. Every id is independently nullable — <see cref="CardTrader"/> in
 /// particular is present only intermittently, observed to appear and disappear
 /// between successive fetches of the same card.
 /// </para>
@@ -139,10 +146,12 @@ public sealed record ThirdParty
     public int? Cardmarket { get; init; }
 
     /// <summary>TCGplayer's internal product identifier.</summary>
-    public int? Tcgplayer { get; init; }
+    [JsonPropertyName("tcgplayer")]
+    public int? TcgPlayer { get; init; }
 
-    /// <summary>Cardtrader's internal product identifier, when this card is listed there.</summary>
-    public int? Cardtrader { get; init; }
+    /// <summary>CardTrader's internal product identifier, when this card is listed there.</summary>
+    [JsonPropertyName("cardtrader")]
+    public int? CardTrader { get; init; }
 }
 
 /// <summary>

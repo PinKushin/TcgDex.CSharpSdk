@@ -79,7 +79,7 @@ public sealed class PocketShapeTests : LiveApiFixture
             "the container is served even though both providers are empty");
 
         pricing.Cardmarket.ShouldBeNull();
-        pricing.Tcgplayer.ShouldBeNull();
+        pricing.TcgPlayer.ShouldBeNull();
     }
 
     [Test]

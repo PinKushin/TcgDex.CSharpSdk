@@ -123,10 +123,10 @@ public sealed class CardShapeTests : LiveApiFixture
         Pricing pricing = card.ShouldNotBeNull().Pricing.ShouldNotBeNull();
 
         pricing.Cardmarket.ShouldNotBeNull().Unit.ShouldBe("EUR");
-        pricing.Tcgplayer.ShouldNotBeNull().Unit.ShouldBe("USD");
+        pricing.TcgPlayer.ShouldNotBeNull().Unit.ShouldBe("USD");
 
         // Printing names are data, not schema — they vary per card.
-        pricing.Tcgplayer.Printings.ShouldNotBeEmpty();
+        pricing.TcgPlayer.Printings.ShouldNotBeEmpty();
     }
 
     [Test]
