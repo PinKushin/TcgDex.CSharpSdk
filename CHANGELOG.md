@@ -29,6 +29,7 @@ the table below.
 | `Serie` | `Series` |
 | `SerieBrief` | `SeriesBrief` |
 | `ISerieResource` | `ISeriesResource` |
+| `ISetResource` | `ICardSetResource` |
 | `Set` (the model) | `CardSet` |
 | `SetBrief` | `CardSetBrief` |
 | `SetAbbreviation` | `CardSetAbbreviation` |

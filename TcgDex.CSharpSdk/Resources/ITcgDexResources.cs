@@ -97,7 +97,7 @@ public interface ICardResource
 /// <summary>
 /// Reads sets.
 /// </summary>
-public interface ISetResource
+public interface ICardSetResource
 {
     /// <summary>Fetches a single set, including its card list.</summary>
     /// <param name="id">The set id, for example <c>"swsh3"</c>.</param>

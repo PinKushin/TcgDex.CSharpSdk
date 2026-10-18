@@ -62,7 +62,7 @@ namespace TcgDex
         TcgDex.Resources.ICatalogResource Catalog { get; }
         TcgDex.Resources.IRandomResource Random { get; }
         TcgDex.Resources.ISeriesResource Series { get; }
-        TcgDex.Resources.ISetResource Sets { get; }
+        TcgDex.Resources.ICardSetResource Sets { get; }
     }
     public sealed class TcgDexApiException : System.Exception
     {
@@ -84,7 +84,7 @@ namespace TcgDex
         public TcgDex.Resources.ICatalogResource Catalog { get; }
         public TcgDex.Resources.IRandomResource Random { get; }
         public TcgDex.Resources.ISeriesResource Series { get; }
-        public TcgDex.Resources.ISetResource Sets { get; }
+        public TcgDex.Resources.ICardSetResource Sets { get; }
         public void Dispose() { }
         public static TcgDex.TcgDexClient Create(TcgDex.TcgDexOptions? options = null, System.Action<TcgDex.Caching.TcgDexCacheOptions>? configureCache = null, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory = null) { }
     }
@@ -470,6 +470,11 @@ namespace TcgDex.Resources
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.Card>> SearchDetailedAsync(TcgDex.Querying.CardFilter filter, int? page = default, int? itemsPerPage = default, System.Threading.CancellationToken cancellationToken = default);
         System.Collections.Generic.IAsyncEnumerable<TcgDex.Models.CardBrief> StreamAsync(TcgDex.Querying.CardQuery query, int pageSize = 100, System.Threading.CancellationToken cancellationToken = default);
     }
+    public interface ICardSetResource
+    {
+        System.Threading.Tasks.Task<TcgDex.Models.CardSet?> GetAsync(string id, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardSetBrief>> ListAsync(System.Threading.CancellationToken cancellationToken = default);
+    }
     public interface ICatalogResource
     {
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetCategoriesAsync(System.Threading.CancellationToken cancellationToken = default);
@@ -496,10 +501,5 @@ namespace TcgDex.Resources
     {
         System.Threading.Tasks.Task<TcgDex.Models.Series?> GetAsync(string id, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.SeriesBrief>> ListAsync(System.Threading.CancellationToken cancellationToken = default);
-    }
-    public interface ISetResource
-    {
-        System.Threading.Tasks.Task<TcgDex.Models.CardSet?> GetAsync(string id, System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardSetBrief>> ListAsync(System.Threading.CancellationToken cancellationToken = default);
     }
 }

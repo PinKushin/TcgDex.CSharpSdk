@@ -94,9 +94,9 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport g
     }
 }
 
-/// <inheritdoc cref="ISetResource" />
-internal sealed class SetResource(TcgDexTransport transport)
-    : ResourceBase(transport), ISetResource
+/// <inheritdoc cref="ICardSetResource" />
+internal sealed class CardSetResource(TcgDexTransport transport)
+    : ResourceBase(transport), ICardSetResource
 {
     public Task<CardSet?> GetAsync(string id, CancellationToken cancellationToken = default)
         => Transport.GetAsync<CardSet>($"sets/{EscapeId(id)}", cancellationToken);

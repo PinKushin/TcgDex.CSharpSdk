@@ -20,7 +20,7 @@ public interface ITcgDexClient
     ICardResource Cards { get; }
 
     /// <summary>Set lookups.</summary>
-    ISetResource Sets { get; }
+    ICardSetResource Sets { get; }
 
     /// <summary>Series lookups.</summary>
     ISeriesResource Series { get; }
@@ -134,7 +134,7 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         logger.ClientConfigured(resolved.Language, resolved.BaseAddress);
 
         Cards = new CardResource(transport, graphQl);
-        Sets = new SetResource(transport);
+        Sets = new CardSetResource(transport);
         Series = new SeriesResource(transport);
         Random = new RandomResource(transport);
         Catalog = new CatalogResource(transport);
@@ -149,7 +149,7 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
     public ICardResource Cards { get; }
 
     /// <inheritdoc />
-    public ISetResource Sets { get; }
+    public ICardSetResource Sets { get; }
 
     /// <inheritdoc />
     public ISeriesResource Series { get; }

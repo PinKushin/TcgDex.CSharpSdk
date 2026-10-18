@@ -23,7 +23,7 @@ what you can actually call.
 | Type | Covers |
 |---|---|
 | [ICardResource](TcgDex.Resources.ICardResource.yml) | Cards: get, list, query, detailed search. |
-| [ISetResource](TcgDex.Resources.ISetResource.yml) | Sets, including their card lists. |
+| [ICardSetResource](TcgDex.Resources.ICardSetResource.yml) | Sets, including their card lists. |
 | [ISeriesResource](TcgDex.Resources.ISeriesResource.yml) | Series, including their sets. |
 | [IRandomResource](TcgDex.Resources.IRandomResource.yml) | Random card, set or series. |
 | [ICatalogResource](TcgDex.Resources.ICatalogResource.yml) | All 13 enumeration endpoints. |
