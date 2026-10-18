@@ -411,8 +411,10 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             _state.Statistics.RecordRevalidation();
             _logger.CacheRevalidated(key);
 
-            CachedResponse refreshed = cached with
+            CachedResponse refreshed = new()
             {
+                Body = cached.Body,
+                ContentType = cached.ContentType,
                 StoredAt = _timeProvider.GetUtcNow(),
                 ETag = renewedETag ?? cached.ETag,
             };

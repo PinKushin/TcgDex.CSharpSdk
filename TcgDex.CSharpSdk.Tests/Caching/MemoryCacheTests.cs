@@ -22,6 +22,20 @@ public sealed class MemoryCacheTests
         };
 
     [Test]
+    public void CachedResponse_HasReferenceEquality()
+    {
+        // As a record, two entries sharing a body array compared equal while two
+        // with identical bytes in different arrays did not: equality that
+        // depended on how the body happened to be allocated. Now neither is.
+        byte[] body = [1, 2, 3];
+        CachedResponse first = new() { Body = body, StoredAt = UnixEpoch };
+        CachedResponse second = new() { Body = body, StoredAt = UnixEpoch };
+
+        first.Equals(second).ShouldBeFalse();
+        first.Equals(first).ShouldBeTrue();
+    }
+
+    [Test]
     public async Task StoredEntry_IsRetrievable()
     {
         MemoryTcgDexResponseCache cache = new();
@@ -298,7 +312,7 @@ public sealed class MemoryCacheTests
     public void IsFresh_ComparesAgainstTheStoreTime()
     {
         DateTimeOffset stored = UnixEpoch;
-        CachedResponse response = Response() with { StoredAt = stored };
+        CachedResponse response = Response();
 
         response.IsFresh(stored.AddSeconds(30), TimeSpan.FromMinutes(1)).ShouldBeTrue();
         response.IsFresh(stored.AddMinutes(2), TimeSpan.FromMinutes(1)).ShouldBeFalse();

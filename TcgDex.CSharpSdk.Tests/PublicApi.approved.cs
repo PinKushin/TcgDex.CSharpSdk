@@ -1,6 +1,6 @@
 namespace TcgDex.Caching
 {
-    public sealed class CachedResponse : System.IEquatable<TcgDex.Caching.CachedResponse>
+    public sealed class CachedResponse
     {
         public CachedResponse() { }
         public required byte[] Body { get; init; }

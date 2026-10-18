@@ -618,3 +618,52 @@ ships as 0.7.0 rather than 0.6.4, following semver practice for 0.x.
 From now on, any breaking change on 0.x bumps the minor version. A patch release contains fixes
 only.
 
+## 25. The 1.0 naming pass: .NET conventions over the API's names, before 1.0
+
+The owner, approving the 0.8.0 scope taken from the Fable .NET-convention audit: *"i want .net
+conventions everywhere, thats the point in the sdk"* — the same principle as #22, applied to names.
+Every public name follows the .NET Framework Design Guidelines, and the change ships before 1.0
+because after it each rename is a major version. Under #24 it ships as 0.8.0.
+
+What that meant in practice:
+
+- **No non-words or abbreviations.** `Serie` → `Series`, `Hp` → `HitPoints` (matching
+  `GetHitPointsAsync`), `Avg7` → `Average7Days`, `IdProduct` → `ProductId`, `FirstEd` →
+  `FirstEdition`, `Lang` → `Language`.
+- **No type named after a keyword or a general concept.** `Set` → `CardSet`. The rest of the family
+  moved with it (`CardSetBrief`, `CardSetAbbreviation`), so a brief still pairs with its full type
+  the way `CardBrief` pairs with `Card`.
+- **One casing per brand.** `TcgPlayer` everywhere, matching the `TcgPlayerPricing` type; `CardTrader`,
+  the marketplace's own casing.
+- **Methods are verbs.** Resource methods without one gained `Get` (`GetRaritiesAsync`).
+- **Nothing public that no caller needs.** `QueryOperator` became internal; the status-only
+  `TcgDexApiException` constructor, which produced `Kind = Unspecified`, was removed; the caching
+  handler's counters collapsed into the one `TcgDexCacheStatistics`.
+
+**JSON keys did not change.** Every renamed property carries `[JsonPropertyName]` with the API's
+key, and tests pin the written keys, since case-insensitive reading means a round trip cannot catch
+a missing mapping. The query builder now takes a property's field name from that attribute: before,
+it camel-cased the .NET name, and `c.HitPoints > 100` would have become the unknown `hitPoints`.
+
+Names the audit raised but that were left alone, because the case is not clear-cut, are listed in
+the 0.8.0 report rather than changed on a guess.
+
+## 26. `CachedResponse` has reference equality, not record equality
+
+Decided while doing the naming pass (#25). The owner asked for the decision to be made and recorded
+rather than giving one; the reasoning below is the implementer's, not the owner's.
+
+`CachedResponse` was a `record`, so it had value equality, but record equality compares its
+`byte[] Body` by reference. Two entries holding the same bytes therefore compared equal or not
+depending on whether they happened to share an array, which is equality nobody can rely on. The
+alternatives were:
+
+- **Compare the bytes.** Correct, but every comparison walks the body (22 KB for a set), and the
+  hash code would change if anyone wrote to the array, which breaks it as a dictionary key.
+- **Plain class, reference equality.** Honest about what an entry is: a stored blob with a
+  timestamp, not a value. Nothing in the SDK compares entries, and a custom backend (Redis, disk)
+  builds a fresh one on every read anyway.
+
+The second was taken. `CachedResponse` is a `sealed class`; it loses `with` and `==`, which the
+SDK's own revalidation path used once and now replaces with an initializer.
+
