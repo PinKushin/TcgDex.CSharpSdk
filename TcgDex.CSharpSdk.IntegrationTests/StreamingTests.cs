@@ -72,11 +72,10 @@ public sealed class StreamingTests : LiveApiFixture
         // helper appends what the asset server actually expects.
         Card? card = await Client.Cards.GetAsync("swsh3-136", Timeout);
 
-        string? url = card.ShouldNotBeNull().GetImageUrl(ImageQuality.High, ImageFormat.Png);
-        url.ShouldNotBeNull();
+        Uri url = card.ShouldNotBeNull().GetImageUrl(ImageQuality.High, ImageFormat.Png).ShouldNotBeNull();
 
         using HttpClient http = new();
-        using HttpResponseMessage response = await http.GetAsync(new Uri(url), Timeout);
+        using HttpResponseMessage response = await http.GetAsync(url, Timeout);
 
         response.IsSuccessStatusCode.ShouldBeTrue($"'{url}' should be a real asset");
         response.Content.Headers.ContentType?.MediaType.ShouldBe("image/png");
@@ -96,9 +95,9 @@ public sealed class StreamingTests : LiveApiFixture
             (ImageQuality.Low, ImageFormat.Webp),
         })
         {
-            string url = card.GetImageUrl(quality, format).ShouldNotBeNull();
+            Uri url = card.GetImageUrl(quality, format).ShouldNotBeNull();
 
-            using HttpResponseMessage response = await http.GetAsync(new Uri(url), Timeout);
+            using HttpResponseMessage response = await http.GetAsync(url, Timeout);
             response.IsSuccessStatusCode.ShouldBeTrue($"'{url}' should resolve");
         }
     }
@@ -107,10 +106,10 @@ public sealed class StreamingTests : LiveApiFixture
     public async Task SetLogoUrl_Resolves()
     {
         Card? card = await Client.Cards.GetAsync("swsh3-136", Timeout);
-        string url = card.ShouldNotBeNull().Set.GetLogoUrl().ShouldNotBeNull();
+        Uri url = card.ShouldNotBeNull().Set.GetLogoUrl().ShouldNotBeNull();
 
         using HttpClient http = new();
-        using HttpResponseMessage response = await http.GetAsync(new Uri(url), Timeout);
+        using HttpResponseMessage response = await http.GetAsync(url, Timeout);
 
         response.IsSuccessStatusCode.ShouldBeTrue($"'{url}' should be a real asset");
     }

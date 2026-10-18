@@ -667,3 +667,23 @@ alternatives were:
 The second was taken. `CachedResponse` is a `sealed class`; it loses `with` and `==`, which the
 SDK's own revalidation path used once and now replaces with an initializer.
 
+## 27. Full image URLs are `Uri?`; the API's base URLs stay `string?`
+
+Decided while doing the naming pass (#25). As with #26, the owner asked for the decision to be made
+and recorded; the reasoning is the implementer's.
+
+The .NET guideline (CA1055/CA1056) is that a URL is a `System.Uri`, not a string. The helpers that
+build a fetchable address (`ImageUrl.Build`, `ImageUrl.BuildAsset`, `GetImageUrl`, `GetLogoUrl`,
+`GetSymbolUrl`) now return `Uri?`, which a caller hands straight to `HttpClient` or an image control.
+
+The model properties `Card.Image`, `Logo` and `Symbol` stay `string?`. They are not addresses: the
+API sends a base without a file extension, and requesting it as-is returns 404. Typing them as
+`Uri` would present something unfetchable as a URL, which is the mistake the helpers exist to
+prevent. The helpers' `baseUrl` parameter is a string for the same reason.
+
+A base that does not make an absolute http(s) URL (relative, or not a URL at all) produces `null`,
+following the tolerance policy of `ReleaseDate` and the timestamps: a value from the API that
+cannot be read becomes null rather than an exception. The scheme check also stops `/en/swsh/1`
+parsing as a `file://` URI off Windows. An unknown `ImageQuality` or `ImageFormat` still throws,
+because that is a caller's mistake, not the API's.
+

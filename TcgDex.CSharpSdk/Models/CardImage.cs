@@ -44,13 +44,13 @@ public static class ImageUrl
     /// <returns>
     /// The full asset URL, or <see langword="null"/> when
     /// <paramref name="baseUrl"/> is null or blank — some cards genuinely have
-    /// no artwork on record.
+    /// no artwork on record — or is not an absolute http(s) URL.
     /// </returns>
     /// <remarks>
     /// Card artwork is addressed as <c>{base}/{quality}.{format}</c>. Set logos
     /// and symbols are <em>not</em> — see <see cref="BuildAsset"/>.
     /// </remarks>
-    public static string? Build(
+    public static Uri? Build(
         string? baseUrl,
         ImageQuality quality = ImageQuality.High,
         ImageFormat format = ImageFormat.Png)
@@ -69,7 +69,7 @@ public static class ImageUrl
         // value does not end up with a doubled separator.
         string trimmed = baseUrl.TrimEnd('/');
 
-        return $"{trimmed}/{Name(quality)}.{Name(format)}";
+        return Absolute($"{trimmed}/{Name(quality)}.{Name(format)}");
     }
 
     /// <summary>
@@ -77,21 +77,39 @@ public static class ImageUrl
     /// </summary>
     /// <param name="baseUrl">The base URL from the API, without an extension.</param>
     /// <param name="format">The file format to request.</param>
-    /// <returns>The full asset URL, or <see langword="null"/> when there is no base URL.</returns>
+    /// <returns>
+    /// The full asset URL, or <see langword="null"/> when there is no base URL
+    /// or it is not an absolute http(s) URL.
+    /// </returns>
     /// <remarks>
     /// Logos and symbols are addressed as <c>{base}.{format}</c> — with **no**
     /// quality segment. Applying the card pattern to them returns 404, which is
     /// an easy mistake to make since all three fields look alike on the model.
     /// </remarks>
-    public static string? BuildAsset(string? baseUrl, ImageFormat format = ImageFormat.Png)
+    public static Uri? BuildAsset(string? baseUrl, ImageFormat format = ImageFormat.Png)
     {
         if (baseUrl is null || string.IsNullOrWhiteSpace(baseUrl))
         {
             return null;
         }
 
-        return $"{baseUrl.TrimEnd('/')}.{Name(format)}";
+        return Absolute($"{baseUrl.TrimEnd('/')}.{Name(format)}");
     }
+
+    /// <summary>
+    /// The URL as a <see cref="Uri"/>, or <see langword="null"/> when it is not
+    /// an absolute http(s) URL (DECISIONS #27).
+    /// </summary>
+    /// <remarks>
+    /// The scheme check matters off Windows, where <c>/en/swsh/1</c> parses as an
+    /// absolute <c>file://</c> URI.
+    /// </remarks>
+    private static Uri? Absolute(string url)
+        => Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
+            && (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal)
+                || string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal))
+            ? uri
+            : null;
 
     private static string Name(ImageQuality quality)
         => quality switch
@@ -122,7 +140,7 @@ public static class ImageExtensions
     /// <param name="format">The file format to request.</param>
     /// <returns>The image URL, or <see langword="null"/> when the card has no artwork.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="card"/> is null.</exception>
-    public static string? GetImageUrl(
+    public static Uri? GetImageUrl(
         this Card card,
         ImageQuality quality = ImageQuality.High,
         ImageFormat format = ImageFormat.Png)
@@ -138,7 +156,7 @@ public static class ImageExtensions
     /// <param name="format">The file format to request.</param>
     /// <returns>The image URL, or <see langword="null"/> when the card has no artwork.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="card"/> is null.</exception>
-    public static string? GetImageUrl(
+    public static Uri? GetImageUrl(
         this CardBrief card,
         ImageQuality quality = ImageQuality.High,
         ImageFormat format = ImageFormat.Png)
@@ -157,7 +175,7 @@ public static class ImageExtensions
     /// Takes no quality: logos are served at a single resolution, unlike card
     /// artwork.
     /// </remarks>
-    public static string? GetLogoUrl(this CardSetBrief set, ImageFormat format = ImageFormat.Png)
+    public static Uri? GetLogoUrl(this CardSetBrief set, ImageFormat format = ImageFormat.Png)
     {
         Guard.NotNull(set);
 
@@ -169,7 +187,7 @@ public static class ImageExtensions
     /// <param name="format">The file format to request.</param>
     /// <returns>The logo URL, or <see langword="null"/> when the set has none.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="set"/> is null.</exception>
-    public static string? GetLogoUrl(this CardSet set, ImageFormat format = ImageFormat.Png)
+    public static Uri? GetLogoUrl(this CardSet set, ImageFormat format = ImageFormat.Png)
     {
         Guard.NotNull(set);
 
@@ -185,7 +203,7 @@ public static class ImageExtensions
     /// Takes no quality, and is served language-neutral rather than from the
     /// requested language's path.
     /// </remarks>
-    public static string? GetSymbolUrl(this CardSetBrief set, ImageFormat format = ImageFormat.Png)
+    public static Uri? GetSymbolUrl(this CardSetBrief set, ImageFormat format = ImageFormat.Png)
     {
         Guard.NotNull(set);
 
@@ -197,7 +215,7 @@ public static class ImageExtensions
     /// <param name="format">The file format to request.</param>
     /// <returns>The symbol URL, or <see langword="null"/> when the set has none.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="set"/> is null.</exception>
-    public static string? GetSymbolUrl(this CardSet set, ImageFormat format = ImageFormat.Png)
+    public static Uri? GetSymbolUrl(this CardSet set, ImageFormat format = ImageFormat.Png)
     {
         Guard.NotNull(set);
 

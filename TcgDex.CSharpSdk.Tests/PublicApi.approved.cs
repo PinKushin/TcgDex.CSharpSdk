@@ -309,12 +309,12 @@ namespace TcgDex.Models
     }
     public static class ImageExtensions
     {
-        public static string? GetImageUrl(this TcgDex.Models.Card card, TcgDex.Models.ImageQuality quality = 0, TcgDex.Models.ImageFormat format = 0) { }
-        public static string? GetImageUrl(this TcgDex.Models.CardBrief card, TcgDex.Models.ImageQuality quality = 0, TcgDex.Models.ImageFormat format = 0) { }
-        public static string? GetLogoUrl(this TcgDex.Models.CardSet set, TcgDex.Models.ImageFormat format = 0) { }
-        public static string? GetLogoUrl(this TcgDex.Models.CardSetBrief set, TcgDex.Models.ImageFormat format = 0) { }
-        public static string? GetSymbolUrl(this TcgDex.Models.CardSet set, TcgDex.Models.ImageFormat format = 0) { }
-        public static string? GetSymbolUrl(this TcgDex.Models.CardSetBrief set, TcgDex.Models.ImageFormat format = 0) { }
+        public static System.Uri? GetImageUrl(this TcgDex.Models.Card card, TcgDex.Models.ImageQuality quality = 0, TcgDex.Models.ImageFormat format = 0) { }
+        public static System.Uri? GetImageUrl(this TcgDex.Models.CardBrief card, TcgDex.Models.ImageQuality quality = 0, TcgDex.Models.ImageFormat format = 0) { }
+        public static System.Uri? GetLogoUrl(this TcgDex.Models.CardSet set, TcgDex.Models.ImageFormat format = 0) { }
+        public static System.Uri? GetLogoUrl(this TcgDex.Models.CardSetBrief set, TcgDex.Models.ImageFormat format = 0) { }
+        public static System.Uri? GetSymbolUrl(this TcgDex.Models.CardSet set, TcgDex.Models.ImageFormat format = 0) { }
+        public static System.Uri? GetSymbolUrl(this TcgDex.Models.CardSetBrief set, TcgDex.Models.ImageFormat format = 0) { }
     }
     public enum ImageFormat
     {
@@ -329,8 +329,8 @@ namespace TcgDex.Models
     }
     public static class ImageUrl
     {
-        public static string? Build(string? baseUrl, TcgDex.Models.ImageQuality quality = 0, TcgDex.Models.ImageFormat format = 0) { }
-        public static string? BuildAsset(string? baseUrl, TcgDex.Models.ImageFormat format = 0) { }
+        public static System.Uri? Build(string? baseUrl, TcgDex.Models.ImageQuality quality = 0, TcgDex.Models.ImageFormat format = 0) { }
+        public static System.Uri? BuildAsset(string? baseUrl, TcgDex.Models.ImageFormat format = 0) { }
     }
     public sealed class Legality : System.IEquatable<TcgDex.Models.Legality>
     {
