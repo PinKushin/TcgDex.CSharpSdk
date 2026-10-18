@@ -263,6 +263,27 @@ Line numbers are those of `ddde9bd`, as printed in the report.
 
 `RequestBudget.cs` has no write-offs. Both of its survivors are now killed.
 
+### Second round
+
+GitHub Actions run 39057672321 (branch `test/mutation-weak-files`, merged as `63f02f8`) left 27
+undetected mutants in eight files. Thirteen now have a killing test, checked by hand the same way.
+`TcgDexTransport.cs` still has the eight survivors written off above, at the same line numbers, so
+it gets no new rows. The five rows below are the rest. Projected scores, if they are correct:
+`ITcgDexResponseCache.cs` 100% (from 50%), `FlexibleStringConverter.cs` 100% (80%),
+`TcgDexJsonContracts.cs` 100% (81%), `TcgDexServiceCollectionExtensions.cs` 100% (81%),
+`TcgDexOptions.cs` 100% (86%), `TcgPlayerPricingConverter.cs` 89% (33 of 37, from 81%),
+`TcgDexUserAgent.cs` 83% (unchanged, 5 of 6) and `TcgDexTransport.cs` 89% (unchanged, 67 of 75).
+
+Line numbers are those of `63f02f8`.
+
+| File:line | Mutator | Why it is not killed |
+|---|---|---|
+| `TcgPlayerPricingConverter.cs:62` | Conditional (false) | Equivalent. It also decodes the name for `unit` and `updated`, but both branches `continue` before `name` is read, and `GetString` cannot fail on a name `ValueTextEquals` has just matched. The only cost is an allocation. |
+| `TcgPlayerPricingConverter.cs:62` | Logical (`\|\|` to `&&`) | Equivalent. `isUpdated` is computed as `!isUnit && …`, so the two are never both true. `&&` is always false, which is the conditional-false mutant above. |
+| `TcgPlayerPricingConverter.cs:68` | Conditional (false) | Equivalent. `GetString()` returns `null` on a `Null` token, the same value the branch supplies. |
+| `TcgPlayerPricingConverter.cs:84` | Statement (`continue` removed) | Equivalent. `JsonSerializer.Deserialize` on a `Null` token returns `null` for the reference type `TcgPlayerPrice`, and the `price is not null` check below then skips it, as `continue` did. |
+| `TcgDexUserAgent.cs:71` | String (`"unknown"` to `""`), NoCoverage | Untestable without a seam: not equivalent. If reached, the header would carry no version. It is reached only when `Assembly.GetName().Version` is `null`, which happens for a dynamically emitted assembly and never for this compiled one, and `BuildProduct` is a private static initialiser. |
+
 ## What coverage does not tell you
 
 100% line coverage means every line ran, not that behaviour is correct. A suite

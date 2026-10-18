@@ -2,6 +2,7 @@ namespace TcgDex.Tests.Models;
 
 using System.Net;
 using System.Net.Http;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using TcgDex;
@@ -96,6 +97,18 @@ public sealed class PricingOptOutTests
         card.Set.ShouldNotBeNull().Id.ShouldBe("swsh3");
         card.Attacks.ShouldNotBeNull().ShouldNotBeEmpty();
         card.Variants.ShouldNotBeNull();
+    }
+
+    [Test]
+    public void WhenTurnedOff_TheSkipConverter_RejectsANullWriter()
+    {
+        JsonSerializerOptions contract = TcgDexJsonContracts.For(new TcgDexOptions { DeserializePricing = false });
+        JsonConverter<Pricing?> converter = (JsonConverter<Pricing?>)contract.GetTypeInfo(typeof(Card))
+            .Properties.Single(p => p.Name == "pricing").CustomConverter.ShouldNotBeNull();
+
+        // Without the guard this is a NullReferenceException from WriteNullValue.
+        Should.Throw<ArgumentNullException>(() => converter.Write(null!, null, contract))
+            .ParamName.ShouldBe("writer");
     }
 
     [Test]
