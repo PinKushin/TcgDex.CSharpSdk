@@ -29,7 +29,7 @@ internal abstract class ResourceBase(TcgDexTransport transport)
 }
 
 /// <inheritdoc cref="ICardResource" />
-internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport graphQl)
+internal sealed class CardResource(TcgDexTransport transport, GraphQLTransport graphQL)
     : ResourceBase(transport), ICardResource
 {
     public Task<IReadOnlyList<Card>> SearchDetailedAsync(
@@ -37,7 +37,7 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport g
         int? page = null,
         int? itemsPerPage = null,
         CancellationToken cancellationToken = default)
-        => graphQl.SearchAsync(filter, page, itemsPerPage, cancellationToken);
+        => graphQL.SearchAsync(filter, page, itemsPerPage, cancellationToken);
 
     public Task<Card?> GetAsync(string id, CancellationToken cancellationToken = default)
         => Transport.GetAsync<Card>($"cards/{EscapeId(id)}", cancellationToken);
@@ -94,40 +94,40 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport g
     }
 }
 
-/// <inheritdoc cref="ISetResource" />
-internal sealed class SetResource(TcgDexTransport transport)
-    : ResourceBase(transport), ISetResource
+/// <inheritdoc cref="ICardSetResource" />
+internal sealed class CardSetResource(TcgDexTransport transport)
+    : ResourceBase(transport), ICardSetResource
 {
-    public Task<Set?> GetAsync(string id, CancellationToken cancellationToken = default)
-        => Transport.GetAsync<Set>($"sets/{EscapeId(id)}", cancellationToken);
+    public Task<CardSet?> GetAsync(string id, CancellationToken cancellationToken = default)
+        => Transport.GetAsync<CardSet>($"sets/{EscapeId(id)}", cancellationToken);
 
-    public Task<IReadOnlyList<SetBrief>> ListAsync(CancellationToken cancellationToken = default)
-        => Transport.GetRequiredAsync<IReadOnlyList<SetBrief>>("sets", cancellationToken);
+    public Task<IReadOnlyList<CardSetBrief>> ListAsync(CancellationToken cancellationToken = default)
+        => Transport.GetRequiredAsync<IReadOnlyList<CardSetBrief>>("sets", cancellationToken);
 }
 
-/// <inheritdoc cref="ISerieResource" />
-internal sealed class SerieResource(TcgDexTransport transport)
-    : ResourceBase(transport), ISerieResource
+/// <inheritdoc cref="ISeriesResource" />
+internal sealed class SeriesResource(TcgDexTransport transport)
+    : ResourceBase(transport), ISeriesResource
 {
-    public Task<Serie?> GetAsync(string id, CancellationToken cancellationToken = default)
-        => Transport.GetAsync<Serie>($"series/{EscapeId(id)}", cancellationToken);
+    public Task<Series?> GetAsync(string id, CancellationToken cancellationToken = default)
+        => Transport.GetAsync<Series>($"series/{EscapeId(id)}", cancellationToken);
 
-    public Task<IReadOnlyList<SerieBrief>> ListAsync(CancellationToken cancellationToken = default)
-        => Transport.GetRequiredAsync<IReadOnlyList<SerieBrief>>("series", cancellationToken);
+    public Task<IReadOnlyList<SeriesBrief>> ListAsync(CancellationToken cancellationToken = default)
+        => Transport.GetRequiredAsync<IReadOnlyList<SeriesBrief>>("series", cancellationToken);
 }
 
 /// <inheritdoc cref="IRandomResource" />
 internal sealed class RandomResource(TcgDexTransport transport)
     : ResourceBase(transport), IRandomResource
 {
-    public Task<Card> CardAsync(CancellationToken cancellationToken = default)
+    public Task<Card> GetCardAsync(CancellationToken cancellationToken = default)
         => Transport.GetRequiredAsync<Card>("random/card", cancellationToken);
 
-    public Task<Set> SetAsync(CancellationToken cancellationToken = default)
-        => Transport.GetRequiredAsync<Set>("random/set", cancellationToken);
+    public Task<CardSet> GetSetAsync(CancellationToken cancellationToken = default)
+        => Transport.GetRequiredAsync<CardSet>("random/set", cancellationToken);
 
-    public Task<Serie> SerieAsync(CancellationToken cancellationToken = default)
-        => Transport.GetRequiredAsync<Serie>("random/serie", cancellationToken);
+    public Task<Series> GetSeriesAsync(CancellationToken cancellationToken = default)
+        => Transport.GetRequiredAsync<Series>("random/serie", cancellationToken);
 }
 
 /// <inheritdoc cref="ICatalogResource" />
@@ -139,43 +139,43 @@ internal sealed class RandomResource(TcgDexTransport transport)
 internal sealed class CatalogResource(TcgDexTransport transport)
     : ResourceBase(transport), ICatalogResource
 {
-    public Task<IReadOnlyList<string>> CategoriesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetCategoriesAsync(CancellationToken cancellationToken = default)
         => Text("categories", cancellationToken);
 
-    public Task<IReadOnlyList<string>> RaritiesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetRaritiesAsync(CancellationToken cancellationToken = default)
         => Text("rarities", cancellationToken);
 
-    public Task<IReadOnlyList<string>> TypesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetTypesAsync(CancellationToken cancellationToken = default)
         => Text("types", cancellationToken);
 
-    public Task<IReadOnlyList<string>> IllustratorsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetIllustratorsAsync(CancellationToken cancellationToken = default)
         => Text("illustrators", cancellationToken);
 
-    public Task<IReadOnlyList<string>> StagesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetStagesAsync(CancellationToken cancellationToken = default)
         => Text("stages", cancellationToken);
 
-    public Task<IReadOnlyList<string>> SuffixesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetSuffixesAsync(CancellationToken cancellationToken = default)
         => Text("suffixes", cancellationToken);
 
-    public Task<IReadOnlyList<string>> VariantsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetVariantsAsync(CancellationToken cancellationToken = default)
         => Text("variants", cancellationToken);
 
-    public Task<IReadOnlyList<string>> EnergyTypesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetEnergyTypesAsync(CancellationToken cancellationToken = default)
         => Text("energy-types", cancellationToken);
 
-    public Task<IReadOnlyList<string>> RegulationMarksAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetRegulationMarksAsync(CancellationToken cancellationToken = default)
         => Text("regulation-marks", cancellationToken);
 
-    public Task<IReadOnlyList<string>> TrainerTypesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetTrainerTypesAsync(CancellationToken cancellationToken = default)
         => Text("trainer-types", cancellationToken);
 
-    public Task<IReadOnlyList<int>> HitPointsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<int>> GetHitPointsAsync(CancellationToken cancellationToken = default)
         => Numbers("hp", cancellationToken);
 
-    public Task<IReadOnlyList<int>> RetreatCostsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<int>> GetRetreatCostsAsync(CancellationToken cancellationToken = default)
         => Numbers("retreats", cancellationToken);
 
-    public Task<IReadOnlyList<int>> DexIdsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<int>> GetDexIdsAsync(CancellationToken cancellationToken = default)
         => Numbers("dex-ids", cancellationToken);
 
     private Task<IReadOnlyList<string>> Text(string path, CancellationToken cancellationToken)

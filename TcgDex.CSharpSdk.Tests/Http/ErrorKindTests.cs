@@ -22,7 +22,7 @@ using TcgDex.Querying;
 public sealed class ErrorKindTests
 {
     private const string CardUri = "https://api.tcgdex.net/v2/en/cards/swsh3-136";
-    private const string GraphQlUri = "https://api.tcgdex.net/v2/graphql";
+    private const string GraphQLUri = "https://api.tcgdex.net/v2/graphql";
 
     private sealed class LambdaHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond)
         : HttpMessageHandler
@@ -114,7 +114,7 @@ public sealed class ErrorKindTests
         => await Should.ThrowAsync<TcgDexApiException>(
             () => Client(respond, configure).Cards.GetAsync("swsh3-136", CancellationToken.None));
 
-    private static async Task<TcgDexApiException> GraphQlFailure(
+    private static async Task<TcgDexApiException> GraphQLFailure(
         Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond,
         Action<TcgDexOptions>? configure = null)
         => await Should.ThrowAsync<TcgDexApiException>(
@@ -192,7 +192,7 @@ public sealed class ErrorKindTests
     public async Task Rest_RequiredEndpointMissing_IsInvalidResponse()
     {
         TcgDexApiException error = await Should.ThrowAsync<TcgDexApiException>(
-            () => Client(Answer(HttpStatusCode.NotFound, string.Empty)).Catalog.RaritiesAsync(CancellationToken.None));
+            () => Client(Answer(HttpStatusCode.NotFound, string.Empty)).Catalog.GetRaritiesAsync(CancellationToken.None));
 
         ShouldBe(error, TcgDexErrorKind.InvalidResponse, "https://api.tcgdex.net/v2/en/rarities");
     }
@@ -200,77 +200,57 @@ public sealed class ErrorKindTests
     // ----- GraphQL -----
 
     [Test]
-    public async Task GraphQl_ErrorsArray_IsGraphQlError()
+    public async Task GraphQL_ErrorsArray_IsGraphQLError()
         => ShouldBe(
-            await GraphQlFailure(Answer(HttpStatusCode.OK, """{"errors":[{"message":"bad"}]}""")),
-            TcgDexErrorKind.GraphQlError,
-            GraphQlUri);
+            await GraphQLFailure(Answer(HttpStatusCode.OK, """{"errors":[{"message":"bad"}]}""")),
+            TcgDexErrorKind.GraphQLError,
+            GraphQLUri);
 
     [Test]
-    public async Task GraphQl_ErrorStatus_IsHttpStatus()
+    public async Task GraphQL_ErrorStatus_IsHttpStatus()
     {
-        TcgDexApiException error = await GraphQlFailure(Answer(HttpStatusCode.BadGateway, string.Empty));
+        TcgDexApiException error = await GraphQLFailure(Answer(HttpStatusCode.BadGateway, string.Empty));
 
-        ShouldBe(error, TcgDexErrorKind.HttpStatus, GraphQlUri);
+        ShouldBe(error, TcgDexErrorKind.HttpStatus, GraphQLUri);
         error.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
     }
 
     [Test]
-    public async Task GraphQl_SendFailure_IsNetwork()
-        => ShouldBe(await GraphQlFailure(Throw(new HttpRequestException("refused"))), TcgDexErrorKind.Network, GraphQlUri);
+    public async Task GraphQL_SendFailure_IsNetwork()
+        => ShouldBe(await GraphQLFailure(Throw(new HttpRequestException("refused"))), TcgDexErrorKind.Network, GraphQLUri);
 
     [Test]
-    public async Task GraphQl_BodyReset_IsNetwork()
-        => ShouldBe(await GraphQlFailure(ResetBody()), TcgDexErrorKind.Network, GraphQlUri);
+    public async Task GraphQL_BodyReset_IsNetwork()
+        => ShouldBe(await GraphQLFailure(ResetBody()), TcgDexErrorKind.Network, GraphQLUri);
 
     [Test]
-    public async Task GraphQl_Budget_IsTimeout()
+    public async Task GraphQL_Budget_IsTimeout()
         => ShouldBe(
-            await GraphQlFailure(Hang(), o => o.Timeout = TimeSpan.FromMilliseconds(20)),
+            await GraphQLFailure(Hang(), o => o.Timeout = TimeSpan.FromMilliseconds(20)),
             TcgDexErrorKind.Timeout,
-            GraphQlUri);
+            GraphQLUri);
 
     [Test]
-    public async Task GraphQl_PipelineCancellation_IsCanceled()
+    public async Task GraphQL_PipelineCancellation_IsCanceled()
         => ShouldBe(
-            await GraphQlFailure(Throw(new TaskCanceledException("HttpClient.Timeout"))),
+            await GraphQLFailure(Throw(new TaskCanceledException("HttpClient.Timeout"))),
             TcgDexErrorKind.Canceled,
-            GraphQlUri);
+            GraphQLUri);
 
     [Test]
-    public async Task GraphQl_OversizedBody_IsResponseTooLarge()
+    public async Task GraphQL_OversizedBody_IsResponseTooLarge()
         => ShouldBe(
-            await GraphQlFailure(Answer(HttpStatusCode.OK, "{}"), o => o.MaxResponseBytes = 1),
+            await GraphQLFailure(Answer(HttpStatusCode.OK, "{}"), o => o.MaxResponseBytes = 1),
             TcgDexErrorKind.ResponseTooLarge,
-            GraphQlUri);
+            GraphQLUri);
 
     [Test]
-    public async Task GraphQl_MalformedJson_IsInvalidResponse()
-        => ShouldBe(await GraphQlFailure(Answer(HttpStatusCode.OK, "<html>")), TcgDexErrorKind.InvalidResponse, GraphQlUri);
+    public async Task GraphQL_MalformedJson_IsInvalidResponse()
+        => ShouldBe(await GraphQLFailure(Answer(HttpStatusCode.OK, "<html>")), TcgDexErrorKind.InvalidResponse, GraphQLUri);
 
     [Test]
-    public async Task GraphQl_NullDocument_IsInvalidResponse()
-        => ShouldBe(await GraphQlFailure(Answer(HttpStatusCode.OK, "null")), TcgDexErrorKind.InvalidResponse, GraphQlUri);
-
-    // ----- the public constructors -----
-
-    [Test]
-    public void TheStatusConstructor_KeepsItsValuesAndIsUnspecified()
-    {
-        // Public, and no longer called by the SDK itself, so only this pins it.
-        TcgDex.Models.TcgDexProblem problem = JsonSerializer.Deserialize(
-            """{"type":"t","title":"x","status":409}""",
-            TcgDex.Serialization.TcgDexJsonContext.Default.TcgDexProblem)!;
-        InvalidOperationException cause = new("cause");
-
-        TcgDexApiException error = new("m", HttpStatusCode.Conflict, problem, cause);
-
-        error.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        error.Problem.ShouldBeSameAs(problem);
-        error.InnerException.ShouldBeSameAs(cause);
-        error.Kind.ShouldBe(TcgDexErrorKind.Unspecified);
-        error.RequestUri.ShouldBeNull();
-    }
+    public async Task GraphQL_NullDocument_IsInvalidResponse()
+        => ShouldBe(await GraphQLFailure(Answer(HttpStatusCode.OK, "null")), TcgDexErrorKind.InvalidResponse, GraphQLUri);
 
     // ----- the caching handler, used directly -----
 

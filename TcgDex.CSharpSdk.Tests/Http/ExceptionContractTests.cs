@@ -136,7 +136,7 @@ public sealed class ExceptionContractTests
     }
 
     [Test]
-    public async Task AGraphQlErrorBodyResetMidRead_StillReportsTheStatusCode()
+    public async Task AGraphQLErrorBodyResetMidRead_StillReportsTheStatusCode()
     {
         using TcgDexClient client = Client(new ResettingBodyHandler(HttpStatusCode.BadGateway));
 

@@ -29,26 +29,26 @@ public sealed class BranchCoverageTests
     [Test]
     public void ConstantOnTheLeft_FlipsEveryRelationalOperator()
     {
-        // `100 <= c.Hp` means hp >= 100. Reading the node type without flipping
+        // `100 <= c.HitPoints` means hp >= 100. Reading the node type without flipping
         // would emit `lte`, quietly returning the complement of what was asked.
-        new CardQuery().Where(c => 100 <= c.Hp).ToQueryString().ShouldBe("hp=gte:100");
-        new CardQuery().Where(c => 100 >= c.Hp).ToQueryString().ShouldBe("hp=lte:100");
-        new CardQuery().Where(c => 100 < c.Hp).ToQueryString().ShouldBe("hp=gt:100");
-        new CardQuery().Where(c => 100 > c.Hp).ToQueryString().ShouldBe("hp=lt:100");
+        new CardQuery().Where(c => 100 <= c.HitPoints).ToQueryString().ShouldBe("hp=gte:100");
+        new CardQuery().Where(c => 100 >= c.HitPoints).ToQueryString().ShouldBe("hp=lte:100");
+        new CardQuery().Where(c => 100 < c.HitPoints).ToQueryString().ShouldBe("hp=gt:100");
+        new CardQuery().Where(c => 100 > c.HitPoints).ToQueryString().ShouldBe("hp=lt:100");
     }
 
     [Test]
     public void MemberOnTheLeft_KeepsEveryRelationalOperator()
     {
-        new CardQuery().Where(c => c.Hp >= 100).ToQueryString().ShouldBe("hp=gte:100");
-        new CardQuery().Where(c => c.Hp <= 100).ToQueryString().ShouldBe("hp=lte:100");
-        new CardQuery().Where(c => c.Hp > 100).ToQueryString().ShouldBe("hp=gt:100");
-        new CardQuery().Where(c => c.Hp < 100).ToQueryString().ShouldBe("hp=lt:100");
+        new CardQuery().Where(c => c.HitPoints >= 100).ToQueryString().ShouldBe("hp=gte:100");
+        new CardQuery().Where(c => c.HitPoints <= 100).ToQueryString().ShouldBe("hp=lte:100");
+        new CardQuery().Where(c => c.HitPoints > 100).ToQueryString().ShouldBe("hp=gt:100");
+        new CardQuery().Where(c => c.HitPoints < 100).ToQueryString().ShouldBe("hp=lt:100");
     }
 
     // ----- GraphQL argument assembly -----
 
-    private static async Task<string> GraphQlQueryAsync(
+    private static async Task<string> GraphQLQueryAsync(
         CardFilter filter,
         int? page = null,
         int? itemsPerPage = null)
@@ -67,7 +67,7 @@ public sealed class BranchCoverageTests
     {
         // With no filter the pagination argument is first, so emitting a
         // separator would produce `cards(,pagination:{…})` — a syntax error.
-        string query = await GraphQlQueryAsync(new CardFilter(), page: 2, itemsPerPage: 10);
+        string query = await GraphQLQueryAsync(new CardFilter(), page: 2, itemsPerPage: 10);
 
         query.ShouldContain("cards(pagination:{page:2,itemsPerPage:10})");
     }
@@ -75,7 +75,7 @@ public sealed class BranchCoverageTests
     [Test]
     public async Task PageWithoutItemsPerPage_EmitsOnlyThePage()
     {
-        string query = await GraphQlQueryAsync(new CardFilter(), page: 3);
+        string query = await GraphQLQueryAsync(new CardFilter(), page: 3);
 
         query.ShouldContain("pagination:{page:3}");
         query.ShouldNotContain("itemsPerPage");
@@ -86,7 +86,7 @@ public sealed class BranchCoverageTests
     {
         // The comma between page and itemsPerPage is conditional on page being
         // present; emitting it unconditionally breaks this case.
-        string query = await GraphQlQueryAsync(new CardFilter(), itemsPerPage: 25);
+        string query = await GraphQLQueryAsync(new CardFilter(), itemsPerPage: 25);
 
         query.ShouldContain("pagination:{itemsPerPage:25}");
 
@@ -98,7 +98,7 @@ public sealed class BranchCoverageTests
     [Test]
     public async Task NeitherFilterNorPagination_OmitsTheArgumentListEntirely()
     {
-        string query = await GraphQlQueryAsync(new CardFilter());
+        string query = await GraphQLQueryAsync(new CardFilter());
 
         query.ShouldContain("{ cards {");
     }
@@ -282,9 +282,9 @@ public sealed class BranchCoverageTests
         // The same guard as on Card, on the models that also carry collections.
         // System.Text.Json's source generator discards property initializers, so
         // without this an omitted array deserializes to null.
-        new Set { Id = "s", Name = "S", Cards = null! }.Cards.ShouldBeEmpty();
-        new Serie { Id = "r", Name = "R", Sets = null! }.Sets.ShouldBeEmpty();
-        new DetailedVariant { Stamp = null! }.Stamp.ShouldBeEmpty();
+        new CardSet { Id = "s", Name = "S", Cards = null! }.Cards.ShouldBeEmpty();
+        new Series { Id = "r", Name = "R", Sets = null! }.Sets.ShouldBeEmpty();
+        new DetailedVariant { Stamps = null! }.Stamps.ShouldBeEmpty();
         new Attack { Name = "a", Cost = null! }.Cost.ShouldBeEmpty();
     }
 
@@ -292,25 +292,25 @@ public sealed class BranchCoverageTests
     public void EveryCollectionKeepsASuppliedValue()
     {
         // The other half: the guard must not discard real data.
-        new Set { Id = "s", Name = "S", Cards = [new CardBrief { Id = "c", LocalId = "1", Name = "C" }] }
+        new CardSet { Id = "s", Name = "S", Cards = [new CardBrief { Id = "c", LocalId = "1", Name = "C" }] }
             .Cards.Count.ShouldBe(1);
-        new Serie { Id = "r", Name = "R", Sets = [new SetBrief { Id = "s", Name = "S" }] }
+        new Series { Id = "r", Name = "R", Sets = [new CardSetBrief { Id = "s", Name = "S" }] }
             .Sets.Count.ShouldBe(1);
-        new DetailedVariant { Stamp = ["set-logo"] }.Stamp.Count.ShouldBe(1);
+        new DetailedVariant { Stamps = ["set-logo"] }.Stamps.Count.ShouldBe(1);
         new Attack { Name = "a", Cost = ["Grass"] }.Cost.Count.ShouldBe(1);
     }
 
     // ----- constructor null guards -----
 
     [Test]
-    public void TheGraphQlPathRejectsNullDependencies()
+    public void TheGraphQLPathRejectsNullDependencies()
     {
         // Reached through the client, which is the only way these are built.
         Should.Throw<ArgumentNullException>(() => new TcgDexClient(null!, new TcgDexOptions()));
     }
 
     [Test]
-    public void AnEmptyGraphQlBody_IsReportedRatherThanReturningNull()
+    public void AnEmptyGraphQLBody_IsReportedRatherThanReturningNull()
     {
         // `Deserialize(...) ?? throw` — the null half, which a literal "null"
         // body produces.

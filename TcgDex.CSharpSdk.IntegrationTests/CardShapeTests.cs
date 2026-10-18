@@ -123,10 +123,10 @@ public sealed class CardShapeTests : LiveApiFixture
         Pricing pricing = card.ShouldNotBeNull().Pricing.ShouldNotBeNull();
 
         pricing.Cardmarket.ShouldNotBeNull().Unit.ShouldBe("EUR");
-        pricing.Tcgplayer.ShouldNotBeNull().Unit.ShouldBe("USD");
+        pricing.TcgPlayer.ShouldNotBeNull().Unit.ShouldBe("USD");
 
         // Printing names are data, not schema — they vary per card.
-        pricing.Tcgplayer.Printings.ShouldNotBeEmpty();
+        pricing.TcgPlayer.Printings.ShouldNotBeEmpty();
     }
 
     [Test]
@@ -134,7 +134,7 @@ public sealed class CardShapeTests : LiveApiFixture
     {
         Card? card = await Client.Cards.GetAsync("sv03.5-001", Timeout);
 
-        IReadOnlyList<DetailedVariant> variants = card.ShouldNotBeNull().VariantsDetailed;
+        IReadOnlyList<DetailedVariant> variants = card.ShouldNotBeNull().DetailedVariants;
 
         variants.ShouldNotBeEmpty("variants_detailed maps from a snake_case key");
         // `!= null` rather than `is not null`: ShouldContain takes an expression
@@ -147,7 +147,7 @@ public sealed class CardShapeTests : LiveApiFixture
     {
         // Proves ids returned by one endpoint resolve at another — the kind of
         // break that only shows up against the live service.
-        Set? set = await Client.Sets.GetAsync("swsh3", Timeout);
+        CardSet? set = await Client.Sets.GetAsync("swsh3", Timeout);
 
         set.ShouldNotBeNull().Cards.ShouldNotBeEmpty();
 
@@ -160,12 +160,12 @@ public sealed class CardShapeTests : LiveApiFixture
     [Test]
     public async Task Serie_RoundTripsThroughItsOwnSets()
     {
-        Serie? serie = await Client.Series.GetAsync("swsh", Timeout);
+        Series? serie = await Client.Series.GetAsync("swsh", Timeout);
 
         serie.ShouldNotBeNull().Sets.ShouldNotBeEmpty();
 
-        Set? set = await Client.Sets.GetAsync(serie.Sets[0].Id, Timeout);
+        CardSet? set = await Client.Sets.GetAsync(serie.Sets[0].Id, Timeout);
 
-        set.ShouldNotBeNull().Serie.ShouldNotBeNull().Id.ShouldBe("swsh");
+        set.ShouldNotBeNull().Series.ShouldNotBeNull().Id.ShouldBe("swsh");
     }
 }

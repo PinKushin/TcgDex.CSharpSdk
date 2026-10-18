@@ -79,7 +79,7 @@ public sealed class PocketShapeTests : LiveApiFixture
             "the container is served even though both providers are empty");
 
         pricing.Cardmarket.ShouldBeNull();
-        pricing.Tcgplayer.ShouldBeNull();
+        pricing.TcgPlayer.ShouldBeNull();
     }
 
     [Test]
@@ -91,10 +91,10 @@ public sealed class PocketShapeTests : LiveApiFixture
         Card? pocket = await Client.Cards.GetAsync(PocketPokemon, Timeout);
         Card? physical = await Client.Cards.GetAsync(PhysicalPokemon, Timeout);
 
-        DetailedVariant pocketVariant = pocket.ShouldNotBeNull().VariantsDetailed.ShouldHaveSingleItem();
+        DetailedVariant pocketVariant = pocket.ShouldNotBeNull().DetailedVariants.ShouldHaveSingleItem();
         pocketVariant.VariantId.ShouldBe("generated");
 
-        physical.ShouldNotBeNull().VariantsDetailed[0].VariantId.ShouldBe("endfynwn4n10gzq");
+        physical.ShouldNotBeNull().DetailedVariants[0].VariantId.ShouldBe("endfynwn4n10gzq");
     }
 
     [Test]
@@ -129,9 +129,9 @@ public sealed class PocketShapeTests : LiveApiFixture
     {
         // The serie is the one durable marker in the data. Set ids keep being
         // added, so matching on `A*`/`B*` would rot; `tcgp` will not.
-        Set? set = await Client.Sets.GetAsync("A4", Timeout);
+        CardSet? set = await Client.Sets.GetAsync("A4", Timeout);
 
-        SerieBrief serie = set.ShouldNotBeNull().Serie.ShouldNotBeNull();
+        SeriesBrief serie = set.ShouldNotBeNull().Series.ShouldNotBeNull();
 
         serie.Id.ShouldBe("tcgp");
         serie.Name.ShouldBe("Pokémon TCG Pocket");

@@ -8,7 +8,7 @@ using TcgDex.Querying;
 /// <remarks>
 /// <para>
 /// Written after mutation testing put this file at 67%. The survivors were not
-/// subtle: only <c>Name</c>, <c>Hp</c> and <c>Illustrator</c> were exercised
+/// subtle: only <c>Name</c>, <c>HitPoints</c> and <c>Illustrator</c> were exercised
 /// anywhere, so the other twelve fields could each have their line deleted or
 /// their GraphQL name replaced with an empty string and the whole suite stayed
 /// green.
@@ -35,7 +35,7 @@ public sealed class CardFilterTests
             Name = "Furret",
             Category = "Pokemon",
             Rarity = "Rare",
-            Hp = 110,
+            HitPoints = 110,
             Id = "swsh3-136",
             LocalId = "136",
             DexId = 162,
@@ -45,11 +45,11 @@ public sealed class CardFilterTests
             TrainerType = "Item",
             EnergyType = "Basic",
             RegulationMark = "D",
-            EvolveFrom = "Sentret",
-            Retreat = 1,
+            EvolvesFrom = "Sentret",
+            RetreatCost = 1,
         };
 
-        filter.ToGraphQlArguments().ShouldBe(
+        filter.ToGraphQLArguments().ShouldBe(
             """
             name:"Furret",category:"Pokemon",rarity:"Rare",hp:110,id:"swsh3-136",\
             localId:"136",dexId:162,illustrator:"Kagemaru Himeno",stage:"Stage1",\
@@ -61,7 +61,7 @@ public sealed class CardFilterTests
     [Test]
     public void NoFields_RenderNothing()
     {
-        new CardFilter().ToGraphQlArguments().ShouldBeEmpty();
+        new CardFilter().ToGraphQLArguments().ShouldBeEmpty();
     }
 
     [TestCase("Name", "name:\"x\"")]
@@ -75,7 +75,7 @@ public sealed class CardFilterTests
     [TestCase("TrainerType", "trainerType:\"x\"")]
     [TestCase("EnergyType", "energyType:\"x\"")]
     [TestCase("RegulationMark", "regulationMark:\"x\"")]
-    [TestCase("EvolveFrom", "evolveFrom:\"x\"")]
+    [TestCase("EvolvesFrom", "evolveFrom:\"x\"")]
     public void ASingleTextField_RendersAloneWithoutASeparator(string property, string expected)
     {
         // Each field on its own, which the combined test above cannot show:
@@ -83,19 +83,19 @@ public sealed class CardFilterTests
         // would be invisible.
         CardFilter filter = TextFilterFor(property);
 
-        filter.ToGraphQlArguments().ShouldBe(expected);
+        filter.ToGraphQLArguments().ShouldBe(expected);
     }
 
-    [TestCase("Hp", "hp:7")]
+    [TestCase("HitPoints", "hp:7")]
     [TestCase("DexId", "dexId:7")]
-    [TestCase("Retreat", "retreat:7")]
+    [TestCase("RetreatCost", "retreat:7")]
     public void ASingleNumericField_RendersUnquoted(string property, string expected)
     {
         // Numbers must not be quoted: the GraphQL schema types these as Int,
         // and a quoted value is rejected outright rather than coerced.
         CardFilter filter = NumberFilterFor(property);
 
-        filter.ToGraphQlArguments().ShouldBe(expected);
+        filter.ToGraphQLArguments().ShouldBe(expected);
     }
 
     private static CardFilter TextFilterFor(string property) => property switch
@@ -111,15 +111,15 @@ public sealed class CardFilterTests
         "TrainerType" => new CardFilter { TrainerType = "x" },
         "EnergyType" => new CardFilter { EnergyType = "x" },
         "RegulationMark" => new CardFilter { RegulationMark = "x" },
-        "EvolveFrom" => new CardFilter { EvolveFrom = "x" },
+        "EvolvesFrom" => new CardFilter { EvolvesFrom = "x" },
         _ => throw new ArgumentOutOfRangeException(nameof(property), property, "Unmapped text filter."),
     };
 
     private static CardFilter NumberFilterFor(string property) => property switch
     {
-        "Hp" => new CardFilter { Hp = 7 },
+        "HitPoints" => new CardFilter { HitPoints = 7 },
         "DexId" => new CardFilter { DexId = 7 },
-        "Retreat" => new CardFilter { Retreat = 7 },
+        "RetreatCost" => new CardFilter { RetreatCost = 7 },
         _ => throw new ArgumentOutOfRangeException(nameof(property), property, "Unmapped numeric filter."),
     };
 }

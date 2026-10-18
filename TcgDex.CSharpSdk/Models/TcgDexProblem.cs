@@ -41,7 +41,8 @@ public sealed record TcgDexProblem
     public string? Method { get; init; }
 
     /// <summary>The offending language code, on a language error.</summary>
-    public string? Lang { get; init; }
+    [JsonPropertyName("lang")]
+    public string? Language { get; init; }
 
     /// <summary>Additional explanation, such as the list of valid languages.</summary>
     public string? Details { get; init; }

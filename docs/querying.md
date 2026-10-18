@@ -5,7 +5,7 @@ Predicates are written in C# and translated to the API's filter syntax:
 ```csharp
 CardQuery query = new CardQuery()
     .Where(c => c.Name.Contains("Pikachu"))
-    .Where(c => c.Hp > 100)
+    .Where(c => c.HitPoints > 100)
     .OrderByDescending(c => c.Name)
     .Page(1, 50);
 
@@ -30,10 +30,10 @@ Every operator the API has, and nothing it does not:
 |---|---|---|
 | `c.Name == "Furret"` | `name=eq:Furret` | Exact match |
 | `c.Name != "Furret"` | `name=neq:Furret` | Exact exclusion |
-| `c.Hp > 100` | `hp=gt:100` | Greater than |
-| `c.Hp >= 100` | `hp=gte:100` | Greater or equal |
-| `c.Hp < 100` | `hp=lt:100` | Less than |
-| `c.Hp <= 100` | `hp=lte:100` | Less or equal |
+| `c.HitPoints > 100` | `hp=gt:100` | Greater than |
+| `c.HitPoints >= 100` | `hp=gte:100` | Greater or equal |
+| `c.HitPoints < 100` | `hp=lt:100` | Less than |
+| `c.HitPoints <= 100` | `hp=lte:100` | Less or equal |
 | `c.Name.Contains("pika")` | `name=pika` | Loose substring match |
 | `c.Name.StartsWith("fu")` | `name=fu*` | Prefix match |
 | `c.Name.EndsWith("chu")` | `name=*chu` | Suffix match |
@@ -41,7 +41,7 @@ Every operator the API has, and nothing it does not:
 | `c.Effect == null` | `effect=null:` | Field absent |
 | `c.Effect != null` | `effect=notnull:` | Field present |
 
-Operands can appear in either order — `100 < c.Hp` and `c.Hp > 100` both emit
+Operands can appear in either order — `100 < c.HitPoints` and `c.HitPoints > 100` both emit
 `hp=gt:100`.
 
 ## Combining filters
@@ -51,7 +51,7 @@ Operands can appear in either order — `100 < c.Hp` and `c.Hp > 100` both emit
 ```csharp
 new CardQuery()
     .Where(c => c.Category == "Pokemon")
-    .Where(c => c.Hp > 250)
+    .Where(c => c.HitPoints > 250)
 
 // category=eq:Pokemon&hp=gt:250
 ```
@@ -70,7 +70,7 @@ data:
 
 ```csharp
 // NotSupportedException, naming both fields
-new CardQuery().Where(c => c.Name == "Furret" || c.Hp > 100);
+new CardQuery().Where(c => c.Name == "Furret" || c.HitPoints > 100);
 ```
 
 Issue one query per field and combine the results yourself.
@@ -189,5 +189,5 @@ variables are read from their closure — so this works:
 ```csharp
 int minimumHp = 250;
 
-new CardQuery().Where(c => c.Hp > minimumHp);   // hp=gt:250
+new CardQuery().Where(c => c.HitPoints > minimumHp);   // hp=gt:250
 ```

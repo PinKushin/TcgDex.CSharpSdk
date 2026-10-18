@@ -6,7 +6,7 @@ namespace TcgDex.Models;
 /// <remarks>
 /// <para>
 /// Which fields are populated depends on <see cref="Category"/>. Pokémon carry
-/// <see cref="Hp"/>, <see cref="Types"/>, <see cref="Attacks"/> and the rest of
+/// <see cref="HitPoints"/>, <see cref="Types"/>, <see cref="Attacks"/> and the rest of
 /// the battle data; Trainers carry <see cref="TrainerType"/> and
 /// <see cref="Effect"/>; Energy cards carry <see cref="EnergyType"/>. Anything
 /// category-specific is nullable because the API omits it entirely rather than
@@ -24,10 +24,10 @@ public sealed record Card
     // so a `= []` default is silently discarded and an omitted JSON array
     // arrives as null. These backing fields keep every collection non-null for
     // an absent property, an explicit JSON null, and a null passed by a caller.
-    private readonly IReadOnlyList<DetailedVariant> _variantsDetailed = [];
+    private readonly IReadOnlyList<DetailedVariant> _detailedVariants = [];
     private readonly IReadOnlyList<Booster> _boosters = [];
     private readonly IReadOnlyList<string> _types = [];
-    private readonly IReadOnlyList<int> _dexId = [];
+    private readonly IReadOnlyList<int> _dexIds = [];
     private readonly IReadOnlyList<Attack> _attacks = [];
     private readonly IReadOnlyList<Ability> _abilities = [];
     private readonly IReadOnlyList<WeaknessOrResistance> _weaknesses = [];
@@ -62,7 +62,7 @@ public sealed record Card
     public required string LocalId { get; init; }
 
     /// <summary>The set this card belongs to.</summary>
-    public required SetBrief Set { get; init; }
+    public required CardSetBrief Set { get; init; }
 
     /// <summary>Which printings of this card exist.</summary>
     public Variants? Variants { get; init; }
@@ -70,13 +70,17 @@ public sealed record Card
     /// <summary>Per-printing detail, including pricing for each printing.</summary>
     /// <remarks>Empty rather than <see langword="null"/> when the API omits it.</remarks>
     [JsonPropertyName("variants_detailed")]
-    public IReadOnlyList<DetailedVariant> VariantsDetailed
+    public IReadOnlyList<DetailedVariant> DetailedVariants
     {
-        get => _variantsDetailed;
-        init => _variantsDetailed = value ?? [];
+        get => _detailedVariants;
+        init => _detailedVariants = value ?? [];
     }
 
-    /// <summary>When this card's record was last updated.</summary>
+    /// <summary>
+    /// When this card's record was last updated; <see langword="null"/> when
+    /// absent or not a readable timestamp.
+    /// </summary>
+    [JsonConverter(typeof(Serialization.TimestampConverter))]
     public DateTimeOffset? Updated { get; init; }
 
     // ----- common but not guaranteed -----
@@ -105,7 +109,8 @@ public sealed record Card
     public ThirdParty? ThirdParty { get; init; }
 
     /// <summary>Tournament legality.</summary>
-    public Legality? Legal { get; init; }
+    [JsonPropertyName("legal")]
+    public Legality? Legality { get; init; }
 
     /// <summary>The regulation mark letter, on modern cards.</summary>
     public string? RegulationMark { get; init; }
@@ -126,7 +131,8 @@ public sealed record Card
     // ----- Pokémon -----
 
     /// <summary>Hit points.</summary>
-    public int? Hp { get; init; }
+    [JsonPropertyName("hp")]
+    public int? HitPoints { get; init; }
 
     /// <summary>Elemental types, for example <c>["Grass"]</c>.</summary>
     public IReadOnlyList<string> Types
@@ -136,14 +142,16 @@ public sealed record Card
     }
 
     /// <summary>National Pokédex numbers this card depicts.</summary>
-    public IReadOnlyList<int> DexId
+    [JsonPropertyName("dexId")]
+    public IReadOnlyList<int> DexIds
     {
-        get => _dexId;
-        init => _dexId = value ?? [];
+        get => _dexIds;
+        init => _dexIds = value ?? [];
     }
 
     /// <summary>The Pokémon this one evolves from.</summary>
-    public string? EvolveFrom { get; init; }
+    [JsonPropertyName("evolveFrom")]
+    public string? EvolvesFrom { get; init; }
 
     /// <summary>Flavour text.</summary>
     public string? Description { get; init; }
@@ -183,7 +191,8 @@ public sealed record Card
     }
 
     /// <summary>The retreat cost, in energy.</summary>
-    public int? Retreat { get; init; }
+    [JsonPropertyName("retreat")]
+    public int? RetreatCost { get; init; }
 
     // ----- Trainer -----
 

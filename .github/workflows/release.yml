@@ -191,3 +191,8 @@ jobs:
               --notes-file "$RUNNER_TEMP/release-notes.md" \
               --verify-tag
           fi
+
+          # The exact .nupkg/.snupkg that went to nuget.org, so the release page
+          # carries the real package and not only GitHub's source zips. --clobber
+          # keeps a re-run idempotent, like the edit above.
+          gh release upload "v$VERSION" ./artifacts/* --clobber

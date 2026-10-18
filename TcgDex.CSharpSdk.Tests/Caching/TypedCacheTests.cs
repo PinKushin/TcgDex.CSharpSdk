@@ -147,12 +147,12 @@ public sealed class TypedCacheTests
     {
         // The key has to carry the type. Nothing in the public surface reaches
         // this today — each endpoint has one model — but a key that ignored the
-        // type would hand a Card back to a caller asking for a Serie, and that
+        // type would hand a Card back to a caller asking for a Series, and that
         // would surface as an InvalidCastException a long way from here.
         TaggedHandler handler = new(Fixture.ReadText("serie-full.json"));
         using TcgDexClient client = Client(handler);
 
-        Serie? asSerie = await client.Series.GetAsync("swsh", CancellationToken.None);
+        Series? asSerie = await client.Series.GetAsync("swsh", CancellationToken.None);
 
         handler.Body = Card();
         handler.ETag = "W/\"v2\"";

@@ -164,14 +164,15 @@ public sealed class CacheReport(TcgDexCacheStatistics stats)
 }
 ```
 
-Without a container, the handler counts what it did:
+Without a container, read the same counts from the handler's `Statistics`:
 
 ```csharp
 TcgDexCachingHandler handler = new(new MemoryTcgDexResponseCache());
+TcgDexCacheStatistics stats = handler.Statistics;
 
-handler.FreshHits;      // served with no network at all
-handler.Revalidations;  // refreshed by a 304, no body transferred
-handler.Misses;         // full responses fetched
+long fresh = stats.FreshHits;          // served with no network at all
+long revalidated = stats.Revalidations; // refreshed by a 304, no body transferred
+long fetched = stats.Misses;            // full responses fetched
 ```
 
 ## Without a container
@@ -188,7 +189,7 @@ TcgDexClient tcgdex = new(http, new TcgDexOptions());
 
 ## A note on what caching cannot speed up
 
-Filtering and sorting happen **server-side** — `Where(c => c.Hp > 100)` becomes
+Filtering and sorting happen **server-side** — `Where(c => c.HitPoints > 100)` becomes
 `hp=gt:100` and the API does the work. There is no local index to optimise.
 
 So the only way to make a search faster is to not send it, which is what caching

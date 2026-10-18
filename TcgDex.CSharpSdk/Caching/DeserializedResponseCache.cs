@@ -25,7 +25,7 @@ namespace TcgDex.Caching;
 /// <para>
 /// The key carries the type as well as the URL. Nothing in the public surface
 /// reaches a URL served as two different models today, but a key that ignored
-/// the type would hand a <c>Card</c> to a caller asking for a <c>Serie</c>, and
+/// the type would hand a <c>Card</c> to a caller asking for a <c>Series</c>, and
 /// that surfaces as an <see cref="InvalidCastException"/> a long way from the
 /// cause.
 /// </para>

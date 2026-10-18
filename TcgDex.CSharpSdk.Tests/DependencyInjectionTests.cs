@@ -109,7 +109,7 @@ public sealed class DependencyInjectionTests
         {
             o.BaseAddress = new Uri("https://mirror.example/v2/");
             o.Language = TcgDexLanguages.German;
-            o.GraphQlEndpoint = new Uri("https://mirror.example/v2/graphql");
+            o.GraphQLEndpoint = new Uri("https://mirror.example/v2/graphql");
             o.MaxResponseBytes = 1234;
             o.Timeout = TimeSpan.FromSeconds(7);
             o.DeserializePricing = false;
@@ -131,7 +131,7 @@ public sealed class DependencyInjectionTests
         {
             options.BaseAddress.ShouldBe(new Uri("https://mirror.example/v2/"));
             options.Language.ShouldBe("de");
-            options.GraphQlEndpoint.ShouldBe(new Uri("https://mirror.example/v2/graphql"));
+            options.GraphQLEndpoint.ShouldBe(new Uri("https://mirror.example/v2/graphql"));
             options.MaxResponseBytes.ShouldBe(1234);
             options.Timeout.ShouldBe(TimeSpan.FromSeconds(7));
             options.DeserializePricing.ShouldBeFalse();
@@ -235,12 +235,113 @@ public sealed class DependencyInjectionTests
 
         using ServiceProvider provider = services.BuildServiceProvider();
 
-        Set? first = await provider.GetRequiredService<ITcgDexClient>().Sets.GetAsync("swsh3");
-        Set? second = await provider.GetRequiredService<ITcgDexClient>().Sets.GetAsync("swsh3");
+        CardSet? first = await provider.GetRequiredService<ITcgDexClient>().Sets.GetAsync("swsh3");
+        CardSet? second = await provider.GetRequiredService<ITcgDexClient>().Sets.GetAsync("swsh3");
 
         primary.Requests.ShouldBe(2);
         first.ShouldNotBeNull();
         second.ShouldBeSameAs(first);
+    }
+
+    // ----- cache options -----
+
+    [Test]
+    public void CacheOptions_MergeConfigureCallsLikeAnyOtherOptions()
+    {
+        // configureCache and a separate Configure<TcgDexCacheOptions> (or an
+        // appsettings binding) must both reach the options the handler gets.
+        ServiceCollection services = new();
+        services.AddTcgDexWithCaching(configureCache: o => o.MaxEntries = 7);
+        services.Configure<TcgDexCacheOptions>(o => o.DefaultTimeToLive = TimeSpan.FromSeconds(9));
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        TcgDexCacheOptions options = provider.GetRequiredService<TcgDexCacheOptions>();
+
+        options.MaxEntries.ShouldBe(7);
+        options.DefaultTimeToLive.ShouldBe(TimeSpan.FromSeconds(9));
+        provider.GetRequiredService<IOptions<TcgDexCacheOptions>>().Value.ShouldBeSameAs(options);
+    }
+
+    [TestCase(nameof(TcgDexCacheOptions.MaxEntries), 0)]
+    [TestCase(nameof(TcgDexCacheOptions.MaxEntries), -1)]
+    [TestCase(nameof(TcgDexCacheOptions.DefaultTimeToLive), -1)]
+    [TestCase(nameof(TcgDexCacheOptions.CatalogTimeToLive), -1)]
+    [TestCase(nameof(TcgDexCacheOptions.PricingTimeToLive), -1)]
+    public void CacheOptions_InvalidValue_FailsAtStartupValidation(string property, int value)
+    {
+        // configureCache runs lazily, so without ValidateOnStart a bad MaxEntries
+        // surfaced only when the first HttpClient was built, and a negative
+        // time-to-live never surfaced at all.
+        ServiceCollection services = new();
+        services.AddTcgDexWithCaching(configureCache: o => Set(o, property, value));
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        Should.Throw<OptionsValidationException>(() => provider.GetRequiredService<IStartupValidator>().Validate())
+            .Message.ShouldContain(property);
+    }
+
+    [Test]
+    public void CacheOptions_BoundaryValues_PassStartupValidation()
+    {
+        // The control for the test above: one entry and a zero time-to-live
+        // (always revalidate) are the smallest legal values.
+        ServiceCollection services = new();
+        services.AddTcgDexWithCaching(configureCache: o =>
+        {
+            o.MaxEntries = 1;
+            o.DefaultTimeToLive = TimeSpan.Zero;
+            o.CatalogTimeToLive = TimeSpan.Zero;
+            o.PricingTimeToLive = TimeSpan.Zero;
+        });
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        Should.NotThrow(() => provider.GetRequiredService<IStartupValidator>().Validate());
+        provider.GetRequiredService<TcgDexCacheOptions>().MaxEntries.ShouldBe(1);
+    }
+
+    private static void Set(TcgDexCacheOptions options, string property, int value)
+    {
+        switch (property)
+        {
+            case nameof(TcgDexCacheOptions.MaxEntries): options.MaxEntries = value; break;
+            case nameof(TcgDexCacheOptions.DefaultTimeToLive): options.DefaultTimeToLive = TimeSpan.FromSeconds(value); break;
+            case nameof(TcgDexCacheOptions.CatalogTimeToLive): options.CatalogTimeToLive = TimeSpan.FromSeconds(value); break;
+            case nameof(TcgDexCacheOptions.PricingTimeToLive): options.PricingTimeToLive = TimeSpan.FromSeconds(value); break;
+            default: throw new ArgumentOutOfRangeException(nameof(property), property, "Unmapped cache option.");
+        }
+    }
+
+    /// <summary>A caller's own freshness policy, counting how often it is asked.</summary>
+    private sealed class CountingCacheOptions : TcgDexCacheOptions
+    {
+        internal int Calls { get; private set; }
+
+        public override TimeSpan GetTimeToLive(Uri requestUri)
+        {
+            Calls++;
+            return base.GetTimeToLive(requestUri);
+        }
+    }
+
+    [Test]
+    public async Task CacheOptions_ASubclassRegisteredFirst_IsTheOneTheHandlerUses()
+    {
+        // GetTimeToLive is the documented extension point, and registering the
+        // subclass before AddTcgDexWithCaching is how a container user supplies it.
+        CountingCacheOptions custom = new();
+        ServiceCollection services = new();
+        services.AddSingleton<TcgDexCacheOptions>(custom);
+        services.AddTcgDexWithCaching();
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        (HttpMessageInvoker invoker, _) = BuildChain(provider, AlwaysOk());
+
+        using HttpResponseMessage response = await Get(invoker);
+
+        provider.GetRequiredService<TcgDexCacheOptions>().ShouldBeSameAs(custom);
+        custom.Calls.ShouldBe(1);
     }
 
     // ----- the caching handler across rotations -----
@@ -259,8 +360,9 @@ public sealed class DependencyInjectionTests
 
         (_, TcgDexCachingHandler after) = BuildChain(provider, AlwaysOk());
 
-        after.Misses.ShouldBe(1);
-        after.FreshHits.ShouldBe(1);
+        after.Statistics.Misses.ShouldBe(1);
+        after.Statistics.FreshHits.ShouldBe(1);
+        after.Statistics.ShouldBeSameAs(provider.GetRequiredService<TcgDexCacheStatistics>());
     }
 
     [Test]

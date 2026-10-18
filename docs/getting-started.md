@@ -145,13 +145,13 @@ exhaustion.
 ## What you can read
 
 ```csharp
-Card?  card  = await tcgdex.Cards.GetAsync("swsh3-136", ct);
-Set?   set   = await tcgdex.Sets.GetAsync("swsh3", ct);      // includes its cards
-Serie? serie = await tcgdex.Series.GetAsync("swsh", ct);     // includes its sets
-Card   lucky = await tcgdex.Random.CardAsync(ct);
+Card?    card   = await tcgdex.Cards.GetAsync("swsh3-136", ct);
+CardSet? set    = await tcgdex.Sets.GetAsync("swsh3", ct);      // includes its cards
+Series?  series = await tcgdex.Series.GetAsync("swsh", ct);     // includes its sets
+Card     lucky  = await tcgdex.Random.GetCardAsync(ct);
 
-IReadOnlyList<string> rarities = await tcgdex.Catalog.RaritiesAsync(ct);
-IReadOnlyList<int>    hpValues = await tcgdex.Catalog.HitPointsAsync(ct);
+IReadOnlyList<string> rarities  = await tcgdex.Catalog.GetRaritiesAsync(ct);
+IReadOnlyList<int>    hitPoints = await tcgdex.Catalog.GetHitPointsAsync(ct);
 ```
 
 `Catalog` covers all thirteen enumeration endpoints — categories, rarities,
@@ -201,7 +201,7 @@ or a local test server — set both endpoints:
 builder.Services.AddTcgDex(options =>
 {
     options.BaseAddress = new Uri("https://tcgdex.example.dev/v2/");
-    options.GraphQlEndpoint = new Uri("https://tcgdex.example.dev/v2/graphql");
+    options.GraphQLEndpoint = new Uri("https://tcgdex.example.dev/v2/graphql");
 });
 ```
 
@@ -290,9 +290,9 @@ Without a container, wrap the handler yourself when constructing the
 helpers build the right form for each:
 
 ```csharp
-string? art  = card.GetImageUrl(ImageQuality.High, ImageFormat.Png);
-string? logo = card.Set.GetLogoUrl();
-string? sym  = card.Set.GetSymbolUrl(ImageFormat.Webp);
+Uri? art  = card.GetImageUrl(ImageQuality.High, ImageFormat.Png);
+Uri? logo = card.Set.GetLogoUrl();
+Uri? sym  = card.Set.GetSymbolUrl(ImageFormat.Webp);
 ```
 
 Worth knowing why these are not one method: **card artwork takes a quality
@@ -322,7 +322,7 @@ by receiving a short page. `StreamAsync` handles that once so you do not have to
 
 ## Reading the models
 
-Fields are populated by category: Pokémon carry `Hp`, `Types`, `Attacks` and
+Fields are populated by category: Pokémon carry `HitPoints`, `Types`, `Attacks` and
 `Weaknesses`; Trainers carry `TrainerType` and `Effect`; Energy cards carry
 `EnergyType`. Anything category-specific is nullable, because the API omits it
 rather than sending null.
@@ -336,6 +336,6 @@ Three shapes are irregular, and the SDK smooths them:
   another. `Attack.BaseDamage` gives the numeric part.
 - `WeaknessOrResistance.Value` is text — `"×2"`, `"-20"`.
 - TCGplayer prices are keyed by printing name, and the names vary per card, so
-  they are a dictionary: `card.Pricing?.Tcgplayer?["holofoil"]`.
+  they are a dictionary: `card.Pricing?.TcgPlayer?["holofoil"]`.
 
 Next: **[Querying](querying.md)**.

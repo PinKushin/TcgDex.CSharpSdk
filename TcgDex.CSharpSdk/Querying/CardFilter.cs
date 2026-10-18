@@ -30,7 +30,7 @@ public sealed record CardFilter
     public string? Rarity { get; init; }
 
     /// <summary>Exact hit points.</summary>
-    public int? Hp { get; init; }
+    public int? HitPoints { get; init; }
 
     /// <summary>Card identifier.</summary>
     public string? Id { get; init; }
@@ -60,24 +60,24 @@ public sealed record CardFilter
     public string? RegulationMark { get; init; }
 
     /// <summary>The Pokémon this card evolves from.</summary>
-    public string? EvolveFrom { get; init; }
+    public string? EvolvesFrom { get; init; }
 
     /// <summary>Retreat cost.</summary>
-    public int? Retreat { get; init; }
+    public int? RetreatCost { get; init; }
 
     /// <summary>
     /// Renders the filter as a GraphQL argument list, or an empty string when
     /// nothing is set.
     /// </summary>
     /// <returns>Text such as <c>name:"Furret",hp:110</c>.</returns>
-    internal string ToGraphQlArguments()
+    internal string ToGraphQLArguments()
     {
         StringBuilder builder = new();
 
         AppendText(builder, "name", Name);
         AppendText(builder, "category", Category);
         AppendText(builder, "rarity", Rarity);
-        AppendNumber(builder, "hp", Hp);
+        AppendNumber(builder, "hp", HitPoints);
         AppendText(builder, "id", Id);
         AppendText(builder, "localId", LocalId);
         AppendNumber(builder, "dexId", DexId);
@@ -87,8 +87,8 @@ public sealed record CardFilter
         AppendText(builder, "trainerType", TrainerType);
         AppendText(builder, "energyType", EnergyType);
         AppendText(builder, "regulationMark", RegulationMark);
-        AppendText(builder, "evolveFrom", EvolveFrom);
-        AppendNumber(builder, "retreat", Retreat);
+        AppendText(builder, "evolveFrom", EvolvesFrom);
+        AppendNumber(builder, "retreat", RetreatCost);
 
         return builder.ToString();
     }

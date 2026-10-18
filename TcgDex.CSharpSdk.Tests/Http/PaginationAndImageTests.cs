@@ -206,23 +206,40 @@ public sealed class PaginationAndImageTests
     [TestCase(ImageQuality.Low, ImageFormat.Webp, "https://assets.tcgdex.net/en/swsh/swsh3/136/low.webp")]
     [TestCase(ImageQuality.High, ImageFormat.Jpg, "https://assets.tcgdex.net/en/swsh/swsh3/136/high.jpg")]
     public void ImageUrl_AppendsQualityAndFormat(ImageQuality quality, ImageFormat format, string expected)
-        => ImageUrl.Build("https://assets.tcgdex.net/en/swsh/swsh3/136", quality, format).ShouldBe(expected);
+        => ImageUrl.Build("https://assets.tcgdex.net/en/swsh/swsh3/136", quality, format).ShouldBe(new Uri(expected));
 
     [Test]
     public void ImageUrl_DefaultsToHighPng()
         => ImageUrl.Build("https://assets.tcgdex.net/en/swsh/swsh3/136")
-            .ShouldBe("https://assets.tcgdex.net/en/swsh/swsh3/136/high.png");
+            .ShouldBe(new Uri("https://assets.tcgdex.net/en/swsh/swsh3/136/high.png"));
 
     [Test]
     public void ImageUrl_ToleratesATrailingSlash()
         => ImageUrl.Build("https://assets.tcgdex.net/en/swsh/swsh3/136/")
-            .ShouldBe("https://assets.tcgdex.net/en/swsh/swsh3/136/high.png");
+            .ShouldBe(new Uri("https://assets.tcgdex.net/en/swsh/swsh3/136/high.png"));
 
     [TestCase(null)]
     [TestCase("")]
     [TestCase("   ")]
     public void ImageUrl_WithNoBase_ReturnsNull(string? baseUrl)
         => ImageUrl.Build(baseUrl).ShouldBeNull();
+
+    [Test]
+    public void ImageUrl_AcceptsPlainHttp()
+        => ImageUrl.Build("http://localhost/en/swsh/swsh3/136")
+            .ShouldBe(new Uri("http://localhost/en/swsh/swsh3/136/high.png"));
+
+    [TestCase("assets/en/swsh/swsh3/136")]
+    [TestCase("not a url")]
+    [TestCase("ftp://assets.tcgdex.net/en/swsh/swsh3/136")]
+    [TestCase("file:///en/swsh/swsh3/136")]
+    public void ImageUrl_WithABaseThatIsNotAnAbsoluteUrl_ReturnsNull(string baseUrl)
+    {
+        // The tolerance policy for API values (DECISIONS #27): what cannot be
+        // read becomes null rather than an exception from a URL helper.
+        ImageUrl.Build(baseUrl).ShouldBeNull();
+        ImageUrl.BuildAsset(baseUrl).ShouldBeNull();
+    }
 
     [Test]
     public void GetImageUrl_OnACardWithoutArtwork_ReturnsNull()
@@ -238,7 +255,8 @@ public sealed class PaginationAndImageTests
     {
         Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
-        card.GetImageUrl(ImageQuality.Low, ImageFormat.Webp).ShouldEndWith("/low.webp");
+        card.GetImageUrl(ImageQuality.Low, ImageFormat.Webp)
+            .ShouldBe(new Uri("https://assets.tcgdex.net/en/swsh/swsh3/136/low.webp"));
     }
 
     [Test]
@@ -248,8 +266,8 @@ public sealed class PaginationAndImageTests
 
         // Logos and symbols take no quality segment — `{base}.{format}`.
         // Applying the card pattern to them returns 404.
-        card.Set.GetLogoUrl().ShouldEndWith("/logo.png");
-        card.Set.GetSymbolUrl(ImageFormat.Webp).ShouldEndWith("/symbol.webp");
+        card.Set.GetLogoUrl().ShouldBe(new Uri("https://assets.tcgdex.net/en/swsh/swsh3/logo.png"));
+        card.Set.GetSymbolUrl(ImageFormat.Webp).ShouldBe(new Uri("https://assets.tcgdex.net/univ/swsh/swsh3/symbol.webp"));
     }
 
     [Test]
@@ -258,7 +276,7 @@ public sealed class PaginationAndImageTests
         IReadOnlyList<CardBrief> briefs = Fixture.Load<IReadOnlyList<CardBrief>>("list-cards-brief.json");
         CardBrief withImage = briefs.First(b => b.Image is not null);
 
-        withImage.GetImageUrl().ShouldEndWith("/high.png");
+        withImage.GetImageUrl().ShouldNotBeNull().AbsoluteUri.ShouldBe(withImage.Image + "/high.png");
     }
 
     [Test]
@@ -266,21 +284,21 @@ public sealed class PaginationAndImageTests
     {
         Should.Throw<ArgumentNullException>(() => ((Card)null!).GetImageUrl());
         Should.Throw<ArgumentNullException>(() => ((CardBrief)null!).GetImageUrl());
-        Should.Throw<ArgumentNullException>(() => ((SetBrief)null!).GetLogoUrl());
-        Should.Throw<ArgumentNullException>(() => ((SetBrief)null!).GetSymbolUrl());
-        Should.Throw<ArgumentNullException>(() => ((Set)null!).GetLogoUrl());
-        Should.Throw<ArgumentNullException>(() => ((Set)null!).GetSymbolUrl());
+        Should.Throw<ArgumentNullException>(() => ((CardSetBrief)null!).GetLogoUrl());
+        Should.Throw<ArgumentNullException>(() => ((CardSetBrief)null!).GetSymbolUrl());
+        Should.Throw<ArgumentNullException>(() => ((CardSet)null!).GetLogoUrl());
+        Should.Throw<ArgumentNullException>(() => ((CardSet)null!).GetSymbolUrl());
     }
 
     [Test]
     public void GetLogoAndSymbolUrls_WorkOnAFullSetToo()
     {
-        // Both Set and SetBrief carry logos, and a caller holding either should
+        // Both CardSet and CardSetBrief carry logos, and a caller holding either should
         // not have to know which overload they are on.
-        Set set = Fixture.Load<Set>("set-full.json");
+        CardSet set = Fixture.Load<CardSet>("set-full.json");
 
-        set.GetLogoUrl().ShouldEndWith("/logo.png");
-        set.GetSymbolUrl(ImageFormat.Webp).ShouldEndWith("/symbol.webp");
+        set.GetLogoUrl().ShouldBe(new Uri("https://assets.tcgdex.net/en/swsh/swsh3/logo.png"));
+        set.GetSymbolUrl(ImageFormat.Webp).ShouldBe(new Uri("https://assets.tcgdex.net/univ/swsh/swsh3/symbol.webp"));
     }
 
     [Test]
@@ -289,10 +307,10 @@ public sealed class PaginationAndImageTests
         // The distinction that matters: set assets are addressed differently
         // from card artwork.
         ImageUrl.BuildAsset("https://assets.tcgdex.net/en/swsh/swsh3/logo")
-            .ShouldBe("https://assets.tcgdex.net/en/swsh/swsh3/logo.png");
+            .ShouldBe(new Uri("https://assets.tcgdex.net/en/swsh/swsh3/logo.png"));
 
         ImageUrl.Build("https://assets.tcgdex.net/en/swsh/swsh3/136")
-            .ShouldBe("https://assets.tcgdex.net/en/swsh/swsh3/136/high.png");
+            .ShouldBe(new Uri("https://assets.tcgdex.net/en/swsh/swsh3/136/high.png"));
     }
 
     [TestCase(null)]

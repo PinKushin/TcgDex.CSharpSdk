@@ -73,7 +73,7 @@ Predicates are written in C# and translated to the API's filter syntax:
 ```csharp
 CardQuery query = new CardQuery()
     .Where(c => c.Name.Contains("Pikachu"))
-    .Where(c => c.Hp > 100)
+    .Where(c => c.HitPoints > 100)
     .OrderByDescending(c => c.Name)
     .Page(1, 50);
 
@@ -92,7 +92,7 @@ Supported translations, covering every operator the API has:
 |---|---|
 | `c.Name == "Furret"` | `name=eq:Furret` |
 | `c.Name != "Furret"` | `name=neq:Furret` |
-| `c.Hp > 100` / `>=` / `<` / `<=` | `hp=gt:100` / `gte:` / `lt:` / `lte:` |
+| `c.HitPoints > 100` / `>=` / `<` / `<=` | `hp=gt:100` / `gte:` / `lt:` / `lte:` |
 | `c.Name.Contains("pika")` | `name=pika` |
 | `c.Name.StartsWith("fu")` | `name=fu*` |
 | `c.Name.EndsWith("chu")` | `name=*chu` |
@@ -158,14 +158,14 @@ the same URL are collapsed into a single request. See
 ## What you can read
 
 ```csharp
-Card?  card  = await tcgdex.Cards.GetAsync("swsh3-136", ct);
-Set?   set   = await tcgdex.Sets.GetAsync("swsh3", ct);      // includes its cards
-Serie? serie = await tcgdex.Series.GetAsync("swsh", ct);     // includes its sets
-Card   lucky = await tcgdex.Random.CardAsync(ct);
+Card?    card   = await tcgdex.Cards.GetAsync("swsh3-136", ct);
+CardSet? set    = await tcgdex.Sets.GetAsync("swsh3", ct);      // includes its cards
+Series?  series = await tcgdex.Series.GetAsync("swsh", ct);     // includes its sets
+Card     lucky  = await tcgdex.Random.GetCardAsync(ct);
 
 // Distinct values, useful for building filters and pickers
-IReadOnlyList<string> rarities = await tcgdex.Catalog.RaritiesAsync(ct);
-IReadOnlyList<int>    hpValues = await tcgdex.Catalog.HitPointsAsync(ct);
+IReadOnlyList<string> rarities  = await tcgdex.Catalog.GetRaritiesAsync(ct);
+IReadOnlyList<int>    hitPoints = await tcgdex.Catalog.GetHitPointsAsync(ct);
 ```
 
 `Catalog` covers all thirteen enumeration endpoints: categories, rarities,
@@ -220,7 +220,7 @@ every push. See `TcgDex.CSharpSdk.AotSmokeTest`.
 
 ## Cards are modelled as the API returns them
 
-Fields are populated by category: Pokémon carry `Hp`, `Types`, `Attacks` and
+Fields are populated by category: Pokémon carry `HitPoints`, `Types`, `Attacks` and
 `Weaknesses`; Trainers carry `TrainerType` and `Effect`; Energy cards carry
 `EnergyType`. Anything category-specific is nullable because the API omits it
 entirely rather than sending null.
@@ -234,7 +234,7 @@ A few shapes are irregular and the SDK smooths them over:
   another. `Attack.BaseDamage` gives you the numeric part.
 - `WeaknessOrResistance.Value` is text — values include `"×2"` and `"-20"`.
 - TCGplayer prices are keyed by printing name, and the names vary per card, so
-  they are exposed as a dictionary: `card.Pricing?.Tcgplayer?["holofoil"]`.
+  they are exposed as a dictionary: `card.Pricing?.TcgPlayer?["holofoil"]`.
 
 ## Images
 
@@ -242,9 +242,9 @@ A few shapes are irregular and the SDK smooths them over:
 helpers build the right form for each:
 
 ```csharp
-string? art  = card.GetImageUrl(ImageQuality.High, ImageFormat.Png);
-string? logo = card.Set.GetLogoUrl();
-string? sym  = card.Set.GetSymbolUrl(ImageFormat.Webp);
+Uri? art  = card.GetImageUrl(ImageQuality.High, ImageFormat.Png);
+Uri? logo = card.Set.GetLogoUrl();
+Uri? sym  = card.Set.GetSymbolUrl(ImageFormat.Webp);
 ```
 
 They are separate methods because **card artwork takes a quality segment and set

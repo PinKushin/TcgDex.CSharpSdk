@@ -37,41 +37,41 @@ public sealed class ResourceCoverageTests
     [Test]
     public async Task Catalog_TextEndpoints_UseTheDocumentedPaths()
     {
-        (await UriForAsync((c, t) => c.Catalog.CategoriesAsync(t)))
+        (await UriForAsync((c, t) => c.Catalog.GetCategoriesAsync(t)))
             .ShouldEndWith("/en/categories");
-        (await UriForAsync((c, t) => c.Catalog.RaritiesAsync(t)))
+        (await UriForAsync((c, t) => c.Catalog.GetRaritiesAsync(t)))
             .ShouldEndWith("/en/rarities");
-        (await UriForAsync((c, t) => c.Catalog.TypesAsync(t)))
+        (await UriForAsync((c, t) => c.Catalog.GetTypesAsync(t)))
             .ShouldEndWith("/en/types");
-        (await UriForAsync((c, t) => c.Catalog.IllustratorsAsync(t)))
+        (await UriForAsync((c, t) => c.Catalog.GetIllustratorsAsync(t)))
             .ShouldEndWith("/en/illustrators");
-        (await UriForAsync((c, t) => c.Catalog.StagesAsync(t)))
+        (await UriForAsync((c, t) => c.Catalog.GetStagesAsync(t)))
             .ShouldEndWith("/en/stages");
-        (await UriForAsync((c, t) => c.Catalog.SuffixesAsync(t)))
+        (await UriForAsync((c, t) => c.Catalog.GetSuffixesAsync(t)))
             .ShouldEndWith("/en/suffixes");
-        (await UriForAsync((c, t) => c.Catalog.VariantsAsync(t)))
+        (await UriForAsync((c, t) => c.Catalog.GetVariantsAsync(t)))
             .ShouldEndWith("/en/variants");
     }
 
     [Test]
     public async Task Catalog_HyphenatedEndpoints_KeepTheirHyphens()
     {
-        (await UriForAsync((c, t) => c.Catalog.EnergyTypesAsync(t)))
+        (await UriForAsync((c, t) => c.Catalog.GetEnergyTypesAsync(t)))
             .ShouldEndWith("/en/energy-types");
-        (await UriForAsync((c, t) => c.Catalog.RegulationMarksAsync(t)))
+        (await UriForAsync((c, t) => c.Catalog.GetRegulationMarksAsync(t)))
             .ShouldEndWith("/en/regulation-marks");
-        (await UriForAsync((c, t) => c.Catalog.TrainerTypesAsync(t)))
+        (await UriForAsync((c, t) => c.Catalog.GetTrainerTypesAsync(t)))
             .ShouldEndWith("/en/trainer-types");
-        (await UriForAsync((c, t) => c.Catalog.DexIdsAsync(t), "list-retreats-int.json"))
+        (await UriForAsync((c, t) => c.Catalog.GetDexIdsAsync(t), "list-retreats-int.json"))
             .ShouldEndWith("/en/dex-ids");
     }
 
     [Test]
     public async Task Catalog_NumericEndpoints_UseTheDocumentedPaths()
     {
-        (await UriForAsync((c, t) => c.Catalog.HitPointsAsync(t), "list-retreats-int.json"))
+        (await UriForAsync((c, t) => c.Catalog.GetHitPointsAsync(t), "list-retreats-int.json"))
             .ShouldEndWith("/en/hp");
-        (await UriForAsync((c, t) => c.Catalog.RetreatCostsAsync(t), "list-retreats-int.json"))
+        (await UriForAsync((c, t) => c.Catalog.GetRetreatCostsAsync(t), "list-retreats-int.json"))
             .ShouldEndWith("/en/retreats");
     }
 
@@ -80,11 +80,11 @@ public sealed class ResourceCoverageTests
     {
         // `random/serie`, not `random/series` — the opposite of the list
         // endpoint, which is an easy inconsistency to get wrong.
-        (await UriForAsync((c, t) => c.Random.CardAsync(t), "card-pokemon-full.json"))
+        (await UriForAsync((c, t) => c.Random.GetCardAsync(t), "card-pokemon-full.json"))
             .ShouldEndWith("/en/random/card");
-        (await UriForAsync((c, t) => c.Random.SetAsync(t), "set-full.json"))
+        (await UriForAsync((c, t) => c.Random.GetSetAsync(t), "set-full.json"))
             .ShouldEndWith("/en/random/set");
-        (await UriForAsync((c, t) => c.Random.SerieAsync(t), "serie-full.json"))
+        (await UriForAsync((c, t) => c.Random.GetSeriesAsync(t), "serie-full.json"))
             .ShouldEndWith("/en/random/serie");
     }
 
@@ -128,14 +128,14 @@ public sealed class ResourceCoverageTests
     }
 
     [Test]
-    public void Options_GraphQlEndpoint_IsSeparateFromBaseAddress()
+    public void Options_GraphQLEndpoint_IsSeparateFromBaseAddress()
     {
         // GraphQL sits outside the language segment, so it is configured
         // independently rather than derived from BaseAddress.
         TcgDexOptions options = new();
 
-        options.GraphQlEndpoint.ToString().ShouldNotContain("/en/");
-        options.GraphQlEndpoint.ToString().ShouldEndWith("/graphql");
+        options.GraphQLEndpoint.ToString().ShouldNotContain("/en/");
+        options.GraphQLEndpoint.ToString().ShouldEndWith("/graphql");
     }
 
     [TestCase("line\nbreak", @"line\nbreak")]
@@ -161,7 +161,7 @@ public sealed class ResourceCoverageTests
 
     [Test]
     public void DetailedVariant_WithNullStamp_CoercesToEmpty()
-        => new DetailedVariant { Stamp = null! }.Stamp.ShouldBeEmpty();
+        => new DetailedVariant { Stamps = null! }.Stamps.ShouldBeEmpty();
 
     // ----- exception constructors -----
 

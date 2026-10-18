@@ -48,7 +48,7 @@ public sealed class ValueExpressionTests
 
     [Test]
     public void AnIListElement_IsRead()
-        => Query(c => c.Hp > Hps[1]).ShouldBe("hp=gt:110");
+        => Query(c => c.HitPoints > Hps[1]).ShouldBe("hp=gt:110");
 
     /// <summary>Declared as the interface, so the indexer is <c>IList`1.get_Item</c>.</summary>
     public static IList<int> Hps { get; } = [60, 110];
@@ -84,7 +84,7 @@ public sealed class ValueExpressionTests
     {
         string name = "Furret";
 
-        Query(c => c.Hp == name.Trim().Length).ShouldBe("hp=eq:6");
+        Query(c => c.HitPoints == name.Trim().Length).ShouldBe("hp=eq:6");
     }
 
     // ----- conversions -----
@@ -95,7 +95,7 @@ public sealed class ValueExpressionTests
         // C# truncates; dropping the cast would send `3.9`.
         double hp = 3.9;
 
-        Query(c => c.Hp > (int)hp).ShouldBe("hp=gt:3");
+        Query(c => c.HitPoints > (int)hp).ShouldBe("hp=gt:3");
     }
 
     [Test]
@@ -103,7 +103,7 @@ public sealed class ValueExpressionTests
     {
         short hp = 70;
 
-        Query(c => c.Hp >= hp).ShouldBe("hp=gte:70");
+        Query(c => c.HitPoints >= hp).ShouldBe("hp=gte:70");
     }
 
     // ----- what stays unsupported names the node -----
@@ -187,8 +187,8 @@ public sealed class ValueExpressionTests
         // operator's answer for a value the caller never had.
         Level? none = null;
 
-        Outcome(() => Query(c => c.Hp == (int?)none))
-            .ShouldBe(Outcome(() => Query(c => c.Hp == (int?)null)));
+        Outcome(() => Query(c => c.HitPoints == (int?)none))
+            .ShouldBe(Outcome(() => Query(c => c.HitPoints == (int?)null)));
     }
 
     [Test]
@@ -207,7 +207,7 @@ public sealed class ValueExpressionTests
     {
         int value = 300;
 
-        NotSupportedException exception = Should.Throw<NotSupportedException>(() => Query(c => c.Hp > (byte)value));
+        NotSupportedException exception = Should.Throw<NotSupportedException>(() => Query(c => c.HitPoints > (byte)value));
         exception.Message.ShouldContain("Convert(");
         exception.InnerException.ShouldBeOfType<OverflowException>();
     }
@@ -217,7 +217,7 @@ public sealed class ValueExpressionTests
     {
         long value = 5_000_000_000L;
 
-        NotSupportedException exception = Should.Throw<NotSupportedException>(() => Query(c => c.Hp > (int)value));
+        NotSupportedException exception = Should.Throw<NotSupportedException>(() => Query(c => c.HitPoints > (int)value));
         exception.Message.ShouldContain("Convert(");
         exception.InnerException.ShouldBeOfType<OverflowException>();
     }
@@ -227,7 +227,7 @@ public sealed class ValueExpressionTests
     {
         double value = double.NaN;
 
-        NotSupportedException exception = Should.Throw<NotSupportedException>(() => Query(c => c.Hp > (int)value));
+        NotSupportedException exception = Should.Throw<NotSupportedException>(() => Query(c => c.HitPoints > (int)value));
         exception.Message.ShouldContain("Convert(");
         exception.InnerException.ShouldBeOfType<OverflowException>();
     }

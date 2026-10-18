@@ -33,6 +33,44 @@ public sealed class SerializationTests
     }
 
     [Test]
+    public void RenamedProperties_AreWrittenUnderTheApiKeys()
+    {
+        // Reading is case-insensitive, so a round trip passes even when a
+        // spelled-out property writes its .NET name. Only the written key shows
+        // whether the [JsonPropertyName] mapping is there.
+        string card = Serialize(Fixture.Load<Card>("card-pokemon-full.json"));
+        string set = Serialize(Fixture.Load<CardSet>("set-full.json"));
+        string problem = Serialize(Fixture.Load<TcgDexProblem>("error-bad-language.json"));
+
+        foreach (string key in new[] { "hp", "idProduct", "avg", "avg1", "avg7", "avg30", "dexId", "retreat", "evolveFrom", "legal" })
+        {
+            card.ShouldContain($"\"{key}\":", Case.Sensitive);
+        }
+
+        set.ShouldContain("\"serie\":", Case.Sensitive);
+        set.ShouldContain("\"firstEd\":", Case.Sensitive);
+        set.ShouldContain("\"legal\":", Case.Sensitive);
+        problem.ShouldContain("\"lang\":", Case.Sensitive);
+    }
+
+    [Test]
+    public void Pricing_IsWrittenUnderTheApiKeys()
+        // Alone, not inside a card: a card's thirdParty also has a
+        // "tcgplayer" key, which would satisfy a search through the whole card.
+        => Serialize(new Pricing { TcgPlayer = new TcgPlayerPricing() })
+            .ShouldBe("""{"tcgplayer":{}}""");
+
+    [Test]
+    public void DetailedVariant_StampsAreWrittenUnderTheApiKey()
+        => Serialize(new DetailedVariant { Stamps = ["set-logo"] })
+            .ShouldBe("""{"stamp":["set-logo"]}""");
+
+    [Test]
+    public void ThirdParty_IsWrittenUnderTheApiKeys()
+        => Serialize(new ThirdParty { TcgPlayer = 1, CardTrader = 2 })
+            .ShouldBe("""{"tcgplayer":1,"cardtrader":2}""");
+
+    [Test]
     public void Card_RoundTrips()
     {
         Card original = Fixture.Load<Card>("card-pokemon-full.json");
@@ -41,10 +79,37 @@ public sealed class SerializationTests
 
         restored.Id.ShouldBe(original.Id);
         restored.Name.ShouldBe(original.Name);
-        restored.Hp.ShouldBe(original.Hp);
+        restored.HitPoints.ShouldBe(original.HitPoints);
         restored.Types.ShouldBe(original.Types);
         restored.Set.Id.ShouldBe(original.Set.Id);
         restored.Attacks.Count.ShouldBe(original.Attacks.Count);
+    }
+
+    [Test]
+    public void Card_WithNoUpdated_OmitsItThroughTheSdkContext()
+    {
+        // The context ignores nulls when writing, so the key is absent. Checked
+        // at the card's own `updated`, not the ones inside its pricing blocks.
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
+        card.Updated.ShouldNotBeNull("the control: the fixture has a timestamp to remove");
+
+        using JsonDocument written = JsonDocument.Parse(Serialize(card with { Updated = null }));
+
+        written.RootElement.TryGetProperty("updated", out _).ShouldBeFalse();
+    }
+
+    [Test]
+    public void Card_WithNoUpdated_WritesNullThroughReflectionSerialization()
+    {
+        // Reflection-based JsonSerializer (DECISIONS #28) writes nulls, and here
+        // the converter's own null handling decides the output: its Write
+        // unwraps with GetValueOrDefault, which for a null would be 0001-01-01.
+        // It relies on System.Text.Json writing the null itself.
+        Card card = Fixture.Load<Card>("card-pokemon-full.json") with { Updated = null };
+
+        using JsonDocument written = JsonDocument.Parse(JsonSerializer.Serialize(card));
+
+        written.RootElement.GetProperty("Updated").ValueKind.ShouldBe(JsonValueKind.Null);
     }
 
     [Test]
@@ -102,10 +167,10 @@ public sealed class SerializationTests
         // TcgPlayerPricingConverter.Write: printing names are data, so they must
         // survive being written back out.
         Card original = Fixture.Load<Card>("card-pokemon-full.json");
-        TcgPlayerPricing pricing = original.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+        TcgPlayerPricing pricing = original.Pricing.ShouldNotBeNull().TcgPlayer.ShouldNotBeNull();
 
         TcgPlayerPricing restored = Deserialize<Card>(Serialize(original))
-            .Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+            .Pricing.ShouldNotBeNull().TcgPlayer.ShouldNotBeNull();
 
         restored.Unit.ShouldBe(pricing.Unit);
         restored.Printings.Keys.ShouldBe(pricing.Printings.Keys, ignoreOrder: true);
@@ -144,16 +209,16 @@ public sealed class SerializationTests
     {
         Pricing pricing = Deserialize<Pricing>("""{"tcgplayer":null,"cardmarket":null}""");
 
-        pricing.Tcgplayer.ShouldBeNull();
+        pricing.TcgPlayer.ShouldBeNull();
         pricing.Cardmarket.ShouldBeNull();
     }
 
     [Test]
     public void Set_RoundTrips()
     {
-        Set original = Fixture.Load<Set>("set-full.json");
+        CardSet original = Fixture.Load<CardSet>("set-full.json");
 
-        Set restored = Deserialize<Set>(Serialize(original));
+        CardSet restored = Deserialize<CardSet>(Serialize(original));
 
         restored.Id.ShouldBe(original.Id);
         restored.Cards.Count.ShouldBe(original.Cards.Count);
@@ -163,9 +228,9 @@ public sealed class SerializationTests
     [Test]
     public void Serie_RoundTrips()
     {
-        Serie original = Fixture.Load<Serie>("serie-full.json");
+        Series original = Fixture.Load<Series>("serie-full.json");
 
-        Serie restored = Deserialize<Serie>(Serialize(original));
+        Series restored = Deserialize<Series>(Serialize(original));
 
         restored.Id.ShouldBe(original.Id);
         restored.Sets.Count.ShouldBe(original.Sets.Count);

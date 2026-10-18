@@ -119,7 +119,7 @@ public sealed class TranslatorEdgeTests
     {
         // A comma decimal separator from a local culture would produce a filter
         // the API cannot parse.
-        Query().Where(c => c.Hp > 1000).ToQueryString().ShouldBe("hp=gt:1000");
+        Query().Where(c => c.HitPoints > 1000).ToQueryString().ShouldBe("hp=gt:1000");
     }
 
     // ----- unsupported node shapes -----
@@ -141,7 +141,7 @@ public sealed class TranslatorEdgeTests
     [Test]
     public void ConditionalExpression_IsRejected()
         => Should.Throw<NotSupportedException>(
-            () => Query().Where(c => (c.Hp > 100 ? "big" : "small") == "big"));
+            () => Query().Where(c => (c.HitPoints > 100 ? "big" : "small") == "big"));
 
     [Test]
     public void NegatedUnsupportedOperand_IsRejected()
@@ -179,7 +179,7 @@ public sealed class TranslatorEdgeTests
 
     [Test]
     public void TcgPlayerPricing_WhenExplicitlyNull_ReadsAsNull()
-        => Deserialize<Pricing>("""{"tcgplayer":null}""").Tcgplayer.ShouldBeNull();
+        => Deserialize<Pricing>("""{"tcgplayer":null}""").TcgPlayer.ShouldBeNull();
 
     [Test]
     public void TcgPlayerPricing_WithMalformedContents_ThrowsJsonException()

@@ -97,35 +97,35 @@ public interface ICardResource
 /// <summary>
 /// Reads sets.
 /// </summary>
-public interface ISetResource
+public interface ICardSetResource
 {
     /// <summary>Fetches a single set, including its card list.</summary>
     /// <param name="id">The set id, for example <c>"swsh3"</c>.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The set, or <see langword="null"/> if no set has that id.</returns>
-    Task<Set?> GetAsync(string id, CancellationToken cancellationToken = default);
+    Task<CardSet?> GetAsync(string id, CancellationToken cancellationToken = default);
 
     /// <summary>Lists every set in brief form.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every set, as briefs.</returns>
-    Task<IReadOnlyList<SetBrief>> ListAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CardSetBrief>> ListAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
 /// Reads series.
 /// </summary>
-public interface ISerieResource
+public interface ISeriesResource
 {
     /// <summary>Fetches a single series, including its sets.</summary>
     /// <param name="id">The series id, for example <c>"swsh"</c>.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The series, or <see langword="null"/> if none has that id.</returns>
-    Task<Serie?> GetAsync(string id, CancellationToken cancellationToken = default);
+    Task<Series?> GetAsync(string id, CancellationToken cancellationToken = default);
 
     /// <summary>Lists every series in brief form.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every series, as briefs.</returns>
-    Task<IReadOnlyList<SerieBrief>> ListAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SeriesBrief>> ListAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -136,17 +136,17 @@ public interface IRandomResource
     /// <summary>Fetches a random card.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>A randomly chosen card.</returns>
-    Task<Card> CardAsync(CancellationToken cancellationToken = default);
+    Task<Card> GetCardAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Fetches a random set.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>A randomly chosen set.</returns>
-    Task<Set> SetAsync(CancellationToken cancellationToken = default);
+    Task<CardSet> GetSetAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Fetches a random series.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>A randomly chosen series.</returns>
-    Task<Serie> SerieAsync(CancellationToken cancellationToken = default);
+    Task<Series> GetSeriesAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -154,73 +154,73 @@ public interface IRandomResource
 /// </summary>
 /// <remarks>
 /// Useful for building valid filters and for populating pickers. Note that
-/// <see cref="HitPointsAsync"/>, <see cref="RetreatCostsAsync"/> and
-/// <see cref="DexIdsAsync"/> return numbers where the rest return text.
+/// <see cref="GetHitPointsAsync"/>, <see cref="GetRetreatCostsAsync"/> and
+/// <see cref="GetDexIdsAsync"/> return numbers where the rest return text.
 /// </remarks>
 public interface ICatalogResource
 {
     /// <summary>The card categories: Pokemon, Trainer, Energy.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every category value in use.</returns>
-    Task<IReadOnlyList<string>> CategoriesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetCategoriesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every rarity in use.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every rarity value in use.</returns>
-    Task<IReadOnlyList<string>> RaritiesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetRaritiesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every elemental energy type.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every type value in use.</returns>
-    Task<IReadOnlyList<string>> TypesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetTypesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every illustrator credited on a card.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every illustrator name in use.</returns>
-    Task<IReadOnlyList<string>> IllustratorsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetIllustratorsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every evolution stage.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every stage value in use.</returns>
-    Task<IReadOnlyList<string>> StagesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetStagesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every card-name suffix, such as EX or VMAX.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every suffix value in use.</returns>
-    Task<IReadOnlyList<string>> SuffixesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetSuffixesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every printing variant name.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every variant name in use.</returns>
-    Task<IReadOnlyList<string>> VariantsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetVariantsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>The energy categories: Normal and Special.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every energy type value in use.</returns>
-    Task<IReadOnlyList<string>> EnergyTypesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetEnergyTypesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every regulation mark.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every regulation mark in use.</returns>
-    Task<IReadOnlyList<string>> RegulationMarksAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetRegulationMarksAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every Trainer subtype.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every trainer type value in use.</returns>
-    Task<IReadOnlyList<string>> TrainerTypesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetTrainerTypesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every hit-point value in use.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every HP value in use.</returns>
-    Task<IReadOnlyList<int>> HitPointsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<int>> GetHitPointsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every retreat cost in use.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every retreat cost in use.</returns>
-    Task<IReadOnlyList<int>> RetreatCostsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<int>> GetRetreatCostsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every National Pokédex number represented.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every dex id in use.</returns>
-    Task<IReadOnlyList<int>> DexIdsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<int>> GetDexIdsAsync(CancellationToken cancellationToken = default);
 }

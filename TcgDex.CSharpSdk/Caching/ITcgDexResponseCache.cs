@@ -7,8 +7,15 @@ namespace TcgDex.Caching;
 /// The body is stored as bytes rather than as a deserialized model, so one
 /// cached entry serves every caller regardless of the type they deserialize
 /// into, and nothing mutable is ever shared between them.
+/// <para>
+/// A class with reference equality, not a record (DECISIONS #26). Record
+/// equality compares <see cref="Body"/> by reference, so two entries with the
+/// same bytes compared equal or not depending on how the array was allocated.
+/// Comparing the bytes instead would cost a pass over every body and a hash
+/// that changes if the array is written to. No caller compares entries.
+/// </para>
 /// </remarks>
-public sealed record CachedResponse
+public sealed class CachedResponse
 {
     /// <summary>The raw response body.</summary>
     // CA1819: byte[] is the natural round-trip contract for a cache body that

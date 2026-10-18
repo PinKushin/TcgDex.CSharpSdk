@@ -232,7 +232,7 @@ internal static class Program
     {
         string actual = new CardQuery()
             .Where(c => c.Name == "Furret")
-            .Where(c => c.Hp > 100)
+            .Where(c => c.HitPoints > 100)
             .OrderByDescending(c => c.Name)
             .Page(2, 50)
             .ToQueryString();
@@ -251,7 +251,7 @@ internal static class Program
         // closure field reflectively instead.
         int minimumHp = 250;
 
-        string actual = new CardQuery().Where(c => c.Hp > minimumHp).ToQueryString();
+        string actual = new CardQuery().Where(c => c.HitPoints > minimumHp).ToQueryString();
 
         return actual == "hp=gt:250" ? null : $"got '{actual}'";
     }

@@ -119,6 +119,40 @@ public static class TcgDexServiceCollectionExtensions
     }
 
     /// <summary>
+    /// Rejects cache options the default cache cannot be built from, or that
+    /// make no sense as a freshness window.
+    /// </summary>
+    /// <remarks>
+    /// Zero is a legal time-to-live (always revalidate); a negative one is not.
+    /// </remarks>
+    private sealed class TcgDexCacheOptionsValidator : IValidateOptions<TcgDexCacheOptions>
+    {
+        public ValidateOptionsResult Validate(string? name, TcgDexCacheOptions options)
+        {
+            List<string> failures = [];
+
+            if (options.MaxEntries < 1)
+            {
+                failures.Add($"{nameof(TcgDexCacheOptions.MaxEntries)} must be at least 1, but was {options.MaxEntries}.");
+            }
+
+            AddIfNegative(failures, nameof(TcgDexCacheOptions.DefaultTimeToLive), options.DefaultTimeToLive);
+            AddIfNegative(failures, nameof(TcgDexCacheOptions.CatalogTimeToLive), options.CatalogTimeToLive);
+            AddIfNegative(failures, nameof(TcgDexCacheOptions.PricingTimeToLive), options.PricingTimeToLive);
+
+            return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
+        }
+
+        private static void AddIfNegative(List<string> failures, string property, TimeSpan value)
+        {
+            if (value < TimeSpan.Zero)
+            {
+                failures.Add($"{property} must not be negative, but was {value}.");
+            }
+        }
+    }
+
+    /// <summary>
     /// Registers the typed client itself, with no handlers attached.
     /// </summary>
     private static IHttpClientBuilder RegisterClient(IServiceCollection services)
@@ -197,12 +231,18 @@ public static class TcgDexServiceCollectionExtensions
         Guard.NotNull(services);
         EnsureFirstRegistration(services);
 
-        TcgDexCacheOptions cacheOptions = new();
-        configureCache?.Invoke(cacheOptions);
-
-        services.TryAddSingleton(cacheOptions);
+        // The options pattern, as for TcgDexOptions: configureCache is one
+        // Configure among any others (appsettings, Configure<TcgDexCacheOptions>),
+        // merged when first resolved and validated at start. A TcgDexCacheOptions
+        // registered before this call, such as a subclass overriding
+        // GetTimeToLive, still wins, and is the caller's to keep valid.
+        services.AddOptions<TcgDexCacheOptions>()
+            .Configure(configureCache ?? (static _ => { }))
+            .ValidateOnStart();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<TcgDexCacheOptions>, TcgDexCacheOptionsValidator>());
+        services.TryAddSingleton(provider => provider.GetRequiredService<IOptions<TcgDexCacheOptions>>().Value);
         services.TryAddSingleton<ITcgDexResponseCache>(
-            _ => new MemoryTcgDexResponseCache(cacheOptions.MaxEntries));
+            provider => new MemoryTcgDexResponseCache(provider.GetRequiredService<TcgDexCacheOptions>().MaxEntries));
 
         // IHttpClientFactory rebuilds handlers every handler lifetime, so the
         // counters and the in-flight table live in a singleton the handlers

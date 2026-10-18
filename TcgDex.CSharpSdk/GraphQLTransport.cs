@@ -39,7 +39,7 @@ using TcgDex.Serialization;
 /// one call per card — 13 round trips versus 1 for a search returning 12 cards.
 /// </para>
 /// </remarks>
-internal sealed class GraphQlTransport(
+internal sealed class GraphQLTransport(
     HttpClient httpClient,
     TcgDexOptions options,
     ILogger? logger = null)
@@ -68,7 +68,7 @@ internal sealed class GraphQlTransport(
     // Copied out at construction, like TcgDexTransport: options are read once,
     // when the client is built (see TcgDexOptions). Holding the object and
     // reading it per request let a later mutation change GraphQL and not REST.
-    private readonly Uri _endpoint = (options ?? throw new ArgumentNullException(nameof(options))).GraphQlEndpoint;
+    private readonly Uri _endpoint = (options ?? throw new ArgumentNullException(nameof(options))).GraphQLEndpoint;
 
     private readonly TimeSpan _timeout = options.Timeout;
 
@@ -99,7 +99,7 @@ internal sealed class GraphQlTransport(
         Guard.NotLessThan(itemsPerPage, 1);
 
         string query = BuildQuery(filter, page, itemsPerPage);
-        GraphQlCardsResponse response = await PostAsync(query, cancellationToken).ConfigureAwait(false);
+        GraphQLCardsResponse response = await PostAsync(query, cancellationToken).ConfigureAwait(false);
 
         // GraphQL answers 200 even when the query failed, so the errors array is
         // the only reliable failure signal.
@@ -107,11 +107,11 @@ internal sealed class GraphQlTransport(
         {
             string messages = string.Join("; ", response.Errors.Select(e => e.Message));
 
-            _logger.GraphQlErrors(messages);
+            _logger.GraphQLErrors(messages);
 
             throw new TcgDexApiException(
                 $"The TCGdex GraphQL endpoint reported errors: {messages}",
-                TcgDexErrorKind.GraphQlError,
+                TcgDexErrorKind.GraphQLError,
                 _endpoint,
                 HttpStatusCode.OK);
         }
@@ -133,10 +133,10 @@ internal sealed class GraphQlTransport(
         int dropped = cards.Count - resolved.Length;
         if (dropped > 0)
         {
-            _logger.GraphQlDroppedEntries(dropped);
+            _logger.GraphQLDroppedEntries(dropped);
         }
 
-        _logger.GraphQlSearchCompleted(resolved.Length);
+        _logger.GraphQLSearchCompleted(resolved.Length);
 
         return resolved;
     }
@@ -144,7 +144,7 @@ internal sealed class GraphQlTransport(
     private static string BuildQuery(CardFilter filter, int? page, int? itemsPerPage)
     {
         StringBuilder arguments = new();
-        string filterArguments = filter.ToGraphQlArguments();
+        string filterArguments = filter.ToGraphQLArguments();
 
         if (filterArguments.Length > 0)
         {
@@ -183,7 +183,7 @@ internal sealed class GraphQlTransport(
         return $"{{ cards{argumentList} {{ {CardSelection} }} }}";
     }
 
-    private async Task<GraphQlCardsResponse> PostAsync(string query, CancellationToken cancellationToken)
+    private async Task<GraphQLCardsResponse> PostAsync(string query, CancellationToken cancellationToken)
     {
         // The same ceiling the REST path has had all along. Without it this
         // path inherited HttpClient's 100-second default — the value
@@ -226,13 +226,13 @@ internal sealed class GraphQlTransport(
     }
 
     /// <summary>The body of <see cref="PostAsync"/> that runs under the budget.</summary>
-    private async Task<GraphQlCardsResponse> PostUnderBudgetAsync(string query, CancellationToken deadline)
+    private async Task<GraphQLCardsResponse> PostUnderBudgetAsync(string query, CancellationToken deadline)
     {
         try
         {
             using JsonContent content = JsonContent.Create(
-                new GraphQlRequest(query),
-                GraphQlJsonContext.Default.GraphQlRequest);
+                new GraphQLRequest(query),
+                GraphQLJsonContext.Default.GraphQLRequest);
 
             using HttpRequestMessage httpRequest =
                 new(HttpMethod.Post, _endpoint) { Content = content };
@@ -269,7 +269,7 @@ internal sealed class GraphQlTransport(
 
             return JsonSerializer.Deserialize(
                     new ReadOnlySpan<byte>(body.Array, body.Offset, body.Count),
-                    GraphQlJsonContext.Default.GraphQlCardsResponse)
+                    GraphQLJsonContext.Default.GraphQLCardsResponse)
                 ?? throw new TcgDexApiException(
                     "The GraphQL endpoint returned an empty response.",
                     TcgDexErrorKind.InvalidResponse,

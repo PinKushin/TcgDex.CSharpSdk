@@ -174,7 +174,7 @@ public class QueryComparisonBenchmarks
     public string BuildQuery_Mine()
         => new CardQuery()
             .Where(c => c.Name.Contains("Pikachu"))
-            .Where(c => c.Hp > 100)
+            .Where(c => c.HitPoints > 100)
             .OrderByDescending(c => c.Name)
             .Page(2, 50)
             .ToQueryString();

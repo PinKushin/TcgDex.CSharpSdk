@@ -6,9 +6,10 @@ namespace TcgDex.Querying;
 /// <remarks>
 /// This is the complete set, verified against the live service. There is no
 /// operator for anything else, which is why predicates that do not map onto one
-/// of these are rejected rather than approximated.
+/// of these are rejected rather than approximated. Internal: no public member
+/// takes or returns one, so as public API it was only a name to keep stable.
 /// </remarks>
-public enum QueryOperator
+internal enum QueryOperator
 {
     /// <summary>Loose substring match — the API's default when no prefix is given.</summary>
     Like,

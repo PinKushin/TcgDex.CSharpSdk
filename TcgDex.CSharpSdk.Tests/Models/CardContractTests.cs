@@ -26,13 +26,13 @@ public sealed class CardContractTests
         card.LocalId.ShouldBe("136");
         card.Illustrator.ShouldBe("tetsuya koizumi");
         card.Rarity.ShouldBe("Uncommon");
-        card.Hp.ShouldBe(110);
-        card.Retreat.ShouldBe(1);
+        card.HitPoints.ShouldBe(110);
+        card.RetreatCost.ShouldBe(1);
         card.Stage.ShouldBe("Stage1");
-        card.EvolveFrom.ShouldBe("Sentret");
+        card.EvolvesFrom.ShouldBe("Sentret");
         card.RegulationMark.ShouldBe("D");
         card.Types.ShouldBe(["Colorless"]);
-        card.DexId.ShouldContain(162);
+        card.DexIds.ShouldContain(162);
     }
 
     [Test]
@@ -79,9 +79,9 @@ public sealed class CardContractTests
     {
         Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
-        card.Legal.ShouldNotBeNull();
-        card.Legal.Standard.ShouldBeFalse();
-        card.Legal.Expanded.ShouldBeTrue();
+        card.Legality.ShouldNotBeNull();
+        card.Legality.Standard.ShouldBeFalse();
+        card.Legality.Expanded.ShouldBeTrue();
     }
 
     // ----- the polymorphic damage field -----
@@ -131,7 +131,7 @@ public sealed class CardContractTests
         card.IsCategory("trainer").ShouldBeTrue("category comparison ignores case");
 
         // Pokémon-only fields are absent rather than defaulted.
-        card.Hp.ShouldBeNull();
+        card.HitPoints.ShouldBeNull();
         card.Attacks.ShouldBeEmpty();
         card.Types.ShouldBeEmpty();
     }
@@ -234,7 +234,7 @@ public sealed class CardContractTests
         trainer.Weaknesses.ShouldBeEmpty();
         trainer.Resistances.ShouldBeEmpty();
         trainer.Types.ShouldBeEmpty();
-        trainer.DexId.ShouldNotBeNull();
+        trainer.DexIds.ShouldNotBeNull();
         trainer.Boosters.ShouldNotBeNull();
     }
 
@@ -248,7 +248,7 @@ public sealed class CardContractTests
             Name = "Test",
             Category = CardCategories.Trainer,
             LocalId = "1",
-            Set = new SetBrief { Id = "x", Name = "Test Set" },
+            Set = new CardSetBrief { Id = "x", Name = "Test Set" },
             Attacks = null!,
             Types = null!,
         };

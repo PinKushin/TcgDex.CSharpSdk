@@ -406,7 +406,7 @@ public sealed class ResponseLimitTests
     }
 
     [Test]
-    public void GraphQl_ResponseOverTheLimit_Throws()
+    public void GraphQL_ResponseOverTheLimit_Throws()
     {
         // The GraphQL transport reads bodies too, and an unbounded read there
         // would leave the limit half-applied.
@@ -421,7 +421,7 @@ public sealed class ResponseLimitTests
     }
 
     [Test]
-    public async Task GraphQl_StopsReadingAtTheLimit_RatherThanBufferingFirst()
+    public async Task GraphQL_StopsReadingAtTheLimit_RatherThanBufferingFirst()
     {
         // The test above cannot see this defect: it throws either way. What it
         // could not distinguish is WHEN the memory is spent.

@@ -20,10 +20,10 @@ public interface ITcgDexClient
     ICardResource Cards { get; }
 
     /// <summary>Set lookups.</summary>
-    ISetResource Sets { get; }
+    ICardSetResource Sets { get; }
 
     /// <summary>Series lookups.</summary>
-    ISerieResource Series { get; }
+    ISeriesResource Series { get; }
 
     /// <summary>Random card, set and series.</summary>
     IRandomResource Random { get; }
@@ -129,13 +129,13 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         ILogger logger = loggerFactory?.CreateLogger(TcgDexLog.Category) ?? NullLogger.Instance;
 
         TcgDexTransport transport = new(httpClient, resolved, logger, sharedDeserialized);
-        GraphQlTransport graphQl = new(httpClient, resolved, logger);
+        GraphQLTransport graphQL = new(httpClient, resolved, logger);
 
         logger.ClientConfigured(resolved.Language, resolved.BaseAddress);
 
-        Cards = new CardResource(transport, graphQl);
-        Sets = new SetResource(transport);
-        Series = new SerieResource(transport);
+        Cards = new CardResource(transport, graphQL);
+        Sets = new CardSetResource(transport);
+        Series = new SeriesResource(transport);
         Random = new RandomResource(transport);
         Catalog = new CatalogResource(transport);
     }
@@ -149,10 +149,10 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
     public ICardResource Cards { get; }
 
     /// <inheritdoc />
-    public ISetResource Sets { get; }
+    public ICardSetResource Sets { get; }
 
     /// <inheritdoc />
-    public ISerieResource Series { get; }
+    public ISeriesResource Series { get; }
 
     /// <inheritdoc />
     public IRandomResource Random { get; }

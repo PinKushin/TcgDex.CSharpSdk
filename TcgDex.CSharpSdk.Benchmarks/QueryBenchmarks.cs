@@ -32,7 +32,7 @@ public class QueryBenchmarks
 
     [Benchmark]
     public string ComparisonFilter()
-        => new CardQuery().Where(c => c.Hp > MinimumHp).ToQueryString();
+        => new CardQuery().Where(c => c.HitPoints > MinimumHp).ToQueryString();
 
     /// <summary>A captured local, which is the case that would tempt a compile.</summary>
     [Benchmark]
@@ -40,7 +40,7 @@ public class QueryBenchmarks
     {
         int minimum = MinimumHp;
 
-        return new CardQuery().Where(c => c.Hp > minimum).ToQueryString();
+        return new CardQuery().Where(c => c.HitPoints > minimum).ToQueryString();
     }
 
     /// <summary>Closer to what a real search screen builds.</summary>
@@ -48,7 +48,7 @@ public class QueryBenchmarks
     public string MultipleFiltersWithSortAndPaging()
         => new CardQuery()
             .Where(c => c.Name.Contains("Pikachu"))
-            .Where(c => c.Hp > MinimumHp)
+            .Where(c => c.HitPoints > MinimumHp)
             .Where(c => c.Rarity == "Rare")
             .OrderByDescending(c => c.Name)
             .Page(2, 50)

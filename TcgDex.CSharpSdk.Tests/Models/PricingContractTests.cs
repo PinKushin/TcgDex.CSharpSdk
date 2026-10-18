@@ -18,15 +18,22 @@ public sealed class PricingContractTests
         CardmarketPricing cardmarket = card.Pricing.ShouldNotBeNull().Cardmarket.ShouldNotBeNull();
 
         cardmarket.Unit.ShouldBe("EUR");
-        cardmarket.IdProduct.ShouldBe(483559);
-        cardmarket.Avg.ShouldBe(0.08m);
+        cardmarket.ProductId.ShouldBe(483559);
+        cardmarket.Average.ShouldBe(0.08m);
         cardmarket.Low.ShouldBe(0.02m);
+
+        // Spelled out in .NET, abbreviated on the wire (`avg1`, `avg7`, `avg30`).
+        cardmarket.Average1Day.ShouldBe(0.22m);
+        cardmarket.Average7Days.ShouldBe(0.1m);
+        cardmarket.Average30Days.ShouldBe(0.08m);
+        cardmarket.Average1DayHolo.ShouldBe(0.24m);
+        cardmarket.Average7DaysHolo.ShouldBe(0.27m);
 
         // These map to `avg-holo` / `low-holo`, which do not round-trip without
         // explicit name mapping.
-        cardmarket.AvgHolo.ShouldBe(0.26m);
+        cardmarket.AverageHolo.ShouldBe(0.26m);
         cardmarket.LowHolo.ShouldBe(0.04m);
-        cardmarket.Avg30Holo.ShouldBe(0.3m);
+        cardmarket.Average30DaysHolo.ShouldBe(0.3m);
     }
 
     [Test]
@@ -34,7 +41,7 @@ public sealed class PricingContractTests
     {
         Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
-        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().TcgPlayer.ShouldNotBeNull();
 
         tcgplayer.Unit.ShouldBe("USD");
         tcgplayer.Printings.Keys.ShouldBe(["normal", "reverse-holofoil"], ignoreOrder: true);
@@ -53,7 +60,7 @@ public sealed class PricingContractTests
         // than `normal` — fixed properties would silently drop it.
         Card card = Fixture.Load<Card>("card-pricing-holofoil.json");
 
-        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().TcgPlayer.ShouldNotBeNull();
 
         tcgplayer.Printings.Keys.ShouldContain("holofoil");
         tcgplayer["holofoil"].ShouldNotBeNull().MarketPrice.ShouldNotBeNull();
@@ -63,7 +70,7 @@ public sealed class PricingContractTests
     public void Indexer_ForUnknownPrinting_ReturnsNull()
     {
         Card card = Fixture.Load<Card>("card-pokemon-full.json");
-        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().TcgPlayer.ShouldNotBeNull();
 
         tcgplayer["a-printing-that-does-not-exist"].ShouldBeNull();
     }
@@ -76,11 +83,11 @@ public sealed class PricingContractTests
         // Counted and named. "Not empty" would have been satisfied by one
         // entry with every field null, which is exactly what a broken
         // snake_case mapping produces — the array binds, the contents do not.
-        card.VariantsDetailed.Count.ShouldBe(
+        card.DetailedVariants.Count.ShouldBe(
             2,
             "swsh3-136 is printed in a normal and a reverse variant");
 
-        DetailedVariant first = card.VariantsDetailed[0];
+        DetailedVariant first = card.DetailedVariants[0];
         first.Type.ShouldBe("normal");
         first.Size.ShouldBe("standard");
         first.VariantId.ShouldBe("endfynwn4n10gzq", "variantId is REST-only and must not be dropped");
@@ -116,13 +123,13 @@ public sealed class PricingContractTests
         card.ThirdParty.ShouldBeNull(
             "this card's ids live on each printing, not the card root");
 
-        ThirdParty normal = card.VariantsDetailed[0].ThirdParty.ShouldNotBeNull();
+        ThirdParty normal = card.DetailedVariants[0].ThirdParty.ShouldNotBeNull();
         normal.Cardmarket.ShouldBe(483559);
-        normal.Tcgplayer.ShouldBe(219333);
+        normal.TcgPlayer.ShouldBe(219333);
 
-        ThirdParty reverse = card.VariantsDetailed[1].ThirdParty.ShouldNotBeNull();
+        ThirdParty reverse = card.DetailedVariants[1].ThirdParty.ShouldNotBeNull();
         reverse.Cardmarket.ShouldBe(483559);
-        reverse.Tcgplayer.ShouldBe(219333);
+        reverse.TcgPlayer.ShouldBe(219333);
     }
 
     [Test]
@@ -135,10 +142,10 @@ public sealed class PricingContractTests
 
         ThirdParty ids = card.ThirdParty.ShouldNotBeNull();
         ids.Cardmarket.ShouldBe(427231);
-        ids.Tcgplayer.ShouldBe(206047);
-        ids.Cardtrader.ShouldBeNull("not every card lists on Cardtrader");
+        ids.TcgPlayer.ShouldBe(206047);
+        ids.CardTrader.ShouldBeNull("not every card lists on Cardtrader");
 
-        card.VariantsDetailed[0].ThirdParty.ShouldBeNull(
+        card.DetailedVariants[0].ThirdParty.ShouldBeNull(
             "this card's single variant has no product ids of its own");
     }
 
@@ -155,8 +162,8 @@ public sealed class PricingContractTests
             """{"cardmarket":278422,"tcgplayer":83543,"cardtrader":991234}""");
 
         ids.Cardmarket.ShouldBe(278422);
-        ids.Tcgplayer.ShouldBe(83543);
-        ids.Cardtrader.ShouldBe(991234);
+        ids.TcgPlayer.ShouldBe(83543);
+        ids.CardTrader.ShouldBe(991234);
     }
 
     [Test]
@@ -175,11 +182,11 @@ public sealed class PricingContractTests
 
         Card card = Fixture.Parse<Card>(json);
 
-        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull();
+        TcgPlayerPricing tcgplayer = card.Pricing.ShouldNotBeNull().TcgPlayer.ShouldNotBeNull();
         tcgplayer.Unit.ShouldBe("USD");
         tcgplayer.Printings.Keys.ShouldBe(["normal", "reverse-holofoil"], ignoreOrder: true);
         tcgplayer["normal"].ShouldNotBeNull().ProductId.ShouldBe(219333);
-        card.VariantsDetailed[0].Pricing.ShouldNotBeNull().Tcgplayer.ShouldNotBeNull()
+        card.DetailedVariants[0].Pricing.ShouldNotBeNull().TcgPlayer.ShouldNotBeNull()
             .Printings.Count.ShouldBe(2);
     }
 }

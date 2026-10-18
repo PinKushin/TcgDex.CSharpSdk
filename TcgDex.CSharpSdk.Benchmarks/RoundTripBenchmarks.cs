@@ -103,7 +103,7 @@ public class RoundTripBenchmarks : IDisposable
         foreach (CardBrief brief in briefs)
         {
             Card? card = await _client.Cards.GetAsync(brief.Id, CancellationToken.None).ConfigureAwait(false);
-            hp += card?.Hp ?? 0;
+            hp += card?.HitPoints ?? 0;
         }
 
         return hp;
@@ -111,7 +111,7 @@ public class RoundTripBenchmarks : IDisposable
 
     /// <summary>The same result in one request.</summary>
     [Benchmark(Description = "GraphQL: one request")]
-    public async Task<int> GraphQl_SingleRequest()
+    public async Task<int> GraphQL_SingleRequest()
     {
         IReadOnlyList<Card> cards = await _client.Cards.SearchDetailedAsync(
             new CardFilter { Name = Name },
@@ -121,7 +121,7 @@ public class RoundTripBenchmarks : IDisposable
 
         foreach (Card card in cards)
         {
-            hp += card.Hp ?? 0;
+            hp += card.HitPoints ?? 0;
         }
 
         return hp;

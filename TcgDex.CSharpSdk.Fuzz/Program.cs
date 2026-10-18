@@ -111,9 +111,9 @@ internal static class Program
                 case 0: Run(c => c.Cards.GetAsync("swsh3-136", CancellationToken.None), payload); break;
                 case 1: Run(c => c.Cards.ListAsync(CancellationToken.None), payload); break;
                 case 2: Run(c => c.Sets.GetAsync("swsh3", CancellationToken.None), payload); break;
-                case 3: Run(c => c.Catalog.RaritiesAsync(CancellationToken.None), payload); break;
+                case 3: Run(c => c.Catalog.GetRaritiesAsync(CancellationToken.None), payload); break;
                 case 4: ProblemDetails(payload); break;
-                case 5: GraphQl(payload); break;
+                case 5: GraphQL(payload); break;
                 default: QueryBuilding(payload); break;
             }
         }
@@ -224,7 +224,7 @@ internal static class Program
 
     /// <summary>The GraphQL transport, whose envelope the REST models never see.</summary>
     /// <param name="payload">The fuzzer's bytes, used as the GraphQL response.</param>
-    private static void GraphQl(byte[] payload)
+    private static void GraphQL(byte[] payload)
     {
         using HttpClient http = new(new FuzzHandler(payload, HttpStatusCode.OK));
         using TcgDexClient client = new(http, Options());

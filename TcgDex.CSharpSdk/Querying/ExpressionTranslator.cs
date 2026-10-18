@@ -156,7 +156,7 @@ internal static class ExpressionTranslator
     /// Puts the member on the left and the value on the right, reporting whether
     /// they were swapped so the caller can flip the operator.
     /// </summary>
-    /// <remarks><c>100 &lt; c.Hp</c> must become <c>hp=gt:100</c>, not <c>hp=lt:100</c>.</remarks>
+    /// <remarks><c>100 &lt; c.HitPoints</c> must become <c>hp=gt:100</c>, not <c>hp=lt:100</c>.</remarks>
     private static (MemberExpression Member, object? Value, bool Flipped) OrientOperands(
         BinaryExpression node,
         ParameterExpression parameter)
@@ -245,8 +245,18 @@ internal static class ExpressionTranslator
         return false;
     }
 
+    /// <summary>
+    /// The API's name for a property: its <see cref="JsonPropertyNameAttribute"/>
+    /// when it has one, since a .NET name such as <c>HitPoints</c> can differ
+    /// from the wire name <c>hp</c>; otherwise the camel-cased property name.
+    /// </summary>
     private static string FieldName(MemberExpression member)
     {
+        if (System.Reflection.CustomAttributeExtensions.GetCustomAttribute<JsonPropertyNameAttribute>(member.Member) is { } wireName)
+        {
+            return wireName.Name;
+        }
+
         string name = member.Member.Name;
 
         return string.Concat(char.ToLowerInvariant(name[0]), name.AsSpan(1).ToString());

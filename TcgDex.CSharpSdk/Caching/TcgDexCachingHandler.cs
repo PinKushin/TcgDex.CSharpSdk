@@ -108,20 +108,13 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
         _logger = logger ?? NullLogger.Instance;
     }
 
-    /// <summary>Number of responses served without any network request.</summary>
+    /// <summary>How this handler's cache has been answering requests.</summary>
     /// <remarks>
-    /// Useful for confirming the cache is doing what you expect. Under
-    /// <c>AddTcgDexWithCaching</c> this counts across every handler the factory
-    /// has built; inject <see cref="TcgDexCacheStatistics"/> to read it without
-    /// a handler.
+    /// The same instance <c>AddTcgDexWithCaching</c> registers for injection,
+    /// so under <c>IHttpClientFactory</c> it counts across every handler the
+    /// factory has built. A handler constructed by hand has its own.
     /// </remarks>
-    public long FreshHits => _state.Statistics.FreshHits;
-
-    /// <summary>Number of entries refreshed by a <c>304</c> instead of a re-download.</summary>
-    public long Revalidations => _state.Statistics.Revalidations;
-
-    /// <summary>Number of requests that went to the API in full.</summary>
-    public long Misses => _state.Statistics.Misses;
+    public TcgDexCacheStatistics Statistics => _state.Statistics;
 
     /// <inheritdoc />
     protected override async Task<HttpResponseMessage> SendAsync(
@@ -418,8 +411,10 @@ public sealed class TcgDexCachingHandler : DelegatingHandler
             _state.Statistics.RecordRevalidation();
             _logger.CacheRevalidated(key);
 
-            CachedResponse refreshed = cached with
+            CachedResponse refreshed = new()
             {
+                Body = cached.Body,
+                ContentType = cached.ContentType,
                 StoredAt = _timeProvider.GetUtcNow(),
                 ETag = renewedETag ?? cached.ETag,
             };

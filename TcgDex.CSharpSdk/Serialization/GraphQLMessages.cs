@@ -15,25 +15,25 @@ using TcgDex.Models;
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     PropertyNameCaseInsensitive = true,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
-[JsonSerializable(typeof(GraphQlRequest))]
-[JsonSerializable(typeof(GraphQlCardsResponse))]
-internal sealed partial class GraphQlJsonContext : JsonSerializerContext
+[JsonSerializable(typeof(GraphQLRequest))]
+[JsonSerializable(typeof(GraphQLCardsResponse))]
+internal sealed partial class GraphQLJsonContext : JsonSerializerContext
 {
 }
 
 /// <summary>The request body sent to the GraphQL endpoint.</summary>
 /// <param name="Query">The GraphQL document.</param>
-internal sealed record GraphQlRequest(string Query);
+internal sealed record GraphQLRequest(string Query);
 
 /// <summary>A single error returned alongside or instead of data.</summary>
-internal sealed record GraphQlError
+internal sealed record GraphQLError
 {
     /// <summary>Human-readable description of what went wrong.</summary>
     public string? Message { get; init; }
 }
 
 /// <summary>The <c>data</c> payload for a card search.</summary>
-internal sealed record GraphQlCardsData
+internal sealed record GraphQLCardsData
 {
     /// <summary>
     /// The matching cards. Entries can be null when the server fails to resolve
@@ -43,14 +43,14 @@ internal sealed record GraphQlCardsData
 }
 
 /// <summary>The full response envelope for a card search.</summary>
-internal sealed record GraphQlCardsResponse
+internal sealed record GraphQLCardsResponse
 {
     /// <summary>The returned data, absent when the query failed outright.</summary>
-    public GraphQlCardsData? Data { get; init; }
+    public GraphQLCardsData? Data { get; init; }
 
     /// <summary>
     /// Errors reported by the server. GraphQL returns HTTP 200 even for a failed
     /// query, so this is the only reliable failure signal.
     /// </summary>
-    public IReadOnlyList<GraphQlError>? Errors { get; init; }
+    public IReadOnlyList<GraphQLError>? Errors { get; init; }
 }

@@ -24,7 +24,7 @@ public sealed class ApiContractTests : LiveApiFixture
         card.Name.ShouldBe("Furret");
         card.Category.ShouldBe(CardCategories.Pokemon);
         card.Set.Id.ShouldBe("swsh3");
-        card.Hp.ShouldNotBeNull();
+        card.HitPoints.ShouldNotBeNull();
         card.Attacks.ShouldNotBeEmpty();
     }
 
@@ -91,7 +91,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task GetSet_IncludesItsCards()
     {
-        Set? set = await Client.Sets.GetAsync("swsh3", Timeout);
+        CardSet? set = await Client.Sets.GetAsync("swsh3", Timeout);
 
         set.ShouldNotBeNull();
         set.Name.ShouldBe("Darkness Ablaze");
@@ -102,7 +102,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task GetSerie_UsesThePluralPathAndIncludesSets()
     {
-        Serie? serie = await Client.Series.GetAsync("swsh", Timeout);
+        Series? serie = await Client.Series.GetAsync("swsh", Timeout);
 
         serie.ShouldNotBeNull().Id.ShouldBe("swsh");
 
@@ -195,7 +195,7 @@ public sealed class ApiContractTests : LiveApiFixture
         cards.ShouldAllBe(c => c.Name == "Furret");
 
         Card furret = cards.First(c => c.Id == "swsh3-136");
-        furret.Hp.ShouldBe(110);
+        furret.HitPoints.ShouldBe(110);
         furret.Types.ShouldBe(["Colorless"]);
         furret.Attacks.ShouldNotBeEmpty();
         furret.Set.Name.ShouldBe("Darkness Ablaze");
@@ -247,7 +247,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task Catalog_ReturnsTheKnownValueSets()
     {
-        IReadOnlyList<string> categories = await Client.Catalog.CategoriesAsync(Timeout);
+        IReadOnlyList<string> categories = await Client.Catalog.GetCategoriesAsync(Timeout);
 
         categories.ShouldBe(["Energy", "Pokemon", "Trainer"], ignoreOrder: true);
     }
@@ -255,7 +255,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task Catalog_NumericEndpoints_DeserializeAsNumbers()
     {
-        IReadOnlyList<int> retreats = await Client.Catalog.RetreatCostsAsync(Timeout);
+        IReadOnlyList<int> retreats = await Client.Catalog.GetRetreatCostsAsync(Timeout);
 
         retreats.ShouldNotBeEmpty();
         retreats.ShouldAllBe(r => r > 0);
@@ -264,7 +264,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task Catalog_TrainerTypes_UsesTheHyphenatedPath()
     {
-        IReadOnlyList<string> trainerTypes = await Client.Catalog.TrainerTypesAsync(Timeout);
+        IReadOnlyList<string> trainerTypes = await Client.Catalog.GetTrainerTypesAsync(Timeout);
 
         trainerTypes.ShouldContain("Item");
         trainerTypes.ShouldContain("Supporter");
@@ -273,7 +273,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task Random_ReturnsAUsableCard()
     {
-        Card card = await Client.Random.CardAsync(Timeout);
+        Card card = await Client.Random.GetCardAsync(Timeout);
 
         // The value is genuinely unpredictable, so the prediction is about the
         // card rather than its contents: whatever came back must be a real card
@@ -314,7 +314,7 @@ public sealed class ApiContractTests : LiveApiFixture
             httpClient,
             new TcgDexOptions { Language = TcgDexLanguages.Japanese });
 
-        Set? set = await client.Sets.GetAsync("SM1+", Timeout);
+        CardSet? set = await client.Sets.GetAsync("SM1+", Timeout);
 
         set.ShouldNotBeNull().Id.ShouldBe("SM1+");
         set.ReleaseDate.ShouldNotBeNull();

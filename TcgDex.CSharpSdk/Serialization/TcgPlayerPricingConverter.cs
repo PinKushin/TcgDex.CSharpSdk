@@ -71,9 +71,7 @@ internal sealed class TcgPlayerPricingConverter : JsonConverter<TcgPlayerPricing
 
             if (isUpdated)
             {
-                updated = reader.TokenType == JsonTokenType.Null
-                    ? null
-                    : reader.GetDateTimeOffset();
+                updated = TimestampConverter.ReadTimestamp(ref reader);
                 continue;
             }
 

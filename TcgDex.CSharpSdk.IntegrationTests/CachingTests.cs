@@ -82,8 +82,8 @@ public sealed class CachingTests : LiveApiFixture
             second.ShouldNotBeNull().Name.ShouldBe("Furret");
             third.ShouldNotBeNull().Name.ShouldBe("Furret");
 
-            cache.Misses.ShouldBe(1);
-            cache.FreshHits.ShouldBe(2);
+            cache.Statistics.Misses.ShouldBe(1);
+            cache.Statistics.FreshHits.ShouldBe(2);
         }
     }
 
@@ -107,12 +107,12 @@ public sealed class CachingTests : LiveApiFixture
 
         using (http)
         {
-            IReadOnlyList<string> first = await client.Catalog.RaritiesAsync(Timeout);
-            IReadOnlyList<string> second = await client.Catalog.RaritiesAsync(Timeout);
+            IReadOnlyList<string> first = await client.Catalog.GetRaritiesAsync(Timeout);
+            IReadOnlyList<string> second = await client.Catalog.GetRaritiesAsync(Timeout);
 
             second.ShouldBe(first);
-            cache.Revalidations.ShouldBe(1, "the second read should have been a 304");
-            cache.Misses.ShouldBe(1, "only the first read should have downloaded a body");
+            cache.Statistics.Revalidations.ShouldBe(1, "the second read should have been a 304");
+            cache.Statistics.Misses.ShouldBe(1, "only the first read should have downloaded a body");
         }
     }
 
@@ -135,8 +135,8 @@ public sealed class CachingTests : LiveApiFixture
             second.ShouldNotBeNull().Name.ShouldBe("Furret");
 
             // Whichever path was taken, the entry was not served stale.
-            (cache.Revalidations + cache.Misses).ShouldBe(2);
-            cache.FreshHits.ShouldBe(0, "a zero freshness window must never serve without asking");
+            (cache.Statistics.Revalidations + cache.Statistics.Misses).ShouldBe(2);
+            cache.Statistics.FreshHits.ShouldBe(0, "a zero freshness window must never serve without asking");
         }
     }
 
@@ -156,11 +156,11 @@ public sealed class CachingTests : LiveApiFixture
             cached.ShouldNotBeNull();
 
             cached.Name.ShouldBe(live.Name);
-            cached.Hp.ShouldBe(live.Hp);
+            cached.HitPoints.ShouldBe(live.HitPoints);
             cached.Attacks.Count.ShouldBe(live.Attacks.Count);
             cached.Set.Id.ShouldBe(live.Set.Id);
-            int? livePrintings = live.Pricing?.Tcgplayer?.Printings.Count;
-            int? cachedPrintings = cached.Pricing?.Tcgplayer?.Printings.Count;
+            int? livePrintings = live.Pricing?.TcgPlayer?.Printings.Count;
+            int? cachedPrintings = cached.Pricing?.TcgPlayer?.Printings.Count;
             cachedPrintings.ShouldBe(livePrintings);
         }
     }
@@ -174,14 +174,14 @@ public sealed class CachingTests : LiveApiFixture
 
         using (http)
         {
-            Set? first = await client.Sets.GetAsync("swsh3", Timeout);
-            Set? second = await client.Sets.GetAsync("swsh3", Timeout);
+            CardSet? first = await client.Sets.GetAsync("swsh3", Timeout);
+            CardSet? second = await client.Sets.GetAsync("swsh3", Timeout);
 
             first.ShouldNotBeNull().Cards.Count.ShouldBeGreaterThan(200);
             second.ShouldNotBeNull().Cards.Count.ShouldBe(first.Cards.Count);
 
-            cache.Misses.ShouldBe(1);
-            cache.FreshHits.ShouldBe(1);
+            cache.Statistics.Misses.ShouldBe(1);
+            cache.Statistics.FreshHits.ShouldBe(1);
         }
     }
 
@@ -198,7 +198,7 @@ public sealed class CachingTests : LiveApiFixture
             Card?[] cards = await Task.WhenAll(reads);
 
             cards.ShouldAllBe(c => c != null && c.Name == "Furret");
-            cache.Misses.ShouldBe(1, "ten concurrent readers should share one fetch");
+            cache.Statistics.Misses.ShouldBe(1, "ten concurrent readers should share one fetch");
         }
     }
 
@@ -217,7 +217,7 @@ public sealed class CachingTests : LiveApiFixture
     }
 
     [Test]
-    public async Task GraphQlRequests_AreNotCached()
+    public async Task GraphQLRequests_AreNotCached()
     {
         // GraphQL is a POST, so it must bypass the cache entirely.
         (ITcgDexClient? client, TcgDexCachingHandler? cache, HttpClient? http) = CreateCachingClient();
@@ -229,8 +229,8 @@ public sealed class CachingTests : LiveApiFixture
             await client.Cards.SearchDetailedAsync(
                 new CardFilter { Name = "Furret" }, cancellationToken: Timeout);
 
-            cache.FreshHits.ShouldBe(0);
-            cache.Misses.ShouldBe(0);
+            cache.Statistics.FreshHits.ShouldBe(0);
+            cache.Statistics.Misses.ShouldBe(0);
         }
     }
 }

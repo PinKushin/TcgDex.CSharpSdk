@@ -276,7 +276,7 @@ public sealed class ContextCaptureTests
         Handler handler = new(() => Json(HttpStatusCode.OK, """["Common"]"""), gated: true);
         using TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
 
-        Task work = await AssertNoPostsAsync(() => client.Catalog.RaritiesAsync(CancellationToken.None), handler.Gate);
+        Task work = await AssertNoPostsAsync(() => client.Catalog.GetRaritiesAsync(CancellationToken.None), handler.Gate);
 
         work.Status.ShouldBe(TaskStatus.RanToCompletion);
     }

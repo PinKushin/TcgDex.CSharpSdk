@@ -21,14 +21,14 @@ using TcgDex.Querying;
 public sealed class OptionsFrozenTests
 {
     [Test]
-    public async Task GraphQl_IgnoresOptionsChangedAfterConstruction()
+    public async Task GraphQL_IgnoresOptionsChangedAfterConstruction()
     {
         RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.OK, """{"data":{"cards":[]}}""");
         TcgDexOptions options = new();
         TcgDexClient client = new(new HttpClient(handler), options);
 
-        options.GraphQlEndpoint = new Uri("https://elsewhere.example/graphql");
+        options.GraphQLEndpoint = new Uri("https://elsewhere.example/graphql");
         options.MaxResponseBytes = 1;
 
         await client.Cards.SearchDetailedAsync(new CardFilter { Name = "Furret" }, cancellationToken: CancellationToken.None);

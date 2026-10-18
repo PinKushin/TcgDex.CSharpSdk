@@ -119,7 +119,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     public async Task NumericComparison_IsHonoured()
     {
         IReadOnlyList<CardBrief> cards = await Client.Cards.ListAsync(
-            new CardQuery().Where(c => c.Hp > 300).Page(1, 10),
+            new CardQuery().Where(c => c.HitPoints > 300).Page(1, 10),
             Timeout);
 
         // A full page. An ignored filter and an honoured one both return
@@ -129,7 +129,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
         cards.Count.ShouldBe(10, "far more than ten cards have over 300 HP");
 
         Card? card = await Client.Cards.GetAsync(cards[0].Id, Timeout);
-        card.ShouldNotBeNull().Hp.ShouldNotBeNull().ShouldBeGreaterThan(300);
+        card.ShouldNotBeNull().HitPoints.ShouldNotBeNull().ShouldBeGreaterThan(300);
     }
 
     [Test]
@@ -197,7 +197,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task MissingSet_ReturnsNull()
     {
-        Set? set = await Client.Sets.GetAsync("no-such-set-999", Timeout);
+        CardSet? set = await Client.Sets.GetAsync("no-such-set-999", Timeout);
 
         set.ShouldBeNull();
     }
@@ -205,7 +205,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task MissingSerie_ReturnsNull()
     {
-        Serie? serie = await Client.Series.GetAsync("no-such-serie-999", Timeout);
+        Series? serie = await Client.Series.GetAsync("no-such-serie-999", Timeout);
 
         serie.ShouldBeNull();
     }

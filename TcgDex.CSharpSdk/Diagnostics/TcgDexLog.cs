@@ -187,13 +187,13 @@ internal static partial class TcgDexLog
         EventId = 1300,
         Level = LogLevel.Debug,
         Message = "TCGdex GraphQL search returned {Count} card(s)")]
-    internal static partial void GraphQlSearchCompleted(this ILogger logger, int count);
+    internal static partial void GraphQLSearchCompleted(this ILogger logger, int count);
 
     [LoggerMessage(
         EventId = 1301,
         Level = LogLevel.Error,
         Message = "TCGdex GraphQL reported errors: {Errors}")]
-    internal static partial void GraphQlErrors(this ILogger logger, string errors);
+    internal static partial void GraphQLErrors(this ILogger logger, string errors);
 
     /// <remarks>
     /// The server nulls an entry it cannot fully resolve. Dropping it silently
@@ -203,7 +203,7 @@ internal static partial class TcgDexLog
         EventId = 1302,
         Level = LogLevel.Warning,
         Message = "TCGdex GraphQL returned {Count} unresolvable card entr(ies), which were dropped")]
-    internal static partial void GraphQlDroppedEntries(this ILogger logger, int count);
+    internal static partial void GraphQLDroppedEntries(this ILogger logger, int count);
 
     // ----- 1400: data quality -----
 

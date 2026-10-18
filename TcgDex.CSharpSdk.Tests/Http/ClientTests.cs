@@ -62,7 +62,7 @@ public sealed class ClientTests
         RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "set-full.json");
 
-        Set? set = await CreateClient(handler).Sets.GetAsync("swsh3", CancellationToken.None);
+        CardSet? set = await CreateClient(handler).Sets.GetAsync("swsh3", CancellationToken.None);
 
         handler.SingleRequestUri.ShouldBe("https://api.tcgdex.net/v2/en/sets/swsh3");
         set.ShouldNotBeNull().Cards.ShouldNotBeEmpty();
@@ -104,7 +104,7 @@ public sealed class ClientTests
 
         CardQuery query = new CardQuery()
             .Where(c => c.Name == "Furret")
-            .Where(c => c.Hp > 100)
+            .Where(c => c.HitPoints > 100)
             .OrderByDescending(c => c.Name)
             .Page(2, 50);
 
@@ -133,7 +133,7 @@ public sealed class ClientTests
         RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
 
-        await CreateClient(handler).Random.CardAsync(CancellationToken.None);
+        await CreateClient(handler).Random.GetCardAsync(CancellationToken.None);
 
         handler.SingleRequestUri.ShouldBe("https://api.tcgdex.net/v2/en/random/card");
     }
@@ -144,7 +144,7 @@ public sealed class ClientTests
         RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "list-categories.json");
 
-        IReadOnlyList<string> categories = await CreateClient(handler).Catalog.CategoriesAsync(CancellationToken.None);
+        IReadOnlyList<string> categories = await CreateClient(handler).Catalog.GetCategoriesAsync(CancellationToken.None);
 
         handler.SingleRequestUri.ShouldBe("https://api.tcgdex.net/v2/en/categories");
         categories.ShouldContain("Pokemon");
@@ -158,7 +158,7 @@ public sealed class ClientTests
         RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "list-retreats-int.json");
 
-        IReadOnlyList<int> retreats = await CreateClient(handler).Catalog.RetreatCostsAsync(CancellationToken.None);
+        IReadOnlyList<int> retreats = await CreateClient(handler).Catalog.GetRetreatCostsAsync(CancellationToken.None);
 
         handler.SingleRequestUri.ShouldBe("https://api.tcgdex.net/v2/en/retreats");
         retreats.ShouldBe([1, 2, 3, 4, 5]);
@@ -216,7 +216,7 @@ public sealed class ClientTests
         {
             options.Language = TcgDexLanguages.German;
             options.BaseAddress = new Uri("https://mirror.example/v2/");
-            options.GraphQlEndpoint = new Uri("https://mirror.example/v2/graphql");
+            options.GraphQLEndpoint = new Uri("https://mirror.example/v2/graphql");
         });
 
         using ServiceProvider provider = services.BuildServiceProvider();
@@ -224,7 +224,7 @@ public sealed class ClientTests
 
         options.Language.ShouldBe("de");
         options.BaseAddress.ShouldBe(new Uri("https://mirror.example/v2/"));
-        options.GraphQlEndpoint.ShouldBe(new Uri("https://mirror.example/v2/graphql"));
+        options.GraphQLEndpoint.ShouldBe(new Uri("https://mirror.example/v2/graphql"));
     }
 
     [Test]

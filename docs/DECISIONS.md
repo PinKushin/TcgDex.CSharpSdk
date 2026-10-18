@@ -618,3 +618,131 @@ ships as 0.7.0 rather than 0.6.4, following semver practice for 0.x.
 From now on, any breaking change on 0.x bumps the minor version. A patch release contains fixes
 only.
 
+## 25. The 1.0 naming pass: .NET conventions over the API's names, before 1.0
+
+The owner, approving the 0.8.0 scope taken from the Fable .NET-convention audit: *"i want .net
+conventions everywhere, thats the point in the sdk"* — the same principle as #22, applied to names.
+Every public name follows the .NET Framework Design Guidelines, and the change ships before 1.0
+because after it each rename is a major version. Under #24 it ships as 0.8.0.
+
+What that meant in practice:
+
+- **No non-words or abbreviations.** `Serie` → `Series`, `Hp` → `HitPoints` (matching
+  `GetHitPointsAsync`), `Avg7` → `Average7Days`, `IdProduct` → `ProductId`, `FirstEd` →
+  `FirstEdition`, `Lang` → `Language`.
+- **No type named after a keyword or a general concept.** `Set` → `CardSet`. The rest of the family
+  moved with it (`CardSetBrief`, `CardSetAbbreviation`), so a brief still pairs with its full type
+  the way `CardBrief` pairs with `Card`.
+- **One casing per brand.** `TcgPlayer` everywhere, matching the `TcgPlayerPricing` type; `CardTrader`,
+  the marketplace's own casing.
+- **Methods are verbs.** Resource methods without one gained `Get` (`GetRaritiesAsync`).
+- **Nothing public that no caller needs.** `QueryOperator` became internal; the status-only
+  `TcgDexApiException` constructor, which produced `Kind = Unspecified`, was removed; the caching
+  handler's counters collapsed into the one `TcgDexCacheStatistics`.
+
+**JSON keys did not change.** Every renamed property carries `[JsonPropertyName]` with the API's
+key, and tests pin the written keys, since case-insensitive reading means a round trip cannot catch
+a missing mapping. The query builder now takes a property's field name from that attribute: before,
+it camel-cased the .NET name, and `c.HitPoints > 100` would have become the unknown `hitPoints`.
+
+Names the audit raised but that were left alone, because the case is not clear-cut, are listed in
+the 0.8.0 report rather than changed on a guess.
+
+## 26. `CachedResponse` has reference equality, not record equality
+
+Decided while doing the naming pass (#25). The owner asked for the decision to be made and recorded
+rather than giving one; the reasoning below is the implementer's, not the owner's.
+
+`CachedResponse` was a `record`, so it had value equality, but record equality compares its
+`byte[] Body` by reference. Two entries holding the same bytes therefore compared equal or not
+depending on whether they happened to share an array, which is equality nobody can rely on. The
+alternatives were:
+
+- **Compare the bytes.** Correct, but every comparison walks the body (22 KB for a set), and the
+  hash code would change if anyone wrote to the array, which breaks it as a dictionary key.
+- **Plain class, reference equality.** Honest about what an entry is: a stored blob with a
+  timestamp, not a value. Nothing in the SDK compares entries, and a custom backend (Redis, disk)
+  builds a fresh one on every read anyway.
+
+The second was taken. `CachedResponse` is a `sealed class`; it loses `with` and `==`, which the
+SDK's own revalidation path used once and now replaces with an initializer.
+
+## 27. Full image URLs are `Uri?`; the API's base URLs stay `string?`
+
+Decided while doing the naming pass (#25). As with #26, the owner asked for the decision to be made
+and recorded; the reasoning is the implementer's.
+
+The .NET guideline (CA1055/CA1056) is that a URL is a `System.Uri`, not a string. The helpers that
+build a fetchable address (`ImageUrl.Build`, `ImageUrl.BuildAsset`, `GetImageUrl`, `GetLogoUrl`,
+`GetSymbolUrl`) now return `Uri?`, which a caller hands straight to `HttpClient` or an image control.
+
+The model properties `Card.Image`, `Logo` and `Symbol` stay `string?`. They are not addresses: the
+API sends a base without a file extension, and requesting it as-is returns 404. Typing them as
+`Uri` would present something unfetchable as a URL, which is the mistake the helpers exist to
+prevent. The helpers' `baseUrl` parameter is a string for the same reason.
+
+A base that does not make an absolute http(s) URL (relative, or not a URL at all) produces `null`,
+following the tolerance policy of `ReleaseDate` and the timestamps: a value from the API that
+cannot be read becomes null rather than an exception. The scheme check also stops `/en/swsh/1`
+parsing as a `file://` URI off Windows. An unknown `ImageQuality` or `ImageFormat` still throws,
+because that is a caller's mistake, not the API's.
+
+## 28. JSON converters stay internal
+
+Decided while doing the naming pass (#25); the owner's scope was "internal unless a consumer
+genuinely needs one", and the reasoning is the implementer's.
+
+The SDK's converters (`FlexibleStringConverter`, `ReleaseDateConverter`, `TimestampConverter`,
+`TcgPlayerPricingConverter`) are all internal, and stay so. They are attached to the models with
+`[JsonConverter]`, so reflection-based `JsonSerializer` applies them without a consumer naming one.
+Public, each would be pinned API with nothing to call. They do appear in `PublicApi.approved.cs`,
+but only as the type argument of those attributes, which is metadata rather than callable surface.
+
+The cost, already noted in the 0.7.0 CHANGELOG: a consumer's own source-generated
+`JsonSerializerContext` cannot include the models, because the generated code would have to
+construct an internal converter. Serializing models under Native AOT is therefore not supported.
+That is the consequence of #20 as much as of this entry, and no consumer has asked for it. Two other
+cases would justify a public converter: that one, or a consumer modelling their own type with the
+same quirk (a string-or-number field, a tolerant date). Making a type public later is not breaking,
+whereas making it internal after 1.0 would be, so internal is the default until someone asks.
+
+## 29. The doubtful renames: the owner's picks
+
+The naming pass (#25) left a list of names whose case was not clear-cut. On 2026-10-18 the owner
+chose from that list in a multiple-choice question. No further reasoning was given for any pick or
+rejection, and none is supplied here.
+
+**Renamed** (each keeps its JSON key through `[JsonPropertyName]`):
+
+- `Card.Retreat` / `CardFilter.Retreat` → `RetreatCost`
+- `Card.VariantsDetailed` → `DetailedVariants`
+- `Card.EvolveFrom` / `CardFilter.EvolveFrom` → `EvolvesFrom`
+- `ISetResource` → `ICardSetResource`
+- `GraphQl` → `GraphQL` in every public name (`TcgDexOptions.GraphQLEndpoint`,
+  `TcgDexErrorKind.GraphQLError`), with internal names following
+- `Card.Legal` / `CardSet.Legal` → `Legality`
+
+**Left as they are:** the type of `TcgDexProblem.Status`, `WPromo`, `Attack.Cost`, `Holo` and
+`CardQuery.Page`.
+
+**Kept from the first round:** the three renames the implementer added beyond the audit —
+`CardSetBrief`, `CardTrader`, and the plural `DexIds` / `Stamps`. `CardFilter.DexId` stays singular
+because it filters by one id; the 0.8.0 migration table says so.
+
+## 30. 0.8.0 ships as a normal release, not a 1.0 release candidate
+
+The naming pass (#25) was the last item on the 1.0 bar (#19), so it could have shipped as
+`1.0.0-rc.1`. The owner chose `0.8.0`: "it wont be served on nuget natively if we do a rc tag, so
+everyone would be on old stuff, so im leaning towads the 0.8.0 for a little". NuGet hides
+prerelease versions unless a consumer opts in, so an RC would have left every default install on
+0.7.0.
+
+1.0.0 follows on the same code once 0.8.0 has had some use. A published NuGet version cannot be
+renamed, so that is a small version-bump PR (csproj `<Version>` plus a `[1.0.0]` CHANGELOG
+section) and a new `v1.0.0` tag, not a retag of 0.8.0.
+
+Same release: the GitHub Release now carries the published `.nupkg` and `.snupkg`, and its notes
+and the Discord post link the NuGet page and give the install command. The owner had been linking
+the GitHub release on Discord, which until now pointed only at source zips: "people havent
+actually seen a real release lol i think".
+
