@@ -233,7 +233,7 @@ Always present: `id`, `name`, `category`, `localId`, `set`, `illustrator`, `vari
 | `variants_detailed` | `DetailedVariant[]` | |
 | `updated` | `string` | ISO 8601 with offset, e.g. `2026-07-01T21:27:44+01:00`. |
 | `pricing` | `Pricing` | Optional. |
-| `legal` | `Legal` | |
+| `legal` | `Legality` | |
 | `regulationMark` | `string` | Modern cards only. |
 | `boosters` | `Booster[]` | **Array of objects**, not a string. Observed on `A4-139`: `[{"id":"boo_A4-ho-oh","name":"Ho-Oh"}]` — only `id` and `name` were present. |
 | `stage` | `string` | Not Pokémon-exclusive — observed on the Energy card `base1-102`. |
@@ -354,7 +354,7 @@ percent-encodes path segments, so `Sets.GetAsync("SM1+")` works.
 `id`, `name`, `logo`, `releaseDate`, `firstSet`, `lastSet`, `sets` (`CardSetBrief[]`).
 List form (`/series`) is `id`, `name`, `logo`.
 
-### Legal
+### Legality
 `standard: bool`, `expanded: bool`
 
 ### Booster

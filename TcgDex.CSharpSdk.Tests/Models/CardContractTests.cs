@@ -27,9 +27,9 @@ public sealed class CardContractTests
         card.Illustrator.ShouldBe("tetsuya koizumi");
         card.Rarity.ShouldBe("Uncommon");
         card.HitPoints.ShouldBe(110);
-        card.Retreat.ShouldBe(1);
+        card.RetreatCost.ShouldBe(1);
         card.Stage.ShouldBe("Stage1");
-        card.EvolveFrom.ShouldBe("Sentret");
+        card.EvolvesFrom.ShouldBe("Sentret");
         card.RegulationMark.ShouldBe("D");
         card.Types.ShouldBe(["Colorless"]);
         card.DexIds.ShouldContain(162);
@@ -79,9 +79,9 @@ public sealed class CardContractTests
     {
         Card card = Fixture.Load<Card>("card-pokemon-full.json");
 
-        card.Legal.ShouldNotBeNull();
-        card.Legal.Standard.ShouldBeFalse();
-        card.Legal.Expanded.ShouldBeTrue();
+        card.Legality.ShouldNotBeNull();
+        card.Legality.Standard.ShouldBeFalse();
+        card.Legality.Expanded.ShouldBeTrue();
     }
 
     // ----- the polymorphic damage field -----

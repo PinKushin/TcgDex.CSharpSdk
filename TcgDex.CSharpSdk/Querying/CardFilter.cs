@@ -60,10 +60,10 @@ public sealed record CardFilter
     public string? RegulationMark { get; init; }
 
     /// <summary>The Pokémon this card evolves from.</summary>
-    public string? EvolveFrom { get; init; }
+    public string? EvolvesFrom { get; init; }
 
     /// <summary>Retreat cost.</summary>
-    public int? Retreat { get; init; }
+    public int? RetreatCost { get; init; }
 
     /// <summary>
     /// Renders the filter as a GraphQL argument list, or an empty string when
@@ -87,8 +87,8 @@ public sealed record CardFilter
         AppendText(builder, "trainerType", TrainerType);
         AppendText(builder, "energyType", EnergyType);
         AppendText(builder, "regulationMark", RegulationMark);
-        AppendText(builder, "evolveFrom", EvolveFrom);
-        AppendNumber(builder, "retreat", Retreat);
+        AppendText(builder, "evolveFrom", EvolvesFrom);
+        AppendNumber(builder, "retreat", RetreatCost);
 
         return builder.ToString();
     }

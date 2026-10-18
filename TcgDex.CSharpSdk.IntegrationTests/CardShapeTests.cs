@@ -134,7 +134,7 @@ public sealed class CardShapeTests : LiveApiFixture
     {
         Card? card = await Client.Cards.GetAsync("sv03.5-001", Timeout);
 
-        IReadOnlyList<DetailedVariant> variants = card.ShouldNotBeNull().VariantsDetailed;
+        IReadOnlyList<DetailedVariant> variants = card.ShouldNotBeNull().DetailedVariants;
 
         variants.ShouldNotBeEmpty("variants_detailed maps from a snake_case key");
         // `!= null` rather than `is not null`: ShouldContain takes an expression

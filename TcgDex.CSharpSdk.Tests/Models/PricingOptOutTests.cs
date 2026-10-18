@@ -66,9 +66,9 @@ public sealed class PricingOptOutTests
 
         Card card = (await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).ShouldNotBeNull();
 
-        card.VariantsDetailed.Count.ShouldBe(2);
-        card.VariantsDetailed.ShouldAllBe(v => v.Pricing == null);
-        card.VariantsDetailed[0].VariantId.ShouldBe("endfynwn4n10gzq", "the rest of the variant still deserializes");
+        card.DetailedVariants.Count.ShouldBe(2);
+        card.DetailedVariants.ShouldAllBe(v => v.Pricing == null);
+        card.DetailedVariants[0].VariantId.ShouldBe("endfynwn4n10gzq", "the rest of the variant still deserializes");
     }
 
     [Test]
@@ -78,7 +78,7 @@ public sealed class PricingOptOutTests
 
         Card card = (await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).ShouldNotBeNull();
 
-        card.VariantsDetailed.ShouldAllBe(v => v.Pricing != null);
+        card.DetailedVariants.ShouldAllBe(v => v.Pricing != null);
     }
 
     [Test]

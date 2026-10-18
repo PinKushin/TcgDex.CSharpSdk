@@ -91,10 +91,10 @@ public sealed class PocketShapeTests : LiveApiFixture
         Card? pocket = await Client.Cards.GetAsync(PocketPokemon, Timeout);
         Card? physical = await Client.Cards.GetAsync(PhysicalPokemon, Timeout);
 
-        DetailedVariant pocketVariant = pocket.ShouldNotBeNull().VariantsDetailed.ShouldHaveSingleItem();
+        DetailedVariant pocketVariant = pocket.ShouldNotBeNull().DetailedVariants.ShouldHaveSingleItem();
         pocketVariant.VariantId.ShouldBe("generated");
 
-        physical.ShouldNotBeNull().VariantsDetailed[0].VariantId.ShouldBe("endfynwn4n10gzq");
+        physical.ShouldNotBeNull().DetailedVariants[0].VariantId.ShouldBe("endfynwn4n10gzq");
     }
 
     [Test]

@@ -42,13 +42,14 @@ public sealed class SerializationTests
         string set = Serialize(Fixture.Load<CardSet>("set-full.json"));
         string problem = Serialize(Fixture.Load<TcgDexProblem>("error-bad-language.json"));
 
-        foreach (string key in new[] { "hp", "idProduct", "avg", "avg1", "avg7", "avg30", "dexId" })
+        foreach (string key in new[] { "hp", "idProduct", "avg", "avg1", "avg7", "avg30", "dexId", "retreat", "evolveFrom", "legal" })
         {
             card.ShouldContain($"\"{key}\":", Case.Sensitive);
         }
 
         set.ShouldContain("\"serie\":", Case.Sensitive);
         set.ShouldContain("\"firstEd\":", Case.Sensitive);
+        set.ShouldContain("\"legal\":", Case.Sensitive);
         problem.ShouldContain("\"lang\":", Case.Sensitive);
     }
 

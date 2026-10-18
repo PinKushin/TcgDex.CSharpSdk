@@ -83,11 +83,11 @@ public sealed class PricingContractTests
         // Counted and named. "Not empty" would have been satisfied by one
         // entry with every field null, which is exactly what a broken
         // snake_case mapping produces — the array binds, the contents do not.
-        card.VariantsDetailed.Count.ShouldBe(
+        card.DetailedVariants.Count.ShouldBe(
             2,
             "swsh3-136 is printed in a normal and a reverse variant");
 
-        DetailedVariant first = card.VariantsDetailed[0];
+        DetailedVariant first = card.DetailedVariants[0];
         first.Type.ShouldBe("normal");
         first.Size.ShouldBe("standard");
         first.VariantId.ShouldBe("endfynwn4n10gzq", "variantId is REST-only and must not be dropped");
@@ -123,11 +123,11 @@ public sealed class PricingContractTests
         card.ThirdParty.ShouldBeNull(
             "this card's ids live on each printing, not the card root");
 
-        ThirdParty normal = card.VariantsDetailed[0].ThirdParty.ShouldNotBeNull();
+        ThirdParty normal = card.DetailedVariants[0].ThirdParty.ShouldNotBeNull();
         normal.Cardmarket.ShouldBe(483559);
         normal.TcgPlayer.ShouldBe(219333);
 
-        ThirdParty reverse = card.VariantsDetailed[1].ThirdParty.ShouldNotBeNull();
+        ThirdParty reverse = card.DetailedVariants[1].ThirdParty.ShouldNotBeNull();
         reverse.Cardmarket.ShouldBe(483559);
         reverse.TcgPlayer.ShouldBe(219333);
     }
@@ -145,7 +145,7 @@ public sealed class PricingContractTests
         ids.TcgPlayer.ShouldBe(206047);
         ids.CardTrader.ShouldBeNull("not every card lists on Cardtrader");
 
-        card.VariantsDetailed[0].ThirdParty.ShouldBeNull(
+        card.DetailedVariants[0].ThirdParty.ShouldBeNull(
             "this card's single variant has no product ids of its own");
     }
 
@@ -186,7 +186,7 @@ public sealed class PricingContractTests
         tcgplayer.Unit.ShouldBe("USD");
         tcgplayer.Printings.Keys.ShouldBe(["normal", "reverse-holofoil"], ignoreOrder: true);
         tcgplayer["normal"].ShouldNotBeNull().ProductId.ShouldBe(219333);
-        card.VariantsDetailed[0].Pricing.ShouldNotBeNull().TcgPlayer.ShouldNotBeNull()
+        card.DetailedVariants[0].Pricing.ShouldNotBeNull().TcgPlayer.ShouldNotBeNull()
             .Printings.Count.ShouldBe(2);
     }
 }

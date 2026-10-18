@@ -174,17 +174,21 @@ namespace TcgDex.Models
         public System.Collections.Generic.IReadOnlyList<TcgDex.Models.Booster> Boosters { get; init; }
         public required string Category { get; init; }
         public string? Description { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("variants_detailed")]
+        public System.Collections.Generic.IReadOnlyList<TcgDex.Models.DetailedVariant> DetailedVariants { get; init; }
         [System.Text.Json.Serialization.JsonPropertyName("dexId")]
         public System.Collections.Generic.IReadOnlyList<int> DexIds { get; init; }
         public string? Effect { get; init; }
         public string? EnergyType { get; init; }
-        public string? EvolveFrom { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("evolveFrom")]
+        public string? EvolvesFrom { get; init; }
         [System.Text.Json.Serialization.JsonPropertyName("hp")]
         public int? HitPoints { get; init; }
         public required string Id { get; init; }
         public string? Illustrator { get; init; }
         public string? Image { get; init; }
-        public TcgDex.Models.Legality? Legal { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("legal")]
+        public TcgDex.Models.Legality? Legality { get; init; }
         [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.FlexibleStringConverter?))]
         public required string LocalId { get; init; }
         public required string Name { get; init; }
@@ -192,7 +196,8 @@ namespace TcgDex.Models
         public string? Rarity { get; init; }
         public string? RegulationMark { get; init; }
         public System.Collections.Generic.IReadOnlyList<TcgDex.Models.WeaknessOrResistance> Resistances { get; init; }
-        public int? Retreat { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("retreat")]
+        public int? RetreatCost { get; init; }
         public required TcgDex.Models.CardSetBrief Set { get; init; }
         public string? Stage { get; init; }
         public string? Suffix { get; init; }
@@ -202,8 +207,6 @@ namespace TcgDex.Models
         [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.TimestampConverter?))]
         public System.DateTimeOffset? Updated { get; init; }
         public TcgDex.Models.Variants? Variants { get; init; }
-        [System.Text.Json.Serialization.JsonPropertyName("variants_detailed")]
-        public System.Collections.Generic.IReadOnlyList<TcgDex.Models.DetailedVariant> VariantsDetailed { get; init; }
         public System.Collections.Generic.IReadOnlyList<TcgDex.Models.WeaknessOrResistance> Weaknesses { get; init; }
         public bool IsCategory(string category) { }
     }
@@ -240,7 +243,8 @@ namespace TcgDex.Models
         public TcgDex.Models.CardCount? CardCount { get; init; }
         public System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardBrief> Cards { get; init; }
         public required string Id { get; init; }
-        public TcgDex.Models.Legality? Legal { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("legal")]
+        public TcgDex.Models.Legality? Legality { get; init; }
         public string? Logo { get; init; }
         public required string Name { get; init; }
         [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.ReleaseDateConverter?))]
@@ -433,7 +437,7 @@ namespace TcgDex.Querying
         public string? Category { get; init; }
         public int? DexId { get; init; }
         public string? EnergyType { get; init; }
-        public string? EvolveFrom { get; init; }
+        public string? EvolvesFrom { get; init; }
         public int? HitPoints { get; init; }
         public string? Id { get; init; }
         public string? Illustrator { get; init; }
@@ -441,7 +445,7 @@ namespace TcgDex.Querying
         public string? Name { get; init; }
         public string? Rarity { get; init; }
         public string? RegulationMark { get; init; }
-        public int? Retreat { get; init; }
+        public int? RetreatCost { get; init; }
         public string? Stage { get; init; }
         public string? Suffix { get; init; }
         public string? TrainerType { get; init; }

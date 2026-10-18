@@ -20,7 +20,7 @@ public sealed class SetSerieContractTests
         set.TcgOnline.ShouldBe("DAA");
         set.Abbreviation.ShouldNotBeNull().Official.ShouldBe("DAA");
         set.Series.ShouldNotBeNull().Id.ShouldBe("swsh");
-        set.Legal.ShouldNotBeNull().Expanded.ShouldBeTrue();
+        set.Legality.ShouldNotBeNull().Expanded.ShouldBeTrue();
     }
 
     [Test]

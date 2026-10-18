@@ -86,7 +86,8 @@ public sealed record CardSet
     public DateTime? ReleaseDate { get; init; }
 
     /// <summary>Tournament legality for the set as a whole.</summary>
-    public Legality? Legal { get; init; }
+    [JsonPropertyName("legal")]
+    public Legality? Legality { get; init; }
 
     /// <summary>The series this set belongs to.</summary>
     [JsonPropertyName("serie")]

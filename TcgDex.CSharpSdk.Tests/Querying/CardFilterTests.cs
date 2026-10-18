@@ -45,8 +45,8 @@ public sealed class CardFilterTests
             TrainerType = "Item",
             EnergyType = "Basic",
             RegulationMark = "D",
-            EvolveFrom = "Sentret",
-            Retreat = 1,
+            EvolvesFrom = "Sentret",
+            RetreatCost = 1,
         };
 
         filter.ToGraphQlArguments().ShouldBe(
@@ -75,7 +75,7 @@ public sealed class CardFilterTests
     [TestCase("TrainerType", "trainerType:\"x\"")]
     [TestCase("EnergyType", "energyType:\"x\"")]
     [TestCase("RegulationMark", "regulationMark:\"x\"")]
-    [TestCase("EvolveFrom", "evolveFrom:\"x\"")]
+    [TestCase("EvolvesFrom", "evolveFrom:\"x\"")]
     public void ASingleTextField_RendersAloneWithoutASeparator(string property, string expected)
     {
         // Each field on its own, which the combined test above cannot show:
@@ -86,9 +86,9 @@ public sealed class CardFilterTests
         filter.ToGraphQlArguments().ShouldBe(expected);
     }
 
-    [TestCase("Hp", "hp:7")]
+    [TestCase("HitPoints", "hp:7")]
     [TestCase("DexId", "dexId:7")]
-    [TestCase("Retreat", "retreat:7")]
+    [TestCase("RetreatCost", "retreat:7")]
     public void ASingleNumericField_RendersUnquoted(string property, string expected)
     {
         // Numbers must not be quoted: the GraphQL schema types these as Int,
@@ -111,15 +111,15 @@ public sealed class CardFilterTests
         "TrainerType" => new CardFilter { TrainerType = "x" },
         "EnergyType" => new CardFilter { EnergyType = "x" },
         "RegulationMark" => new CardFilter { RegulationMark = "x" },
-        "EvolveFrom" => new CardFilter { EvolveFrom = "x" },
+        "EvolvesFrom" => new CardFilter { EvolvesFrom = "x" },
         _ => throw new ArgumentOutOfRangeException(nameof(property), property, "Unmapped text filter."),
     };
 
     private static CardFilter NumberFilterFor(string property) => property switch
     {
-        "Hp" => new CardFilter { HitPoints = 7 },
+        "HitPoints" => new CardFilter { HitPoints = 7 },
         "DexId" => new CardFilter { DexId = 7 },
-        "Retreat" => new CardFilter { Retreat = 7 },
+        "RetreatCost" => new CardFilter { RetreatCost = 7 },
         _ => throw new ArgumentOutOfRangeException(nameof(property), property, "Unmapped numeric filter."),
     };
 }

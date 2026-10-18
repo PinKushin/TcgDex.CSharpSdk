@@ -217,6 +217,11 @@ public sealed class CardQueryTests
             .ShouldBe("sort:field=hp&sort:order=ASC");
 
     [Test]
+    public void Where_RenamedProperties_FilterByTheirWireNames()
+        => Query().Where(c => c.RetreatCost == 1 && c.EvolvesFrom == "Sentret").ToQueryString()
+            .ShouldBe("retreat=eq:1&evolveFrom=eq:Sentret");
+
+    [Test]
     public void Page_EmitsPaginationParameters()
         => Query().Page(2, 50).ToQueryString()
             .ShouldBe("pagination:page=2&pagination:itemsPerPage=50");

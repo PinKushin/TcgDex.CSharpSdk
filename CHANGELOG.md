@@ -35,7 +35,13 @@ the table below.
 | `Set.Serie` | `CardSet.Series` |
 | `Card.Hp` | `Card.HitPoints` |
 | `CardFilter.Hp` | `CardFilter.HitPoints` |
-| `Card.DexId` | `Card.DexIds` |
+| `Card.DexId` | `Card.DexIds` (`CardFilter.DexId` stays singular: it filters by one id) |
+| `Card.Retreat` | `Card.RetreatCost` |
+| `CardFilter.Retreat` | `CardFilter.RetreatCost` |
+| `Card.EvolveFrom` | `Card.EvolvesFrom` |
+| `CardFilter.EvolveFrom` | `CardFilter.EvolvesFrom` |
+| `Card.VariantsDetailed` | `Card.DetailedVariants` |
+| `Card.Legal` / `CardSet.Legal` | `Card.Legality` / `CardSet.Legality` |
 | `DetailedVariant.Stamp` | `DetailedVariant.Stamps` |
 | `CardCount.FirstEd` | `CardCount.FirstEdition` |
 | `CardmarketPricing.IdProduct` | `CardmarketPricing.ProductId` |
