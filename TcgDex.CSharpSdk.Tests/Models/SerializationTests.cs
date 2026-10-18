@@ -86,6 +86,33 @@ public sealed class SerializationTests
     }
 
     [Test]
+    public void Card_WithNoUpdated_OmitsItThroughTheSdkContext()
+    {
+        // The context ignores nulls when writing, so the key is absent. Checked
+        // at the card's own `updated`, not the ones inside its pricing blocks.
+        Card card = Fixture.Load<Card>("card-pokemon-full.json");
+        card.Updated.ShouldNotBeNull("the control: the fixture has a timestamp to remove");
+
+        using JsonDocument written = JsonDocument.Parse(Serialize(card with { Updated = null }));
+
+        written.RootElement.TryGetProperty("updated", out _).ShouldBeFalse();
+    }
+
+    [Test]
+    public void Card_WithNoUpdated_WritesNullThroughReflectionSerialization()
+    {
+        // Reflection-based JsonSerializer (DECISIONS #28) writes nulls, and here
+        // the converter's own null handling decides the output: its Write
+        // unwraps with GetValueOrDefault, which for a null would be 0001-01-01.
+        // It relies on System.Text.Json writing the null itself.
+        Card card = Fixture.Load<Card>("card-pokemon-full.json") with { Updated = null };
+
+        using JsonDocument written = JsonDocument.Parse(JsonSerializer.Serialize(card));
+
+        written.RootElement.GetProperty("Updated").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Test]
     public void Attack_WithTextDamage_RoundTripsThroughTheConverter()
     {
         // FlexibleStringConverter.Write: damage is read from either a number or
