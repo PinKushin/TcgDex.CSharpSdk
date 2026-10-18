@@ -55,7 +55,7 @@ translation of someone else's idioms.
 
 - **Every endpoint** — cards, sets, series, random, and all 13 enumeration
   endpoints.
-- **Typed queries** — `Where(c => c.Hp > 100)` becomes `hp=gt:100`, covering all
+- **Typed queries** — `Where(c => c.HitPoints > 100)` becomes `hp=gt:100`, covering all
   ten operators the API actually has.
 - **One error contract** — a missing resource returns `null`; everything else
   throws `TcgDexApiException`. Not four exception types depending on which

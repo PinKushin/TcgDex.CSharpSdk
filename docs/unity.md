@@ -123,7 +123,7 @@ written as a troubleshooting step rather than a fixed list to remove up front.
 ## IL2CPP and managed stripping
 
 The SDK reads a captured variable out of its closure reflectively, so that
-`.Where(c => c.Hp > minimumHp)` works without compiling the expression tree —
+`.Where(c => c.HitPoints > minimumHp)` works without compiling the expression tree —
 `Expression.Compile()` emits IL at runtime and IL2CPP cannot support it.
 
 Managed stripping can remove members that only reflection reaches. If you build

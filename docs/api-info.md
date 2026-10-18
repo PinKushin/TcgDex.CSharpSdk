@@ -178,13 +178,13 @@ resolution is `releaseDate > localId > id`.
 |---|---|
 | `/cards` | `CardBrief[]` |
 | `/cards/{id}` | `Card` |
-| `/sets` | `SetBrief[]` |
-| `/sets/{id}` | `Set` (includes its `cards`) |
-| `/series` | `SerieBrief[]` |
-| `/series/{id}` | `Serie` (includes its `sets`) |
+| `/sets` | `CardSetBrief[]` |
+| `/sets/{id}` | `CardSet` (includes its `cards`) |
+| `/series` | `SeriesBrief[]` |
+| `/series/{id}` | `Series` (includes its `sets`) |
 | `/random/card` | `Card` |
-| `/random/set` | `Set` |
-| `/random/serie` | `Serie` |
+| `/random/set` | `CardSet` |
+| `/random/serie` | `Series` |
 
 ### Enumeration endpoints
 
@@ -228,7 +228,7 @@ Always present: `id`, `name`, `category`, `localId`, `set`, `illustrator`, `vari
 | `illustrator` | `string` | |
 | `image` | `string` | Base URL **without extension** — see §6. Optional in practice. |
 | `rarity` | `string` | |
-| `set` | `SetBrief` | |
+| `set` | `CardSetBrief` | |
 | `variants` | `Variants` | |
 | `variants_detailed` | `DetailedVariant[]` | |
 | `updated` | `string` | ISO 8601 with offset, e.g. `2026-07-01T21:27:44+01:00`. |
@@ -330,28 +330,28 @@ but not necessarily both at once for the same card —
 `id`, `localId`, `name`, `image` (optional). Nothing else — `category`, `rarity` and
 `trainerType` are **not** in list results; fetch the card to get them.
 
-### Set — `GET /sets/{id}`
+### CardSet — `GET /sets/{id}`
 
 `id`, `name`, `logo`, `symbol`, `abbreviation`, `cardCount`, `releaseDate`, `legal`, `serie`,
 `tcgOnline`, `cards` (`CardBrief[]`).
 
 `releaseDate` is a full `YYYY-MM-DD` on every set: measured 2026-10-17 across all 606 sets
 (en 220, fr 202, ja 184). The SDK exposes it as `DateTime?` (kind `Unspecified`, date only) on
-`Set` and `Serie`, and reads anything else — absent, partial, malformed — as `null` rather than
+`CardSet` and `Series`, and reads anything else — absent, partial, malformed — as `null` rather than
 failing the object.
 
 **Set ids can contain `+`.** Japanese has `SM1+`, `sm2+`, `SM3+`, `SM4+` and `SM5+`. A raw `+` in
 the path is read as a space and 404s; only `%2B` resolves (`/v2/ja/sets/SM1%2B`). The SDK
 percent-encodes path segments, so `Sets.GetAsync("SM1+")` works.
 
-### SetBrief — embedded in a card
+### CardSetBrief — embedded in a card
 `id`, `name`, `logo`, `symbol`, `cardCount`.
 
 ### CardCount
 `official`, `total`, and optionally `normal`, `holo`, `reverse`, `firstEd` — all `int`.
 
-### Serie — `GET /series/{id}`
-`id`, `name`, `logo`, `releaseDate`, `firstSet`, `lastSet`, `sets` (`SetBrief[]`).
+### Series — `GET /series/{id}`
+`id`, `name`, `logo`, `releaseDate`, `firstSet`, `lastSet`, `sets` (`CardSetBrief[]`).
 List form (`/series`) is `id`, `name`, `logo`.
 
 ### Legal
@@ -438,7 +438,7 @@ them** — that language has no physical coverage at all.
   says which game a rarity belongs to, so a rarity picker built from that endpoint will mix them
   with no separator.
 - **A non-null `pricing` does not mean there is pricing.** Pocket cards carry the container with
-  both providers null, so check `Cardmarket`/`Tcgplayer` rather than the object itself. A digital
+  both providers null, so check `Cardmarket`/`TcgPlayer` rather than the object itself. A digital
   card has no secondary market to price.
 - **A language can be Pocket-only.** `pt-br` is, which is why its `/categories` returns two values
   rather than three — see [Languages](#languages). Its card ids will not resolve in `en`.

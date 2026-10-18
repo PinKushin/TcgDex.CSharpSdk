@@ -250,7 +250,7 @@ Deliberately not equivalent work. This SDK translates a **LINQ expression tree**
 which the compiler checks:
 
 ```csharp
-new CardQuery().Where(c => c.Hp > 100)
+new CardQuery().Where(c => c.HitPoints > 100)
 ```
 
 Theirs takes field names and values as strings, which nothing can check:
