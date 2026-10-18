@@ -58,10 +58,13 @@ on a pass.
 ## 4. Docs
 
 ```bash
+dotnet docfx metadata docfx.json --warningsAsErrors
 dotnet docfx build docfx.json --warningsAsErrors
 ```
 
-`docfx.json` is at the **repository root**, not in `docs/`. Relative links
+`metadata` first, as `docs.yml` does: `build` alone does not generate the API
+pages, so in a fresh checkout or worktree every link into `docs/api/` fails as
+`InvalidFileLink`. `docfx.json` is at the **repository root**, not in `docs/`. Relative links
 pointing outside the docs tree fail here as `InvalidFileLink` — use a full
 GitHub URL for anything under `.github/` or at the repo root.
 
