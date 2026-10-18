@@ -62,7 +62,7 @@ public sealed class ClientTests
         RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "set-full.json");
 
-        Set? set = await CreateClient(handler).Sets.GetAsync("swsh3", CancellationToken.None);
+        CardSet? set = await CreateClient(handler).Sets.GetAsync("swsh3", CancellationToken.None);
 
         handler.SingleRequestUri.ShouldBe("https://api.tcgdex.net/v2/en/sets/swsh3");
         set.ShouldNotBeNull().Cards.ShouldNotBeEmpty();

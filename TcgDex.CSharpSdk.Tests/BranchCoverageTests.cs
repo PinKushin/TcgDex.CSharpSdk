@@ -282,8 +282,8 @@ public sealed class BranchCoverageTests
         // The same guard as on Card, on the models that also carry collections.
         // System.Text.Json's source generator discards property initializers, so
         // without this an omitted array deserializes to null.
-        new Set { Id = "s", Name = "S", Cards = null! }.Cards.ShouldBeEmpty();
-        new Serie { Id = "r", Name = "R", Sets = null! }.Sets.ShouldBeEmpty();
+        new CardSet { Id = "s", Name = "S", Cards = null! }.Cards.ShouldBeEmpty();
+        new Series { Id = "r", Name = "R", Sets = null! }.Sets.ShouldBeEmpty();
         new DetailedVariant { Stamp = null! }.Stamp.ShouldBeEmpty();
         new Attack { Name = "a", Cost = null! }.Cost.ShouldBeEmpty();
     }
@@ -292,9 +292,9 @@ public sealed class BranchCoverageTests
     public void EveryCollectionKeepsASuppliedValue()
     {
         // The other half: the guard must not discard real data.
-        new Set { Id = "s", Name = "S", Cards = [new CardBrief { Id = "c", LocalId = "1", Name = "C" }] }
+        new CardSet { Id = "s", Name = "S", Cards = [new CardBrief { Id = "c", LocalId = "1", Name = "C" }] }
             .Cards.Count.ShouldBe(1);
-        new Serie { Id = "r", Name = "R", Sets = [new SetBrief { Id = "s", Name = "S" }] }
+        new Series { Id = "r", Name = "R", Sets = [new CardSetBrief { Id = "s", Name = "S" }] }
             .Sets.Count.ShouldBe(1);
         new DetailedVariant { Stamp = ["set-logo"] }.Stamp.Count.ShouldBe(1);
         new Attack { Name = "a", Cost = ["Grass"] }.Cost.Count.ShouldBe(1);

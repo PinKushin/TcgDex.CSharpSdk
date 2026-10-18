@@ -98,22 +98,22 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport g
 internal sealed class SetResource(TcgDexTransport transport)
     : ResourceBase(transport), ISetResource
 {
-    public Task<Set?> GetAsync(string id, CancellationToken cancellationToken = default)
-        => Transport.GetAsync<Set>($"sets/{EscapeId(id)}", cancellationToken);
+    public Task<CardSet?> GetAsync(string id, CancellationToken cancellationToken = default)
+        => Transport.GetAsync<CardSet>($"sets/{EscapeId(id)}", cancellationToken);
 
-    public Task<IReadOnlyList<SetBrief>> ListAsync(CancellationToken cancellationToken = default)
-        => Transport.GetRequiredAsync<IReadOnlyList<SetBrief>>("sets", cancellationToken);
+    public Task<IReadOnlyList<CardSetBrief>> ListAsync(CancellationToken cancellationToken = default)
+        => Transport.GetRequiredAsync<IReadOnlyList<CardSetBrief>>("sets", cancellationToken);
 }
 
-/// <inheritdoc cref="ISerieResource" />
-internal sealed class SerieResource(TcgDexTransport transport)
-    : ResourceBase(transport), ISerieResource
+/// <inheritdoc cref="ISeriesResource" />
+internal sealed class SeriesResource(TcgDexTransport transport)
+    : ResourceBase(transport), ISeriesResource
 {
-    public Task<Serie?> GetAsync(string id, CancellationToken cancellationToken = default)
-        => Transport.GetAsync<Serie>($"series/{EscapeId(id)}", cancellationToken);
+    public Task<Series?> GetAsync(string id, CancellationToken cancellationToken = default)
+        => Transport.GetAsync<Series>($"series/{EscapeId(id)}", cancellationToken);
 
-    public Task<IReadOnlyList<SerieBrief>> ListAsync(CancellationToken cancellationToken = default)
-        => Transport.GetRequiredAsync<IReadOnlyList<SerieBrief>>("series", cancellationToken);
+    public Task<IReadOnlyList<SeriesBrief>> ListAsync(CancellationToken cancellationToken = default)
+        => Transport.GetRequiredAsync<IReadOnlyList<SeriesBrief>>("series", cancellationToken);
 }
 
 /// <inheritdoc cref="IRandomResource" />
@@ -123,11 +123,11 @@ internal sealed class RandomResource(TcgDexTransport transport)
     public Task<Card> CardAsync(CancellationToken cancellationToken = default)
         => Transport.GetRequiredAsync<Card>("random/card", cancellationToken);
 
-    public Task<Set> SetAsync(CancellationToken cancellationToken = default)
-        => Transport.GetRequiredAsync<Set>("random/set", cancellationToken);
+    public Task<CardSet> SetAsync(CancellationToken cancellationToken = default)
+        => Transport.GetRequiredAsync<CardSet>("random/set", cancellationToken);
 
-    public Task<Serie> SerieAsync(CancellationToken cancellationToken = default)
-        => Transport.GetRequiredAsync<Serie>("random/serie", cancellationToken);
+    public Task<Series> SerieAsync(CancellationToken cancellationToken = default)
+        => Transport.GetRequiredAsync<Series>("random/serie", cancellationToken);
 }
 
 /// <inheritdoc cref="ICatalogResource" />

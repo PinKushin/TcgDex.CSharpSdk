@@ -27,8 +27,8 @@ public enum ImageFormat
 /// Builds asset URLs from the base URLs the API returns.
 /// </summary>
 /// <remarks>
-/// <see cref="Card.Image"/>, <see cref="SetBrief.Logo"/> and
-/// <see cref="SetBrief.Symbol"/> are base URLs <em>without a file extension</em>;
+/// <see cref="Card.Image"/>, <see cref="CardSetBrief.Logo"/> and
+/// <see cref="CardSetBrief.Symbol"/> are base URLs <em>without a file extension</em>;
 /// requesting one directly returns 404. The quality and format have to be
 /// appended, and these methods do it without the caller hand-assembling strings
 /// or guessing at the accepted values.
@@ -157,7 +157,7 @@ public static class ImageExtensions
     /// Takes no quality: logos are served at a single resolution, unlike card
     /// artwork.
     /// </remarks>
-    public static string? GetLogoUrl(this SetBrief set, ImageFormat format = ImageFormat.Png)
+    public static string? GetLogoUrl(this CardSetBrief set, ImageFormat format = ImageFormat.Png)
     {
         Guard.NotNull(set);
 
@@ -169,7 +169,7 @@ public static class ImageExtensions
     /// <param name="format">The file format to request.</param>
     /// <returns>The logo URL, or <see langword="null"/> when the set has none.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="set"/> is null.</exception>
-    public static string? GetLogoUrl(this Set set, ImageFormat format = ImageFormat.Png)
+    public static string? GetLogoUrl(this CardSet set, ImageFormat format = ImageFormat.Png)
     {
         Guard.NotNull(set);
 
@@ -185,7 +185,7 @@ public static class ImageExtensions
     /// Takes no quality, and is served language-neutral rather than from the
     /// requested language's path.
     /// </remarks>
-    public static string? GetSymbolUrl(this SetBrief set, ImageFormat format = ImageFormat.Png)
+    public static string? GetSymbolUrl(this CardSetBrief set, ImageFormat format = ImageFormat.Png)
     {
         Guard.NotNull(set);
 
@@ -197,7 +197,7 @@ public static class ImageExtensions
     /// <param name="format">The file format to request.</param>
     /// <returns>The symbol URL, or <see langword="null"/> when the set has none.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="set"/> is null.</exception>
-    public static string? GetSymbolUrl(this Set set, ImageFormat format = ImageFormat.Png)
+    public static string? GetSymbolUrl(this CardSet set, ImageFormat format = ImageFormat.Png)
     {
         Guard.NotNull(set);
 

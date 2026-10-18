@@ -266,18 +266,18 @@ public sealed class PaginationAndImageTests
     {
         Should.Throw<ArgumentNullException>(() => ((Card)null!).GetImageUrl());
         Should.Throw<ArgumentNullException>(() => ((CardBrief)null!).GetImageUrl());
-        Should.Throw<ArgumentNullException>(() => ((SetBrief)null!).GetLogoUrl());
-        Should.Throw<ArgumentNullException>(() => ((SetBrief)null!).GetSymbolUrl());
-        Should.Throw<ArgumentNullException>(() => ((Set)null!).GetLogoUrl());
-        Should.Throw<ArgumentNullException>(() => ((Set)null!).GetSymbolUrl());
+        Should.Throw<ArgumentNullException>(() => ((CardSetBrief)null!).GetLogoUrl());
+        Should.Throw<ArgumentNullException>(() => ((CardSetBrief)null!).GetSymbolUrl());
+        Should.Throw<ArgumentNullException>(() => ((CardSet)null!).GetLogoUrl());
+        Should.Throw<ArgumentNullException>(() => ((CardSet)null!).GetSymbolUrl());
     }
 
     [Test]
     public void GetLogoAndSymbolUrls_WorkOnAFullSetToo()
     {
-        // Both Set and SetBrief carry logos, and a caller holding either should
+        // Both CardSet and CardSetBrief carry logos, and a caller holding either should
         // not have to know which overload they are on.
-        Set set = Fixture.Load<Set>("set-full.json");
+        CardSet set = Fixture.Load<CardSet>("set-full.json");
 
         set.GetLogoUrl().ShouldEndWith("/logo.png");
         set.GetSymbolUrl(ImageFormat.Webp).ShouldEndWith("/symbol.webp");

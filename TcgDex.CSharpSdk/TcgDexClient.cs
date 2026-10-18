@@ -23,7 +23,7 @@ public interface ITcgDexClient
     ISetResource Sets { get; }
 
     /// <summary>Series lookups.</summary>
-    ISerieResource Series { get; }
+    ISeriesResource Series { get; }
 
     /// <summary>Random card, set and series.</summary>
     IRandomResource Random { get; }
@@ -135,7 +135,7 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
 
         Cards = new CardResource(transport, graphQl);
         Sets = new SetResource(transport);
-        Series = new SerieResource(transport);
+        Series = new SeriesResource(transport);
         Random = new RandomResource(transport);
         Catalog = new CatalogResource(transport);
     }
@@ -152,7 +152,7 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
     public ISetResource Sets { get; }
 
     /// <inheritdoc />
-    public ISerieResource Series { get; }
+    public ISeriesResource Series { get; }
 
     /// <inheritdoc />
     public IRandomResource Random { get; }

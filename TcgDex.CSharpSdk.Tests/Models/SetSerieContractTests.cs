@@ -11,7 +11,7 @@ public sealed class SetSerieContractTests
     [Test]
     public void Deserialize_Set_MapsMetadataAndCards()
     {
-        Set set = Fixture.Load<Set>("set-full.json");
+        CardSet set = Fixture.Load<CardSet>("set-full.json");
 
         set.Id.ShouldBe("swsh3");
         set.Name.ShouldBe("Darkness Ablaze");
@@ -19,14 +19,14 @@ public sealed class SetSerieContractTests
         set.ReleaseDate!.Value.Kind.ShouldBe(DateTimeKind.Unspecified, "a calendar date, not an instant");
         set.TcgOnline.ShouldBe("DAA");
         set.Abbreviation.ShouldNotBeNull().Official.ShouldBe("DAA");
-        set.Serie.ShouldNotBeNull().Id.ShouldBe("swsh");
+        set.Series.ShouldNotBeNull().Id.ShouldBe("swsh");
         set.Legal.ShouldNotBeNull().Expanded.ShouldBeTrue();
     }
 
     [Test]
     public void Deserialize_Set_MapsFullCardCountBreakdown()
     {
-        Set set = Fixture.Load<Set>("set-full.json");
+        CardSet set = Fixture.Load<CardSet>("set-full.json");
 
         CardCount count = set.CardCount.ShouldNotBeNull();
         count.Official.ShouldBe(189);
@@ -40,7 +40,7 @@ public sealed class SetSerieContractTests
     [Test]
     public void Deserialize_Set_IncludesItsCardsAsBriefs()
     {
-        Set set = Fixture.Load<Set>("set-full.json");
+        CardSet set = Fixture.Load<CardSet>("set-full.json");
 
         set.Cards.ShouldNotBeEmpty();
         set.Cards.Count.ShouldBe(set.CardCount!.Total);
@@ -50,7 +50,7 @@ public sealed class SetSerieContractTests
     [Test]
     public void Deserialize_Serie_MapsSetsAndBoundaryMarkers()
     {
-        Serie serie = Fixture.Load<Serie>("serie-full.json");
+        Series serie = Fixture.Load<Series>("serie-full.json");
 
         serie.Id.ShouldBe("swsh");
         serie.Name.ShouldBe("Sword & Shield");
@@ -143,7 +143,7 @@ public sealed class SetSerieContractTests
     [TestCase("""{"id":"x","name":"x"}""", TestName = "ReleaseDate_Absent_IsNull")]
     public void ReleaseDate_AnythingButAFullDate_IsNullNotAThrow(string json)
     {
-        Serie serie = Fixture.Parse<Serie>(json);
+        Series serie = Fixture.Parse<Series>(json);
 
         serie.ReleaseDate.ShouldBeNull();
         serie.Id.ShouldBe("x", "the rest of the object still deserializes");
@@ -151,17 +151,17 @@ public sealed class SetSerieContractTests
 
     [Test]
     public void ReleaseDate_Set_IsTolerantToo()
-        => Fixture.Parse<Set>("""{"id":"x","name":"x","releaseDate":"soon"}""").ReleaseDate.ShouldBeNull();
+        => Fixture.Parse<CardSet>("""{"id":"x","name":"x","releaseDate":"soon"}""").ReleaseDate.ShouldBeNull();
 
     [Test]
     public void ReleaseDate_Serializes_AsTheApiSendsIt()
     {
-        Serie serie = Fixture.Load<Serie>("serie-full.json");
+        Series serie = Fixture.Load<Series>("serie-full.json");
 
-        string json = JsonSerializer.Serialize(serie, TcgDex.Serialization.TcgDexJsonContext.Default.Serie);
+        string json = JsonSerializer.Serialize(serie, TcgDex.Serialization.TcgDexJsonContext.Default.Series);
 
         json.ShouldContain("\"releaseDate\":\"2019-11-15\"");
-        Fixture.Parse<Serie>(json).ReleaseDate.ShouldBe(serie.ReleaseDate);
+        Fixture.Parse<Series>(json).ReleaseDate.ShouldBe(serie.ReleaseDate);
     }
 
     [Test]
@@ -169,7 +169,7 @@ public sealed class SetSerieContractTests
     {
         // The SDK's options omit nulls; a caller's options that do not must
         // still get `null`, which System.Text.Json writes without the converter.
-        JsonSerializer.Serialize(new Serie { Id = "x", Name = "x" }, NeverIgnoreNulls)
+        JsonSerializer.Serialize(new Series { Id = "x", Name = "x" }, NeverIgnoreNulls)
             .ShouldContain("\"releaseDate\":null");
     }
 
@@ -179,7 +179,7 @@ public sealed class SetSerieContractTests
         // ReleaseDateConverter.Write has no null branch: it relies on
         // System.Text.Json never handing it a null DateTime?. Were it called,
         // GetValueOrDefault() would emit "0001-01-01".
-        string json = JsonSerializer.Serialize(new Set { Id = "x", Name = "x" }, NeverIgnoreNulls);
+        string json = JsonSerializer.Serialize(new CardSet { Id = "x", Name = "x" }, NeverIgnoreNulls);
 
         json.ShouldContain("\"releaseDate\":null");
         json.ShouldNotContain("0001-01-01");
@@ -194,7 +194,7 @@ public sealed class SetSerieContractTests
     [Test]
     public void ReleaseDate_Null_IsOmittedWhenSerialized()
         => JsonSerializer.Serialize(
-                new Serie { Id = "x", Name = "x" },
-                TcgDex.Serialization.TcgDexJsonContext.Default.Serie)
+                new Series { Id = "x", Name = "x" },
+                TcgDex.Serialization.TcgDexJsonContext.Default.Series)
             .ShouldNotContain("releaseDate");
 }

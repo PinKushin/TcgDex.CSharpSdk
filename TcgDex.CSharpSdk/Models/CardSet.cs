@@ -28,7 +28,7 @@ public sealed record CardCount
 /// <summary>
 /// The abbreviated set reference embedded in a card.
 /// </summary>
-public sealed record SetBrief
+public sealed record CardSetBrief
 {
     /// <summary>The set identifier, for example <c>"swsh3"</c>.</summary>
     public required string Id { get; init; }
@@ -52,7 +52,7 @@ public sealed record SetBrief
 /// <summary>
 /// A full set, as returned by the single-set endpoint. Includes its card list.
 /// </summary>
-public sealed record Set
+public sealed record CardSet
 {
     // See Card for why collections need a backing field rather than an
     // initializer: the JSON source generator discards initializers.
@@ -65,7 +65,7 @@ public sealed record Set
     public required string Name { get; init; }
 
     /// <summary>The set's short code, when it has one.</summary>
-    public SetAbbreviation? Abbreviation { get; init; }
+    public CardSetAbbreviation? Abbreviation { get; init; }
 
     /// <summary>Logo image URL, without file extension.</summary>
     public string? Logo { get; init; }
@@ -88,7 +88,8 @@ public sealed record Set
     public Legality? Legal { get; init; }
 
     /// <summary>The series this set belongs to.</summary>
-    public SerieBrief? Serie { get; init; }
+    [JsonPropertyName("serie")]
+    public SeriesBrief? Series { get; init; }
 
     /// <summary>The set's code in Pokémon TCG Online, when it has one.</summary>
     public string? TcgOnline { get; init; }
@@ -104,7 +105,7 @@ public sealed record Set
 /// <summary>
 /// A set's official and localized short codes.
 /// </summary>
-public sealed record SetAbbreviation
+public sealed record CardSetAbbreviation
 {
     /// <summary>The official abbreviation.</summary>
     public string? Official { get; init; }

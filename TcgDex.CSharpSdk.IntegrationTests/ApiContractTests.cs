@@ -91,7 +91,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task GetSet_IncludesItsCards()
     {
-        Set? set = await Client.Sets.GetAsync("swsh3", Timeout);
+        CardSet? set = await Client.Sets.GetAsync("swsh3", Timeout);
 
         set.ShouldNotBeNull();
         set.Name.ShouldBe("Darkness Ablaze");
@@ -102,7 +102,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task GetSerie_UsesThePluralPathAndIncludesSets()
     {
-        Serie? serie = await Client.Series.GetAsync("swsh", Timeout);
+        Series? serie = await Client.Series.GetAsync("swsh", Timeout);
 
         serie.ShouldNotBeNull().Id.ShouldBe("swsh");
 
@@ -314,7 +314,7 @@ public sealed class ApiContractTests : LiveApiFixture
             httpClient,
             new TcgDexOptions { Language = TcgDexLanguages.Japanese });
 
-        Set? set = await client.Sets.GetAsync("SM1+", Timeout);
+        CardSet? set = await client.Sets.GetAsync("SM1+", Timeout);
 
         set.ShouldNotBeNull().Id.ShouldBe("SM1+");
         set.ReleaseDate.ShouldNotBeNull();

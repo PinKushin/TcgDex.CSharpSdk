@@ -197,7 +197,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task MissingSet_ReturnsNull()
     {
-        Set? set = await Client.Sets.GetAsync("no-such-set-999", Timeout);
+        CardSet? set = await Client.Sets.GetAsync("no-such-set-999", Timeout);
 
         set.ShouldBeNull();
     }
@@ -205,7 +205,7 @@ public sealed class QueryAndPagingTests : LiveApiFixture
     [Test]
     public async Task MissingSerie_ReturnsNull()
     {
-        Serie? serie = await Client.Series.GetAsync("no-such-serie-999", Timeout);
+        Series? serie = await Client.Series.GetAsync("no-such-serie-999", Timeout);
 
         serie.ShouldBeNull();
     }

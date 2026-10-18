@@ -103,29 +103,29 @@ public interface ISetResource
     /// <param name="id">The set id, for example <c>"swsh3"</c>.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The set, or <see langword="null"/> if no set has that id.</returns>
-    Task<Set?> GetAsync(string id, CancellationToken cancellationToken = default);
+    Task<CardSet?> GetAsync(string id, CancellationToken cancellationToken = default);
 
     /// <summary>Lists every set in brief form.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every set, as briefs.</returns>
-    Task<IReadOnlyList<SetBrief>> ListAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CardSetBrief>> ListAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
 /// Reads series.
 /// </summary>
-public interface ISerieResource
+public interface ISeriesResource
 {
     /// <summary>Fetches a single series, including its sets.</summary>
     /// <param name="id">The series id, for example <c>"swsh"</c>.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The series, or <see langword="null"/> if none has that id.</returns>
-    Task<Serie?> GetAsync(string id, CancellationToken cancellationToken = default);
+    Task<Series?> GetAsync(string id, CancellationToken cancellationToken = default);
 
     /// <summary>Lists every series in brief form.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every series, as briefs.</returns>
-    Task<IReadOnlyList<SerieBrief>> ListAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SeriesBrief>> ListAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -141,12 +141,12 @@ public interface IRandomResource
     /// <summary>Fetches a random set.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>A randomly chosen set.</returns>
-    Task<Set> SetAsync(CancellationToken cancellationToken = default);
+    Task<CardSet> SetAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Fetches a random series.</summary>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>A randomly chosen series.</returns>
-    Task<Serie> SerieAsync(CancellationToken cancellationToken = default);
+    Task<Series> SerieAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>

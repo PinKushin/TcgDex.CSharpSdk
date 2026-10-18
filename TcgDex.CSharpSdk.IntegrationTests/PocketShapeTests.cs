@@ -129,9 +129,9 @@ public sealed class PocketShapeTests : LiveApiFixture
     {
         // The serie is the one durable marker in the data. Set ids keep being
         // added, so matching on `A*`/`B*` would rot; `tcgp` will not.
-        Set? set = await Client.Sets.GetAsync("A4", Timeout);
+        CardSet? set = await Client.Sets.GetAsync("A4", Timeout);
 
-        SerieBrief serie = set.ShouldNotBeNull().Serie.ShouldNotBeNull();
+        SeriesBrief serie = set.ShouldNotBeNull().Series.ShouldNotBeNull();
 
         serie.Id.ShouldBe("tcgp");
         serie.Name.ShouldBe("Pokémon TCG Pocket");

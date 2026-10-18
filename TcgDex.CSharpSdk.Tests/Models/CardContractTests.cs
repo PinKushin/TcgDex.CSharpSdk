@@ -248,7 +248,7 @@ public sealed class CardContractTests
             Name = "Test",
             Category = CardCategories.Trainer,
             LocalId = "1",
-            Set = new SetBrief { Id = "x", Name = "Test Set" },
+            Set = new CardSetBrief { Id = "x", Name = "Test Set" },
             Attacks = null!,
             Types = null!,
         };

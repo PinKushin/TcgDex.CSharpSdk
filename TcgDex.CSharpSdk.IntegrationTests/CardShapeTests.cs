@@ -147,7 +147,7 @@ public sealed class CardShapeTests : LiveApiFixture
     {
         // Proves ids returned by one endpoint resolve at another — the kind of
         // break that only shows up against the live service.
-        Set? set = await Client.Sets.GetAsync("swsh3", Timeout);
+        CardSet? set = await Client.Sets.GetAsync("swsh3", Timeout);
 
         set.ShouldNotBeNull().Cards.ShouldNotBeEmpty();
 
@@ -160,12 +160,12 @@ public sealed class CardShapeTests : LiveApiFixture
     [Test]
     public async Task Serie_RoundTripsThroughItsOwnSets()
     {
-        Serie? serie = await Client.Series.GetAsync("swsh", Timeout);
+        Series? serie = await Client.Series.GetAsync("swsh", Timeout);
 
         serie.ShouldNotBeNull().Sets.ShouldNotBeEmpty();
 
-        Set? set = await Client.Sets.GetAsync(serie.Sets[0].Id, Timeout);
+        CardSet? set = await Client.Sets.GetAsync(serie.Sets[0].Id, Timeout);
 
-        set.ShouldNotBeNull().Serie.ShouldNotBeNull().Id.ShouldBe("swsh");
+        set.ShouldNotBeNull().Series.ShouldNotBeNull().Id.ShouldBe("swsh");
     }
 }

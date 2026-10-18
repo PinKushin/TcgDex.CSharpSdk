@@ -151,9 +151,9 @@ public sealed class SerializationTests
     [Test]
     public void Set_RoundTrips()
     {
-        Set original = Fixture.Load<Set>("set-full.json");
+        CardSet original = Fixture.Load<CardSet>("set-full.json");
 
-        Set restored = Deserialize<Set>(Serialize(original));
+        CardSet restored = Deserialize<CardSet>(Serialize(original));
 
         restored.Id.ShouldBe(original.Id);
         restored.Cards.Count.ShouldBe(original.Cards.Count);
@@ -163,9 +163,9 @@ public sealed class SerializationTests
     [Test]
     public void Serie_RoundTrips()
     {
-        Serie original = Fixture.Load<Serie>("serie-full.json");
+        Series original = Fixture.Load<Series>("serie-full.json");
 
-        Serie restored = Deserialize<Serie>(Serialize(original));
+        Series restored = Deserialize<Series>(Serialize(original));
 
         restored.Id.ShouldBe(original.Id);
         restored.Sets.Count.ShouldBe(original.Sets.Count);

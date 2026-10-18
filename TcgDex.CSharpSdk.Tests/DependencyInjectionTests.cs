@@ -235,8 +235,8 @@ public sealed class DependencyInjectionTests
 
         using ServiceProvider provider = services.BuildServiceProvider();
 
-        Set? first = await provider.GetRequiredService<ITcgDexClient>().Sets.GetAsync("swsh3");
-        Set? second = await provider.GetRequiredService<ITcgDexClient>().Sets.GetAsync("swsh3");
+        CardSet? first = await provider.GetRequiredService<ITcgDexClient>().Sets.GetAsync("swsh3");
+        CardSet? second = await provider.GetRequiredService<ITcgDexClient>().Sets.GetAsync("swsh3");
 
         primary.Requests.ShouldBe(2);
         first.ShouldNotBeNull();

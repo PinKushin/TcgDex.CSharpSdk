@@ -63,7 +63,7 @@ namespace TcgDex
         TcgDex.Resources.ICardResource Cards { get; }
         TcgDex.Resources.ICatalogResource Catalog { get; }
         TcgDex.Resources.IRandomResource Random { get; }
-        TcgDex.Resources.ISerieResource Series { get; }
+        TcgDex.Resources.ISeriesResource Series { get; }
         TcgDex.Resources.ISetResource Sets { get; }
     }
     public sealed class TcgDexApiException : System.Exception
@@ -86,7 +86,7 @@ namespace TcgDex
         public TcgDex.Resources.ICardResource Cards { get; }
         public TcgDex.Resources.ICatalogResource Catalog { get; }
         public TcgDex.Resources.IRandomResource Random { get; }
-        public TcgDex.Resources.ISerieResource Series { get; }
+        public TcgDex.Resources.ISeriesResource Series { get; }
         public TcgDex.Resources.ISetResource Sets { get; }
         public void Dispose() { }
         public static TcgDex.TcgDexClient Create(TcgDex.TcgDexOptions? options = null, System.Action<TcgDex.Caching.TcgDexCacheOptions>? configureCache = null, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory = null) { }
@@ -194,7 +194,7 @@ namespace TcgDex.Models
         public string? RegulationMark { get; init; }
         public System.Collections.Generic.IReadOnlyList<TcgDex.Models.WeaknessOrResistance> Resistances { get; init; }
         public int? Retreat { get; init; }
-        public required TcgDex.Models.SetBrief Set { get; init; }
+        public required TcgDex.Models.CardSetBrief Set { get; init; }
         public string? Stage { get; init; }
         public string? Suffix { get; init; }
         public TcgDex.Models.ThirdParty? ThirdParty { get; init; }
@@ -231,6 +231,38 @@ namespace TcgDex.Models
         public int Official { get; init; }
         public int? Reverse { get; init; }
         public int Total { get; init; }
+    }
+    public sealed class CardSet : System.IEquatable<TcgDex.Models.CardSet>
+    {
+        public CardSet() { }
+        public TcgDex.Models.CardSetAbbreviation? Abbreviation { get; init; }
+        public TcgDex.Models.CardCount? CardCount { get; init; }
+        public System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardBrief> Cards { get; init; }
+        public required string Id { get; init; }
+        public TcgDex.Models.Legality? Legal { get; init; }
+        public string? Logo { get; init; }
+        public required string Name { get; init; }
+        [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.ReleaseDateConverter?))]
+        public System.DateTime? ReleaseDate { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("serie")]
+        public TcgDex.Models.SeriesBrief? Series { get; init; }
+        public string? Symbol { get; init; }
+        public string? TcgOnline { get; init; }
+    }
+    public sealed class CardSetAbbreviation : System.IEquatable<TcgDex.Models.CardSetAbbreviation>
+    {
+        public CardSetAbbreviation() { }
+        public string? Localized { get; init; }
+        public string? Official { get; init; }
+    }
+    public sealed class CardSetBrief : System.IEquatable<TcgDex.Models.CardSetBrief>
+    {
+        public CardSetBrief() { }
+        public TcgDex.Models.CardCount? CardCount { get; init; }
+        public required string Id { get; init; }
+        public string? Logo { get; init; }
+        public required string Name { get; init; }
+        public string? Symbol { get; init; }
     }
     public sealed class CardmarketPricing : System.IEquatable<TcgDex.Models.CardmarketPricing>
     {
@@ -273,10 +305,10 @@ namespace TcgDex.Models
     {
         public static string? GetImageUrl(this TcgDex.Models.Card card, TcgDex.Models.ImageQuality quality = 0, TcgDex.Models.ImageFormat format = 0) { }
         public static string? GetImageUrl(this TcgDex.Models.CardBrief card, TcgDex.Models.ImageQuality quality = 0, TcgDex.Models.ImageFormat format = 0) { }
-        public static string? GetLogoUrl(this TcgDex.Models.Set set, TcgDex.Models.ImageFormat format = 0) { }
-        public static string? GetLogoUrl(this TcgDex.Models.SetBrief set, TcgDex.Models.ImageFormat format = 0) { }
-        public static string? GetSymbolUrl(this TcgDex.Models.Set set, TcgDex.Models.ImageFormat format = 0) { }
-        public static string? GetSymbolUrl(this TcgDex.Models.SetBrief set, TcgDex.Models.ImageFormat format = 0) { }
+        public static string? GetLogoUrl(this TcgDex.Models.CardSet set, TcgDex.Models.ImageFormat format = 0) { }
+        public static string? GetLogoUrl(this TcgDex.Models.CardSetBrief set, TcgDex.Models.ImageFormat format = 0) { }
+        public static string? GetSymbolUrl(this TcgDex.Models.CardSet set, TcgDex.Models.ImageFormat format = 0) { }
+        public static string? GetSymbolUrl(this TcgDex.Models.CardSetBrief set, TcgDex.Models.ImageFormat format = 0) { }
     }
     public enum ImageFormat
     {
@@ -306,55 +338,24 @@ namespace TcgDex.Models
         public TcgDex.Models.CardmarketPricing? Cardmarket { get; init; }
         public TcgDex.Models.TcgPlayerPricing? Tcgplayer { get; init; }
     }
-    public sealed class Serie : System.IEquatable<TcgDex.Models.Serie>
+    public sealed class Series : System.IEquatable<TcgDex.Models.Series>
     {
-        public Serie() { }
-        public TcgDex.Models.SetBrief? FirstSet { get; init; }
+        public Series() { }
+        public TcgDex.Models.CardSetBrief? FirstSet { get; init; }
         public required string Id { get; init; }
-        public TcgDex.Models.SetBrief? LastSet { get; init; }
+        public TcgDex.Models.CardSetBrief? LastSet { get; init; }
         public string? Logo { get; init; }
         public required string Name { get; init; }
         [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.ReleaseDateConverter))]
         public System.DateTime? ReleaseDate { get; init; }
-        public System.Collections.Generic.IReadOnlyList<TcgDex.Models.SetBrief> Sets { get; init; }
+        public System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardSetBrief> Sets { get; init; }
     }
-    public sealed class SerieBrief : System.IEquatable<TcgDex.Models.SerieBrief>
+    public sealed class SeriesBrief : System.IEquatable<TcgDex.Models.SeriesBrief>
     {
-        public SerieBrief() { }
+        public SeriesBrief() { }
         public required string Id { get; init; }
         public string? Logo { get; init; }
         public required string Name { get; init; }
-    }
-    public sealed class Set : System.IEquatable<TcgDex.Models.Set>
-    {
-        public Set() { }
-        public TcgDex.Models.SetAbbreviation? Abbreviation { get; init; }
-        public TcgDex.Models.CardCount? CardCount { get; init; }
-        public System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardBrief> Cards { get; init; }
-        public required string Id { get; init; }
-        public TcgDex.Models.Legality? Legal { get; init; }
-        public string? Logo { get; init; }
-        public required string Name { get; init; }
-        [System.Text.Json.Serialization.JsonConverter(typeof(TcgDex.Serialization.ReleaseDateConverter?))]
-        public System.DateTime? ReleaseDate { get; init; }
-        public TcgDex.Models.SerieBrief? Serie { get; init; }
-        public string? Symbol { get; init; }
-        public string? TcgOnline { get; init; }
-    }
-    public sealed class SetAbbreviation : System.IEquatable<TcgDex.Models.SetAbbreviation>
-    {
-        public SetAbbreviation() { }
-        public string? Localized { get; init; }
-        public string? Official { get; init; }
-    }
-    public sealed class SetBrief : System.IEquatable<TcgDex.Models.SetBrief>
-    {
-        public SetBrief() { }
-        public TcgDex.Models.CardCount? CardCount { get; init; }
-        public required string Id { get; init; }
-        public string? Logo { get; init; }
-        public required string Name { get; init; }
-        public string? Symbol { get; init; }
     }
     public sealed class TcgDexProblem : System.IEquatable<TcgDex.Models.TcgDexProblem>
     {
@@ -485,17 +486,17 @@ namespace TcgDex.Resources
     public interface IRandomResource
     {
         System.Threading.Tasks.Task<TcgDex.Models.Card> CardAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<TcgDex.Models.Serie> SerieAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<TcgDex.Models.Set> SetAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<TcgDex.Models.Series> SerieAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<TcgDex.Models.CardSet> SetAsync(System.Threading.CancellationToken cancellationToken = default);
     }
-    public interface ISerieResource
+    public interface ISeriesResource
     {
-        System.Threading.Tasks.Task<TcgDex.Models.Serie?> GetAsync(string id, System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.SerieBrief>> ListAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<TcgDex.Models.Series?> GetAsync(string id, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.SeriesBrief>> ListAsync(System.Threading.CancellationToken cancellationToken = default);
     }
     public interface ISetResource
     {
-        System.Threading.Tasks.Task<TcgDex.Models.Set?> GetAsync(string id, System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.SetBrief>> ListAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<TcgDex.Models.CardSet?> GetAsync(string id, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardSetBrief>> ListAsync(System.Threading.CancellationToken cancellationToken = default);
     }
 }

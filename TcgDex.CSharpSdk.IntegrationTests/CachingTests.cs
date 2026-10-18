@@ -174,8 +174,8 @@ public sealed class CachingTests : LiveApiFixture
 
         using (http)
         {
-            Set? first = await client.Sets.GetAsync("swsh3", Timeout);
-            Set? second = await client.Sets.GetAsync("swsh3", Timeout);
+            CardSet? first = await client.Sets.GetAsync("swsh3", Timeout);
+            CardSet? second = await client.Sets.GetAsync("swsh3", Timeout);
 
             first.ShouldNotBeNull().Cards.Count.ShouldBeGreaterThan(200);
             second.ShouldNotBeNull().Cards.Count.ShouldBe(first.Cards.Count);

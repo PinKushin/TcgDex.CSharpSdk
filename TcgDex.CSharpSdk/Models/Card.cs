@@ -62,7 +62,7 @@ public sealed record Card
     public required string LocalId { get; init; }
 
     /// <summary>The set this card belongs to.</summary>
-    public required SetBrief Set { get; init; }
+    public required CardSetBrief Set { get; init; }
 
     /// <summary>Which printings of this card exist.</summary>
     public Variants? Variants { get; init; }
