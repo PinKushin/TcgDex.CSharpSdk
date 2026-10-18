@@ -224,8 +224,15 @@ public sealed class PaginationAndImageTests
     public void ImageUrl_WithNoBase_ReturnsNull(string? baseUrl)
         => ImageUrl.Build(baseUrl).ShouldBeNull();
 
+    [Test]
+    public void ImageUrl_AcceptsPlainHttp()
+        => ImageUrl.Build("http://localhost/en/swsh/swsh3/136")
+            .ShouldBe(new Uri("http://localhost/en/swsh/swsh3/136/high.png"));
+
     [TestCase("assets/en/swsh/swsh3/136")]
     [TestCase("not a url")]
+    [TestCase("ftp://assets.tcgdex.net/en/swsh/swsh3/136")]
+    [TestCase("file:///en/swsh/swsh3/136")]
     public void ImageUrl_WithABaseThatIsNotAnAbsoluteUrl_ReturnsNull(string baseUrl)
     {
         // The tolerance policy for API values (DECISIONS #27): what cannot be
