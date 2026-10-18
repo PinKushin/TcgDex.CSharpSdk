@@ -129,11 +129,11 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         ILogger logger = loggerFactory?.CreateLogger(TcgDexLog.Category) ?? NullLogger.Instance;
 
         TcgDexTransport transport = new(httpClient, resolved, logger, sharedDeserialized);
-        GraphQlTransport graphQl = new(httpClient, resolved, logger);
+        GraphQLTransport graphQL = new(httpClient, resolved, logger);
 
         logger.ClientConfigured(resolved.Language, resolved.BaseAddress);
 
-        Cards = new CardResource(transport, graphQl);
+        Cards = new CardResource(transport, graphQL);
         Sets = new CardSetResource(transport);
         Series = new SeriesResource(transport);
         Random = new RandomResource(transport);

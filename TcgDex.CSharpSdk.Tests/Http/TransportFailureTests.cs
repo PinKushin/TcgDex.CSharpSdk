@@ -109,7 +109,7 @@ public sealed class TransportFailureTests
     // ----- GraphQL transport -----
 
     [Test]
-    public void GraphQl_WhenNetworkFails_ThrowsApiException()
+    public void GraphQL_WhenNetworkFails_ThrowsApiException()
     {
         RecordingHandler handler = Throwing(new HttpRequestException("connection reset"));
 
@@ -120,7 +120,7 @@ public sealed class TransportFailureTests
     }
 
     [Test]
-    public void GraphQl_WhenThePipelineCancels_ReportsACancellationNotATimeout()
+    public void GraphQL_WhenThePipelineCancels_ReportsACancellationNotATimeout()
     {
         RecordingHandler handler = Throwing(new TaskCanceledException("cancelled"));
 
@@ -131,7 +131,7 @@ public sealed class TransportFailureTests
     }
 
     [Test]
-    public void GraphQl_WhenServerFails_ThrowsWithTheStatus()
+    public void GraphQL_WhenServerFails_ThrowsWithTheStatus()
     {
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.BadGateway, "{}");
 
@@ -142,7 +142,7 @@ public sealed class TransportFailureTests
     }
 
     [Test]
-    public void GraphQl_WhenBodyIsNotJson_ThrowsApiException()
+    public void GraphQL_WhenBodyIsNotJson_ThrowsApiException()
     {
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "<html>proxy error</html>");
 
@@ -153,7 +153,7 @@ public sealed class TransportFailureTests
     }
 
     [Test]
-    public async Task GraphQl_WhenDataIsAbsent_ReturnsEmpty()
+    public async Task GraphQL_WhenDataIsAbsent_ReturnsEmpty()
     {
         // A response with neither data nor errors is degenerate but must not
         // produce a null collection.
@@ -167,7 +167,7 @@ public sealed class TransportFailureTests
     }
 
     [Test]
-    public async Task GraphQl_WhenCardsIsNull_ReturnsEmpty()
+    public async Task GraphQL_WhenCardsIsNull_ReturnsEmpty()
     {
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, """{"data":{"cards":null}}""");
 
@@ -195,7 +195,7 @@ public sealed class TransportFailureTests
     }
 
     [Test]
-    public async Task GraphQl_WhenCallerCancels_ThrowsOperationCanceled()
+    public async Task GraphQL_WhenCallerCancels_ThrowsOperationCanceled()
     {
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, """{"data":{"cards":[]}}""");
 

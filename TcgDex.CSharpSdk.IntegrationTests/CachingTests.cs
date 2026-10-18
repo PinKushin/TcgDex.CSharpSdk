@@ -217,7 +217,7 @@ public sealed class CachingTests : LiveApiFixture
     }
 
     [Test]
-    public async Task GraphQlRequests_AreNotCached()
+    public async Task GraphQLRequests_AreNotCached()
     {
         // GraphQL is a POST, so it must bypass the cache entirely.
         (ITcgDexClient? client, TcgDexCachingHandler? cache, HttpClient? http) = CreateCachingClient();

@@ -142,7 +142,7 @@ public class RoundTripScalingBenchmarks : IDisposable
 
     /// <summary>The same <see cref="Cards"/> results, full detail, in one request.</summary>
     [Benchmark(Description = "GraphQL: one request")]
-    public async Task<int> GraphQl_SingleRequest()
+    public async Task<int> GraphQL_SingleRequest()
     {
         IReadOnlyList<Card> cards = await _client.Cards.SearchDetailedAsync(
             new CardFilter { Name = Name },

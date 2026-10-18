@@ -216,7 +216,7 @@ public sealed class ClientTests
         {
             options.Language = TcgDexLanguages.German;
             options.BaseAddress = new Uri("https://mirror.example/v2/");
-            options.GraphQlEndpoint = new Uri("https://mirror.example/v2/graphql");
+            options.GraphQLEndpoint = new Uri("https://mirror.example/v2/graphql");
         });
 
         using ServiceProvider provider = services.BuildServiceProvider();
@@ -224,7 +224,7 @@ public sealed class ClientTests
 
         options.Language.ShouldBe("de");
         options.BaseAddress.ShouldBe(new Uri("https://mirror.example/v2/"));
-        options.GraphQlEndpoint.ShouldBe(new Uri("https://mirror.example/v2/graphql"));
+        options.GraphQLEndpoint.ShouldBe(new Uri("https://mirror.example/v2/graphql"));
     }
 
     [Test]

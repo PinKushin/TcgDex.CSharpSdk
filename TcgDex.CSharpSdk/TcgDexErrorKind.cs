@@ -56,5 +56,5 @@ public enum TcgDexErrorKind
     /// <summary>
     /// The GraphQL endpoint answered with an <c>errors</c> array.
     /// </summary>
-    GraphQlError,
+    GraphQLError,
 }

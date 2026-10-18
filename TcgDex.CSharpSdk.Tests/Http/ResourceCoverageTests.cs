@@ -128,14 +128,14 @@ public sealed class ResourceCoverageTests
     }
 
     [Test]
-    public void Options_GraphQlEndpoint_IsSeparateFromBaseAddress()
+    public void Options_GraphQLEndpoint_IsSeparateFromBaseAddress()
     {
         // GraphQL sits outside the language segment, so it is configured
         // independently rather than derived from BaseAddress.
         TcgDexOptions options = new();
 
-        options.GraphQlEndpoint.ToString().ShouldNotContain("/en/");
-        options.GraphQlEndpoint.ToString().ShouldEndWith("/graphql");
+        options.GraphQLEndpoint.ToString().ShouldNotContain("/en/");
+        options.GraphQLEndpoint.ToString().ShouldEndWith("/graphql");
     }
 
     [TestCase("line\nbreak", @"line\nbreak")]

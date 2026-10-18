@@ -51,7 +51,7 @@ public sealed class UserAgentTests
     }
 
     [Test]
-    public async Task GraphQlRequest_CarriesTheUserAgent()
+    public async Task GraphQLRequest_CarriesTheUserAgent()
     {
         RecordingHandler handler = new RecordingHandler()
             .RespondWith(HttpStatusCode.OK, """{"data":{"cards":[]}}""");

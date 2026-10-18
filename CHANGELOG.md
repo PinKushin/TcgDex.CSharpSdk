@@ -54,6 +54,8 @@ the table below.
 | `ThirdParty.Tcgplayer` | `ThirdParty.TcgPlayer` |
 | `ThirdParty.Cardtrader` | `ThirdParty.CardTrader` |
 | `TcgDexProblem.Lang` | `TcgDexProblem.Language` |
+| `TcgDexOptions.GraphQlEndpoint` | `TcgDexOptions.GraphQLEndpoint` |
+| `TcgDexErrorKind.GraphQlError` | `TcgDexErrorKind.GraphQLError` (same value, 7; its `ToString()` changes) |
 | `Random.CardAsync` / `SetAsync` / `SerieAsync` | `Random.GetCardAsync` / `GetSetAsync` / `GetSeriesAsync` |
 | `Catalog.CategoriesAsync` (and the other twelve) | `Catalog.GetCategoriesAsync` (each gains `Get`) |
 | `Catalog.HitPointsAsync` | `Catalog.GetHitPointsAsync` |

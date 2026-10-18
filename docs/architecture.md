@@ -18,7 +18,7 @@ ITcgDexClient                       public entry point
   ├── CardQuery                     expression trees -> REST filter params
   │
   ├── TcgDexTransport               REST: URLs, error contract      (internal)
-  └── GraphQlTransport              GraphQL: one opt-in path        (internal)
+  └── GraphQLTransport              GraphQL: one opt-in path        (internal)
         │
         ├── TcgDexCachingHandler    DelegatingHandler, opt-in       (in the HttpClient pipeline)
         │     └── ITcgDexResponseCache
@@ -27,7 +27,7 @@ ITcgDexClient                       public entry point
         │   TcgDexActivity          ActivitySource spans
         │
         └── TcgDexJsonContext       source-generated serialization
-            GraphQlJsonContext        (internal — wire types stay private)
+            GraphQLJsonContext        (internal — wire types stay private)
                 │
                 └── Models          records with required members
 ```
@@ -86,7 +86,7 @@ adding a model; see [`learnings.md`](learnings.md).
 
 ### Two serializer contexts
 
-`TcgDexJsonContext` covers the API models and `GraphQlJsonContext` the GraphQL
+`TcgDexJsonContext` covers the API models and `GraphQLJsonContext` the GraphQL
 envelopes. Both are **internal**, because the generator emits a public property
 per registered type — a public context would pin every model and wire type as
 public API (DECISIONS #20). The AOT smoke test and benchmarks reach

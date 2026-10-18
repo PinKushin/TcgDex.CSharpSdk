@@ -163,7 +163,7 @@ public sealed class RequestTimeoutTests
 
     [Test]
     [CancelAfter(15000)]
-    public async Task AHangingGraphQlRequest_AlsoObservesTheConfiguredTimeout()
+    public async Task AHangingGraphQLRequest_AlsoObservesTheConfiguredTimeout()
     {
         // The GraphQL path applied no budget at all, so the only ceiling was
         // HttpClient's own 100-second default — the value this option exists to
@@ -285,7 +285,7 @@ public sealed class RequestTimeoutTests
 
     [Test]
     [CancelAfter(15000)]
-    public async Task AGraphQlPipelineTimeout_IsNotReportedAsTheSdkTimeout()
+    public async Task AGraphQLPipelineTimeout_IsNotReportedAsTheSdkTimeout()
     {
         using TcgDexClient client = PipelineTimeoutClient(out HttpClient http);
         using HttpClient _ = http;
@@ -316,7 +316,7 @@ public sealed class RequestTimeoutTests
     }
 
     [Test]
-    public async Task GraphQlCallerCancellation_CarriesTheCallersToken()
+    public async Task GraphQLCallerCancellation_CarriesTheCallersToken()
     {
         using HttpClient http = new(new HangingHandler()) { Timeout = Timeout.InfiniteTimeSpan };
         using TcgDexClient client = new(http, new TcgDexOptions { Timeout = TimeSpan.FromMinutes(5) });

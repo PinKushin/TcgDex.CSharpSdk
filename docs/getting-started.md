@@ -201,7 +201,7 @@ or a local test server — set both endpoints:
 builder.Services.AddTcgDex(options =>
 {
     options.BaseAddress = new Uri("https://tcgdex.example.dev/v2/");
-    options.GraphQlEndpoint = new Uri("https://tcgdex.example.dev/v2/graphql");
+    options.GraphQLEndpoint = new Uri("https://tcgdex.example.dev/v2/graphql");
 });
 ```
 

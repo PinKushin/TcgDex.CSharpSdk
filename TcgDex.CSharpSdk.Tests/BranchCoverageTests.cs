@@ -48,7 +48,7 @@ public sealed class BranchCoverageTests
 
     // ----- GraphQL argument assembly -----
 
-    private static async Task<string> GraphQlQueryAsync(
+    private static async Task<string> GraphQLQueryAsync(
         CardFilter filter,
         int? page = null,
         int? itemsPerPage = null)
@@ -67,7 +67,7 @@ public sealed class BranchCoverageTests
     {
         // With no filter the pagination argument is first, so emitting a
         // separator would produce `cards(,pagination:{…})` — a syntax error.
-        string query = await GraphQlQueryAsync(new CardFilter(), page: 2, itemsPerPage: 10);
+        string query = await GraphQLQueryAsync(new CardFilter(), page: 2, itemsPerPage: 10);
 
         query.ShouldContain("cards(pagination:{page:2,itemsPerPage:10})");
     }
@@ -75,7 +75,7 @@ public sealed class BranchCoverageTests
     [Test]
     public async Task PageWithoutItemsPerPage_EmitsOnlyThePage()
     {
-        string query = await GraphQlQueryAsync(new CardFilter(), page: 3);
+        string query = await GraphQLQueryAsync(new CardFilter(), page: 3);
 
         query.ShouldContain("pagination:{page:3}");
         query.ShouldNotContain("itemsPerPage");
@@ -86,7 +86,7 @@ public sealed class BranchCoverageTests
     {
         // The comma between page and itemsPerPage is conditional on page being
         // present; emitting it unconditionally breaks this case.
-        string query = await GraphQlQueryAsync(new CardFilter(), itemsPerPage: 25);
+        string query = await GraphQLQueryAsync(new CardFilter(), itemsPerPage: 25);
 
         query.ShouldContain("pagination:{itemsPerPage:25}");
 
@@ -98,7 +98,7 @@ public sealed class BranchCoverageTests
     [Test]
     public async Task NeitherFilterNorPagination_OmitsTheArgumentListEntirely()
     {
-        string query = await GraphQlQueryAsync(new CardFilter());
+        string query = await GraphQLQueryAsync(new CardFilter());
 
         query.ShouldContain("{ cards {");
     }
@@ -303,14 +303,14 @@ public sealed class BranchCoverageTests
     // ----- constructor null guards -----
 
     [Test]
-    public void TheGraphQlPathRejectsNullDependencies()
+    public void TheGraphQLPathRejectsNullDependencies()
     {
         // Reached through the client, which is the only way these are built.
         Should.Throw<ArgumentNullException>(() => new TcgDexClient(null!, new TcgDexOptions()));
     }
 
     [Test]
-    public void AnEmptyGraphQlBody_IsReportedRatherThanReturningNull()
+    public void AnEmptyGraphQLBody_IsReportedRatherThanReturningNull()
     {
         // `Deserialize(...) ?? throw` — the null half, which a literal "null"
         // body produces.

@@ -92,7 +92,7 @@ internal sealed class TcgDexTransport
         // Checked once at construction rather than per request, so a misconfigured
         // client says so immediately instead of once per call.
         WarnIfInsecure(options.BaseAddress);
-        WarnIfInsecure(options.GraphQlEndpoint);
+        WarnIfInsecure(options.GraphQLEndpoint);
     }
 
     private void WarnIfInsecure(Uri uri)

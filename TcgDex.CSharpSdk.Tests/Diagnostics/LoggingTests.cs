@@ -211,7 +211,7 @@ public sealed class LoggingTests
     }
 
     [Test]
-    public async Task GraphQlSearch_LogsTheResultCount()
+    public async Task GraphQLSearch_LogsTheResultCount()
     {
         RecordingHandler handler = new RecordingHandler().RespondWith(
             HttpStatusCode.OK,
@@ -224,7 +224,7 @@ public sealed class LoggingTests
     }
 
     [Test]
-    public async Task GraphQlDroppingAnUnresolvableEntry_LogsAtWarning()
+    public async Task GraphQLDroppingAnUnresolvableEntry_LogsAtWarning()
     {
         // Dropping silently would leave a caller wondering why a card vanished.
         RecordingHandler handler = new RecordingHandler().RespondWith(

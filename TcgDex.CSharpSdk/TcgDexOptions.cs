@@ -18,7 +18,7 @@ public sealed class TcgDexOptions
     /// <para>
     /// <b>This is how you point the SDK at a different server</b> — an unofficial
     /// mirror, a self-hosted instance, or a local test server. Set
-    /// <see cref="GraphQlEndpoint"/> alongside it: the two are separate because
+    /// <see cref="GraphQLEndpoint"/> alongside it: the two are separate because
     /// GraphQL lives outside the language segment, so changing this one alone
     /// leaves GraphQL queries going to the official host.
     /// </para>
@@ -52,7 +52,7 @@ public sealed class TcgDexOptions
     /// Deliberately separate from <see cref="BaseAddress"/>: GraphQL lives
     /// outside the language segment because it has no language support at all.
     /// </remarks>
-    public Uri GraphQlEndpoint { get; set; } = new("https://api.tcgdex.net/v2/graphql");
+    public Uri GraphQLEndpoint { get; set; } = new("https://api.tcgdex.net/v2/graphql");
 
     /// <summary>
     /// The largest response body the client will buffer, in bytes. Defaults to
@@ -221,11 +221,11 @@ public sealed class TcgDexOptions
                 nameof(BaseAddress));
         }
 
-        if (!GraphQlEndpoint.IsAbsoluteUri)
+        if (!GraphQLEndpoint.IsAbsoluteUri)
         {
             throw new ArgumentException(
-                $"GraphQlEndpoint must be an absolute URI, but was '{GraphQlEndpoint}'.",
-                nameof(GraphQlEndpoint));
+                $"GraphQLEndpoint must be an absolute URI, but was '{GraphQLEndpoint}'.",
+                nameof(GraphQLEndpoint));
         }
 
         // A missing trailing slash is not cosmetic. Request paths are resolved

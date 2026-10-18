@@ -106,7 +106,7 @@ dotnet_diagnostic.S1075.severity = none
 # groups several small, tightly related types together on purpose —
 # Resources.cs holds six resource classes, ITcgDexResources.cs their six
 # interfaces, Models/CardSet.cs five records that only ever appear together,
-# GraphQlMessages.cs a JsonContext plus the message types it serializes. That
+# GraphQLMessages.cs a JsonContext plus the message types it serializes. That
 # grouping is deliberate: a reader following one concept finds every type for
 # it in one file instead of jumping between a dozen one-type files, and there
 # is no case in this SDK where the rule would have caught a real problem

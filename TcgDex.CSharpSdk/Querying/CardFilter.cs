@@ -70,7 +70,7 @@ public sealed record CardFilter
     /// nothing is set.
     /// </summary>
     /// <returns>Text such as <c>name:"Furret",hp:110</c>.</returns>
-    internal string ToGraphQlArguments()
+    internal string ToGraphQLArguments()
     {
         StringBuilder builder = new();
 

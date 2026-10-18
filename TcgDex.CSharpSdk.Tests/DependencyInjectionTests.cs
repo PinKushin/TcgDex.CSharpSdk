@@ -109,7 +109,7 @@ public sealed class DependencyInjectionTests
         {
             o.BaseAddress = new Uri("https://mirror.example/v2/");
             o.Language = TcgDexLanguages.German;
-            o.GraphQlEndpoint = new Uri("https://mirror.example/v2/graphql");
+            o.GraphQLEndpoint = new Uri("https://mirror.example/v2/graphql");
             o.MaxResponseBytes = 1234;
             o.Timeout = TimeSpan.FromSeconds(7);
             o.DeserializePricing = false;
@@ -131,7 +131,7 @@ public sealed class DependencyInjectionTests
         {
             options.BaseAddress.ShouldBe(new Uri("https://mirror.example/v2/"));
             options.Language.ShouldBe("de");
-            options.GraphQlEndpoint.ShouldBe(new Uri("https://mirror.example/v2/graphql"));
+            options.GraphQLEndpoint.ShouldBe(new Uri("https://mirror.example/v2/graphql"));
             options.MaxResponseBytes.ShouldBe(1234);
             options.Timeout.ShouldBe(TimeSpan.FromSeconds(7));
             options.DeserializePricing.ShouldBeFalse();

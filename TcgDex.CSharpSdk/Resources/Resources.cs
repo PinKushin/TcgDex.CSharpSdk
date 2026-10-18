@@ -29,7 +29,7 @@ internal abstract class ResourceBase(TcgDexTransport transport)
 }
 
 /// <inheritdoc cref="ICardResource" />
-internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport graphQl)
+internal sealed class CardResource(TcgDexTransport transport, GraphQLTransport graphQL)
     : ResourceBase(transport), ICardResource
 {
     public Task<IReadOnlyList<Card>> SearchDetailedAsync(
@@ -37,7 +37,7 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQlTransport g
         int? page = null,
         int? itemsPerPage = null,
         CancellationToken cancellationToken = default)
-        => graphQl.SearchAsync(filter, page, itemsPerPage, cancellationToken);
+        => graphQL.SearchAsync(filter, page, itemsPerPage, cancellationToken);
 
     public Task<Card?> GetAsync(string id, CancellationToken cancellationToken = default)
         => Transport.GetAsync<Card>($"cards/{EscapeId(id)}", cancellationToken);

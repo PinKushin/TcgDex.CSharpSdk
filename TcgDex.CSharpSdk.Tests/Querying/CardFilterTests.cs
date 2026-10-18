@@ -49,7 +49,7 @@ public sealed class CardFilterTests
             RetreatCost = 1,
         };
 
-        filter.ToGraphQlArguments().ShouldBe(
+        filter.ToGraphQLArguments().ShouldBe(
             """
             name:"Furret",category:"Pokemon",rarity:"Rare",hp:110,id:"swsh3-136",\
             localId:"136",dexId:162,illustrator:"Kagemaru Himeno",stage:"Stage1",\
@@ -61,7 +61,7 @@ public sealed class CardFilterTests
     [Test]
     public void NoFields_RenderNothing()
     {
-        new CardFilter().ToGraphQlArguments().ShouldBeEmpty();
+        new CardFilter().ToGraphQLArguments().ShouldBeEmpty();
     }
 
     [TestCase("Name", "name:\"x\"")]
@@ -83,7 +83,7 @@ public sealed class CardFilterTests
         // would be invisible.
         CardFilter filter = TextFilterFor(property);
 
-        filter.ToGraphQlArguments().ShouldBe(expected);
+        filter.ToGraphQLArguments().ShouldBe(expected);
     }
 
     [TestCase("HitPoints", "hp:7")]
@@ -95,7 +95,7 @@ public sealed class CardFilterTests
         // and a quoted value is rejected outright rather than coerced.
         CardFilter filter = NumberFilterFor(property);
 
-        filter.ToGraphQlArguments().ShouldBe(expected);
+        filter.ToGraphQLArguments().ShouldBe(expected);
     }
 
     private static CardFilter TextFilterFor(string property) => property switch

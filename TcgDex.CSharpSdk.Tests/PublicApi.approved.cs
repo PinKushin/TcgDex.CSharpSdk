@@ -97,7 +97,7 @@ namespace TcgDex
         Canceled = 4,
         ResponseTooLarge = 5,
         InvalidResponse = 6,
-        GraphQlError = 7,
+        GraphQLError = 7,
     }
     public static class TcgDexLanguages
     {
@@ -127,7 +127,7 @@ namespace TcgDex
         public TcgDexOptions() { }
         public System.Uri BaseAddress { get; set; }
         public bool DeserializePricing { get; set; }
-        public System.Uri GraphQlEndpoint { get; set; }
+        public System.Uri GraphQLEndpoint { get; set; }
         public string Language { get; set; }
         public int MaxDeserializedCacheEntries { get; set; }
         public long MaxResponseBytes { get; set; }

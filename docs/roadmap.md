@@ -133,7 +133,7 @@ Not committed to. Each would need a reason beyond "it would be neat".
   down, and retired the per-node hostnames the feature was built on. Doing it
   client-side now would be a second, slower retry layer duplicating one the
   service does better. Choosing a server is still supported — set `BaseAddress`
-  and `GraphQlEndpoint` for an unofficial mirror, a self-hosted instance, or a
+  and `GraphQLEndpoint` for an unofficial mirror, a self-hosted instance, or a
   local test server. Full reasoning, including the upstream side of it, in
   [decision 1](DECISIONS.md).
 - **A telemetry vendor dependency.** The SDK writes to `ILogger` and

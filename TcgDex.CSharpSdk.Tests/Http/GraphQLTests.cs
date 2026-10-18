@@ -14,7 +14,7 @@ using TcgDex.Tests.Diagnostics;
 /// The GraphQL search path: the document sent, and the failure handling.
 /// </summary>
 [TestFixture]
-public sealed class GraphQlTests
+public sealed class GraphQLTests
 {
     private const string EmptyResult = """{"data":{"cards":[]}}""";
 
@@ -45,7 +45,7 @@ public sealed class GraphQlTests
     }
 
     [Test]
-    public async Task SearchDetailed_PostsToTheGraphQlEndpoint()
+    public async Task SearchDetailed_PostsToTheGraphQLEndpoint()
     {
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
