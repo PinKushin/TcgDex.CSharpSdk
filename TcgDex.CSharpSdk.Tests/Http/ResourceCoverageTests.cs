@@ -161,7 +161,7 @@ public sealed class ResourceCoverageTests
 
     [Test]
     public void DetailedVariant_WithNullStamp_CoercesToEmpty()
-        => new DetailedVariant { Stamp = null! }.Stamp.ShouldBeEmpty();
+        => new DetailedVariant { Stamps = null! }.Stamps.ShouldBeEmpty();
 
     // ----- exception constructors -----
 

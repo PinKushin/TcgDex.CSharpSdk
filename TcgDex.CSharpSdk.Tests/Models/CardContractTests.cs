@@ -32,7 +32,7 @@ public sealed class CardContractTests
         card.EvolveFrom.ShouldBe("Sentret");
         card.RegulationMark.ShouldBe("D");
         card.Types.ShouldBe(["Colorless"]);
-        card.DexId.ShouldContain(162);
+        card.DexIds.ShouldContain(162);
     }
 
     [Test]
@@ -234,7 +234,7 @@ public sealed class CardContractTests
         trainer.Weaknesses.ShouldBeEmpty();
         trainer.Resistances.ShouldBeEmpty();
         trainer.Types.ShouldBeEmpty();
-        trainer.DexId.ShouldNotBeNull();
+        trainer.DexIds.ShouldNotBeNull();
         trainer.Boosters.ShouldNotBeNull();
     }
 

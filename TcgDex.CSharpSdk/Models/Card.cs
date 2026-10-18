@@ -141,7 +141,8 @@ public sealed record Card
     }
 
     /// <summary>National Pokédex numbers this card depicts.</summary>
-    public IReadOnlyList<int> DexId
+    [JsonPropertyName("dexId")]
+    public IReadOnlyList<int> DexIds
     {
         get => _dexId;
         init => _dexId = value ?? [];

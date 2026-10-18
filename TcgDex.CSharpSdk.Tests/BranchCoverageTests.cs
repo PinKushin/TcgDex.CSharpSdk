@@ -284,7 +284,7 @@ public sealed class BranchCoverageTests
         // without this an omitted array deserializes to null.
         new CardSet { Id = "s", Name = "S", Cards = null! }.Cards.ShouldBeEmpty();
         new Series { Id = "r", Name = "R", Sets = null! }.Sets.ShouldBeEmpty();
-        new DetailedVariant { Stamp = null! }.Stamp.ShouldBeEmpty();
+        new DetailedVariant { Stamps = null! }.Stamps.ShouldBeEmpty();
         new Attack { Name = "a", Cost = null! }.Cost.ShouldBeEmpty();
     }
 
@@ -296,7 +296,7 @@ public sealed class BranchCoverageTests
             .Cards.Count.ShouldBe(1);
         new Series { Id = "r", Name = "R", Sets = [new CardSetBrief { Id = "s", Name = "S" }] }
             .Sets.Count.ShouldBe(1);
-        new DetailedVariant { Stamp = ["set-logo"] }.Stamp.Count.ShouldBe(1);
+        new DetailedVariant { Stamps = ["set-logo"] }.Stamps.Count.ShouldBe(1);
         new Attack { Name = "a", Cost = ["Grass"] }.Cost.Count.ShouldBe(1);
     }
 

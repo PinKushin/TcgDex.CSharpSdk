@@ -42,7 +42,7 @@ public sealed class SerializationTests
         string set = Serialize(Fixture.Load<CardSet>("set-full.json"));
         string problem = Serialize(Fixture.Load<TcgDexProblem>("error-bad-language.json"));
 
-        foreach (string key in new[] { "hp", "idProduct", "avg", "avg1", "avg7", "avg30" })
+        foreach (string key in new[] { "hp", "idProduct", "avg", "avg1", "avg7", "avg30", "dexId" })
         {
             card.ShouldContain($"\"{key}\":", Case.Sensitive);
         }
@@ -58,6 +58,11 @@ public sealed class SerializationTests
         // "tcgplayer" key, which would satisfy a search through the whole card.
         => Serialize(new Pricing { TcgPlayer = new TcgPlayerPricing() })
             .ShouldBe("""{"tcgplayer":{}}""");
+
+    [Test]
+    public void DetailedVariant_StampsAreWrittenUnderTheApiKey()
+        => Serialize(new DetailedVariant { Stamps = ["set-logo"] })
+            .ShouldBe("""{"stamp":["set-logo"]}""");
 
     [Test]
     public void ThirdParty_IsWrittenUnderTheApiKeys()

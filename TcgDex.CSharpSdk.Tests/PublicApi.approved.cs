@@ -174,7 +174,8 @@ namespace TcgDex.Models
         public System.Collections.Generic.IReadOnlyList<TcgDex.Models.Booster> Boosters { get; init; }
         public required string Category { get; init; }
         public string? Description { get; init; }
-        public System.Collections.Generic.IReadOnlyList<int> DexId { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("dexId")]
+        public System.Collections.Generic.IReadOnlyList<int> DexIds { get; init; }
         public string? Effect { get; init; }
         public string? EnergyType { get; init; }
         public string? EvolveFrom { get; init; }
@@ -301,7 +302,8 @@ namespace TcgDex.Models
         public string? Foil { get; init; }
         public TcgDex.Models.Pricing? Pricing { get; init; }
         public string? Size { get; init; }
-        public System.Collections.Generic.IReadOnlyList<string> Stamp { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("stamp")]
+        public System.Collections.Generic.IReadOnlyList<string> Stamps { get; init; }
         public string? Subtype { get; init; }
         public TcgDex.Models.ThirdParty? ThirdParty { get; init; }
         public string? Type { get; init; }

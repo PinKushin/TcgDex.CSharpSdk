@@ -47,7 +47,8 @@ public sealed record DetailedVariant
     public string? Size { get; init; }
 
     /// <summary>Stamps applied to this printing, for example <c>["set-logo"]</c>.</summary>
-    public IReadOnlyList<string> Stamp
+    [JsonPropertyName("stamp")]
+    public IReadOnlyList<string> Stamps
     {
         get => _stamp;
         init => _stamp = value ?? [];
