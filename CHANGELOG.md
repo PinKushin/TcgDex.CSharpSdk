@@ -15,6 +15,63 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-18
+
+The 1.0 naming pass: every public name now follows the .NET Framework Design Guidelines. Almost
+every change is **breaking** at compile time and none changes what goes over the wire — JSON keys,
+request paths and query strings are the same as in 0.7.0. Most upgrades are a find-and-replace from
+the table below.
+
+### Migration
+
+| 0.7.0 | 0.8.0 |
+|---|---|
+| `Serie` | `Series` |
+| `SerieBrief` | `SeriesBrief` |
+| `ISerieResource` | `ISeriesResource` |
+| `Set` (the model) | `CardSet` |
+| `SetBrief` | `CardSetBrief` |
+| `SetAbbreviation` | `CardSetAbbreviation` |
+| `Set.Serie` | `CardSet.Series` |
+| `Card.Hp` | `Card.HitPoints` |
+| `CardFilter.Hp` | `CardFilter.HitPoints` |
+| `Card.DexId` | `Card.DexIds` |
+| `DetailedVariant.Stamp` | `DetailedVariant.Stamps` |
+| `CardCount.FirstEd` | `CardCount.FirstEdition` |
+| `CardmarketPricing.IdProduct` | `CardmarketPricing.ProductId` |
+| `CardmarketPricing.Avg` | `CardmarketPricing.Average` |
+| `CardmarketPricing.Avg1` / `Avg7` / `Avg30` | `Average1Day` / `Average7Days` / `Average30Days` |
+| `CardmarketPricing.AvgHolo` | `CardmarketPricing.AverageHolo` |
+| `CardmarketPricing.Avg1Holo` / `Avg7Holo` / `Avg30Holo` | `Average1DayHolo` / `Average7DaysHolo` / `Average30DaysHolo` |
+| `Pricing.Tcgplayer` | `Pricing.TcgPlayer` |
+| `ThirdParty.Tcgplayer` | `ThirdParty.TcgPlayer` |
+| `ThirdParty.Cardtrader` | `ThirdParty.CardTrader` |
+| `TcgDexProblem.Lang` | `TcgDexProblem.Language` |
+| `Random.CardAsync` / `SetAsync` / `SerieAsync` | `Random.GetCardAsync` / `GetSetAsync` / `GetSeriesAsync` |
+| `Catalog.CategoriesAsync` (and the other twelve) | `Catalog.GetCategoriesAsync` (each gains `Get`) |
+| `Catalog.HitPointsAsync` | `Catalog.GetHitPointsAsync` |
+| `TcgDexCachingHandler.FreshHits` / `Revalidations` / `Misses` | `TcgDexCachingHandler.Statistics.FreshHits` / `.Revalidations` / `.Misses` |
+| `GetImageUrl` / `GetLogoUrl` / `GetSymbolUrl` returning `string?` | the same methods, returning `Uri?` |
+| `ImageUrl.Build` / `BuildAsset` returning `string?` | the same methods, returning `Uri?` |
+| `new TcgDexApiException(message, statusCode, problem, inner)` | `new TcgDexApiException(message, kind, requestUri, statusCode, problem, inner)` |
+| `QueryOperator` | removed from the public API (internal) |
+
+### Changed
+
+- **Breaking:** the renames in the table above.
+- **Breaking:** the image URL helpers return `Uri?`. A base value that does not form an absolute
+  http(s) URL now gives `null` instead of a malformed string.
+- **Breaking:** `CachedResponse` is a class with reference equality rather than a record. It no
+  longer supports `with` or value `==`; create a new instance with an object initializer.
+- **Breaking:** `QueryOperator` is internal. No public member used it.
+- **Breaking:** the `TcgDexApiException` constructor taking only a status code is removed. It
+  produced `Kind = Unspecified`; use the constructor that takes a `TcgDexErrorKind`.
+- `AddTcgDexWithCaching` registers `TcgDexCacheOptions` through the options pattern, so
+  `Configure<TcgDexCacheOptions>`, an `appsettings.json` binding and `IOptions<TcgDexCacheOptions>`
+  now work alongside the `configureCache` delegate. Previously only the delegate was applied.
+- An unreadable `updated` timestamp on a card or a pricing block now reads as `null`, as
+  `ReleaseDate` already did, instead of failing the whole card.
+
 ## [0.7.0] - 2026-10-17
 
 ### Added
@@ -467,7 +524,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.1...v0.6.2
