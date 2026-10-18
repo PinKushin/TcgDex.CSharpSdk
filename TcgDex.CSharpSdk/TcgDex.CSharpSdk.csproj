@@ -57,8 +57,8 @@
     <PackageId>TcgDex.CSharpSdk</PackageId>
     <Version>0.8.0</Version>
     <Authors>PinKushin</Authors>
-    <Description>A .NET SDK for the TCGdex Pokemon TCG API - strongly typed models, a fluent query builder over the full REST filter syntax, and opt-in GraphQL for projection and nested fetches.</Description>
-    <PackageTags>tcgdex;pokemon;tcg;trading-card-game;api-client;sdk</PackageTags>
+    <Description>A .NET SDK for the TCGdex Pokemon TCG API - strongly typed models, C# queries translated to the REST filter syntax, ETag caching, and opt-in GraphQL. .NET 8, .NET 10 and netstandard2.0 (.NET Framework, Unity); trim- and Native AOT-safe. No API key needed.</Description>
+    <PackageTags>tcgdex;pokemon;pokemon-tcg;tcg;trading-card-game;pokemon-cards;tcg-pocket;api-client;sdk;rest;graphql;aot;unity</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <!--
       A link rather than the notes themselves: release notes pasted in here have
@@ -67,6 +67,9 @@
     -->
     <PackageReleaseNotes>See https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- The card-back icon from the SDK's card on pinkushin.github.io, rendered at 128 px. Per-version, so a later
+         release can swap in a TCGdex-approved icon if they give permission. -->
+    <PackageIcon>icon.png</PackageIcon>
     <RepositoryUrl>https://github.com/PinKushin/TcgDex.CSharpSdk</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/PinKushin/TcgDex.CSharpSdk</PackageProjectUrl>
@@ -79,6 +82,7 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" Visible="false" />
     <None Include="..\LICENSE.txt" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="..\icon.png" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>

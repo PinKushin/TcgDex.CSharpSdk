@@ -4,37 +4,40 @@ A .NET SDK for the [TCGdex](https://tcgdex.dev) Pokémon TCG API — strongly ty
 models, a fluent query builder over the full REST filter syntax, and first-class
 support for dependency injection, trimming and Native AOT.
 
+[![NuGet](https://img.shields.io/nuget/v/TcgDex.CSharpSdk)](https://www.nuget.org/packages/TcgDex.CSharpSdk)
+[![Downloads](https://img.shields.io/nuget/dt/TcgDex.CSharpSdk)](https://www.nuget.org/packages/TcgDex.CSharpSdk)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/LICENSE.txt)
 [![CI](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/codeql.yml)
 [![Docs](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/docs.yml)
 [![Live API](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/live-api.yml/badge.svg)](https://github.com/PinKushin/TcgDex.CSharpSdk/actions/workflows/live-api.yml)
 
-Targets **.NET 8**, **.NET 10** and **netstandard2.0** — so it runs on modern
-.NET and on **.NET Framework 4.6.1+**. No API key required — TCGdex is a free,
-public, read-only API.
-
-**Unity** is a supported target by construction rather than by test: the
-`netstandard2.0` assembly contains no runtime code generation, no
-`Expression.Compile()` and no reflection-based serialization, and a Native AOT
-publish exercises the one reflective path under full trimming. Nobody has yet
-run it inside a Unity project, so see [`docs/unity.md`](docs/unity.md) for what
-is verified, what is not, and the packaging and stripping caveats Unity adds.
-
-The API surface is identical on every target, async included. One difference is
-worth knowing before you rely on it: connection recycling, which keeps a
-long-lived client from pinning stale DNS, uses `SocketsHttpHandler` on modern
-.NET and `ServicePoint.ConnectionLeaseTimeout` on .NET Framework. Same
-guarantee, different mechanism. Response cancellation mid-body is best-effort on
-netstandard2.0, because the cancellable `HttpContent` read overloads do not
-exist there.
-
----
+No API key required — TCGdex is a free, public, read-only API.
 
 ## Install
 
 ```bash
 dotnet add package TcgDex.CSharpSdk
 ```
+
+## Why this SDK
+
+- **Runs everywhere .NET does:** .NET 8, .NET 10 and netstandard2.0 (.NET
+  Framework 4.6.1+, Unity), with the same API on every target.
+- **Native AOT and trimming safe**, verified by a published AOT binary in CI on
+  every push.
+- **Queries written in C#:** `Where(c => c.HitPoints > 100)` becomes the API's
+  filter syntax, including sorting and paging.
+- **Caching that respects the server:** ETag revalidation costs zero body bytes
+  on a hit, and a warm hit skips deserialization entirely.
+- **One exception type**, `TcgDexApiException`, with a `Kind` that says what
+  went wrong; a missing card is `null`, not an exception.
+- **Idiomatic .NET:** `IHttpClientFactory`, `IOptions` validated at start-up,
+  `ILogger`, `ActivitySource` tracing, and names that follow the .NET design
+  guidelines.
+- **Measured, not claimed:** 99%+ line coverage, mutation-tested, fuzzed, and
+  [benchmarked against the other C# SDK](https://pinkushin.github.io/TcgDex.CSharpSdk/comparison.html)
+  with the losses reported too.
 
 ## Quick start
 
@@ -209,6 +212,27 @@ Worth knowing: the API returns **404 for an unsupported language too**, so the
 status code alone cannot distinguish that from a missing card. The SDK
 discriminates on the error body and exposes `ex.IsLanguageError`.
 
+## Platforms
+
+Targets **.NET 8**, **.NET 10** and **netstandard2.0**, so it runs on modern
+.NET and on **.NET Framework 4.6.1+**.
+
+**Unity** is a supported target by construction rather than by test: the
+`netstandard2.0` assembly contains no runtime code generation, no
+`Expression.Compile()` and no reflection-based serialization, and a Native AOT
+publish exercises the one reflective path under full trimming. Nobody has yet
+run it inside a Unity project, so see
+[Unity](https://pinkushin.github.io/TcgDex.CSharpSdk/unity.html) for what is
+verified, what is not, and the packaging and stripping caveats Unity adds.
+
+The API surface is identical on every target, async included. One difference is
+worth knowing before you rely on it: connection recycling, which keeps a
+long-lived client from pinning stale DNS, uses `SocketsHttpHandler` on modern
+.NET and `ServicePoint.ConnectionLeaseTimeout` on .NET Framework. Same
+guarantee, different mechanism. Response cancellation mid-body is best-effort on
+netstandard2.0, because the cancellable `HttpContent` read overloads do not
+exist there.
+
 ## Trimming and Native AOT
 
 The SDK is trim- and AOT-safe: serialization is source-generated, and the query
@@ -298,7 +322,7 @@ In this repository:
 
 Found a vulnerability? **Report it privately** through
 [GitHub Security Advisories](https://github.com/PinKushin/TcgDex.CSharpSdk/security/advisories/new)
-rather than opening an issue — see [`SECURITY.md`](SECURITY.md), which also sets
+rather than opening an issue — see [`SECURITY.md`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/SECURITY.md), which also sets
 out what this library actually exposes and what is not in scope.
 
 ## Contributing
