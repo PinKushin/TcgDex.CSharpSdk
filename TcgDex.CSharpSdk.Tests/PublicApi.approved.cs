@@ -181,7 +181,8 @@ namespace TcgDex.Models
         public string? Effect { get; init; }
         public string? EnergyType { get; init; }
         public string? EvolveFrom { get; init; }
-        public int? Hp { get; init; }
+        [System.Text.Json.Serialization.JsonPropertyName("hp")]
+        public int? HitPoints { get; init; }
         public required string Id { get; init; }
         public string? Illustrator { get; init; }
         public string? Image { get; init; }
@@ -422,7 +423,7 @@ namespace TcgDex.Querying
         public int? DexId { get; init; }
         public string? EnergyType { get; init; }
         public string? EvolveFrom { get; init; }
-        public int? Hp { get; init; }
+        public int? HitPoints { get; init; }
         public string? Id { get; init; }
         public string? Illustrator { get; init; }
         public string? LocalId { get; init; }

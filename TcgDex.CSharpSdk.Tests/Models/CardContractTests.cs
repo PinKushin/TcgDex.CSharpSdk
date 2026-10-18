@@ -26,7 +26,7 @@ public sealed class CardContractTests
         card.LocalId.ShouldBe("136");
         card.Illustrator.ShouldBe("tetsuya koizumi");
         card.Rarity.ShouldBe("Uncommon");
-        card.Hp.ShouldBe(110);
+        card.HitPoints.ShouldBe(110);
         card.Retreat.ShouldBe(1);
         card.Stage.ShouldBe("Stage1");
         card.EvolveFrom.ShouldBe("Sentret");
@@ -131,7 +131,7 @@ public sealed class CardContractTests
         card.IsCategory("trainer").ShouldBeTrue("category comparison ignores case");
 
         // Pokémon-only fields are absent rather than defaulted.
-        card.Hp.ShouldBeNull();
+        card.HitPoints.ShouldBeNull();
         card.Attacks.ShouldBeEmpty();
         card.Types.ShouldBeEmpty();
     }

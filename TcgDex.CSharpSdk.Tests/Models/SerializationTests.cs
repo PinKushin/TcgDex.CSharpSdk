@@ -41,7 +41,7 @@ public sealed class SerializationTests
 
         restored.Id.ShouldBe(original.Id);
         restored.Name.ShouldBe(original.Name);
-        restored.Hp.ShouldBe(original.Hp);
+        restored.HitPoints.ShouldBe(original.HitPoints);
         restored.Types.ShouldBe(original.Types);
         restored.Set.Id.ShouldBe(original.Set.Id);
         restored.Attacks.Count.ShouldBe(original.Attacks.Count);

@@ -29,21 +29,21 @@ public sealed class BranchCoverageTests
     [Test]
     public void ConstantOnTheLeft_FlipsEveryRelationalOperator()
     {
-        // `100 <= c.Hp` means hp >= 100. Reading the node type without flipping
+        // `100 <= c.HitPoints` means hp >= 100. Reading the node type without flipping
         // would emit `lte`, quietly returning the complement of what was asked.
-        new CardQuery().Where(c => 100 <= c.Hp).ToQueryString().ShouldBe("hp=gte:100");
-        new CardQuery().Where(c => 100 >= c.Hp).ToQueryString().ShouldBe("hp=lte:100");
-        new CardQuery().Where(c => 100 < c.Hp).ToQueryString().ShouldBe("hp=gt:100");
-        new CardQuery().Where(c => 100 > c.Hp).ToQueryString().ShouldBe("hp=lt:100");
+        new CardQuery().Where(c => 100 <= c.HitPoints).ToQueryString().ShouldBe("hp=gte:100");
+        new CardQuery().Where(c => 100 >= c.HitPoints).ToQueryString().ShouldBe("hp=lte:100");
+        new CardQuery().Where(c => 100 < c.HitPoints).ToQueryString().ShouldBe("hp=gt:100");
+        new CardQuery().Where(c => 100 > c.HitPoints).ToQueryString().ShouldBe("hp=lt:100");
     }
 
     [Test]
     public void MemberOnTheLeft_KeepsEveryRelationalOperator()
     {
-        new CardQuery().Where(c => c.Hp >= 100).ToQueryString().ShouldBe("hp=gte:100");
-        new CardQuery().Where(c => c.Hp <= 100).ToQueryString().ShouldBe("hp=lte:100");
-        new CardQuery().Where(c => c.Hp > 100).ToQueryString().ShouldBe("hp=gt:100");
-        new CardQuery().Where(c => c.Hp < 100).ToQueryString().ShouldBe("hp=lt:100");
+        new CardQuery().Where(c => c.HitPoints >= 100).ToQueryString().ShouldBe("hp=gte:100");
+        new CardQuery().Where(c => c.HitPoints <= 100).ToQueryString().ShouldBe("hp=lte:100");
+        new CardQuery().Where(c => c.HitPoints > 100).ToQueryString().ShouldBe("hp=gt:100");
+        new CardQuery().Where(c => c.HitPoints < 100).ToQueryString().ShouldBe("hp=lt:100");
     }
 
     // ----- GraphQL argument assembly -----

@@ -24,7 +24,7 @@ using TcgDex.Models;
 /// <code>
 /// CardQuery query = new CardQuery()
 ///     .Where(c => c.Name.Contains("Pikachu"))
-///     .Where(c => c.Hp > 100)
+///     .Where(c => c.HitPoints > 100)
 ///     .OrderByDescending(c => c.Name)
 ///     .Page(1, 50);
 ///

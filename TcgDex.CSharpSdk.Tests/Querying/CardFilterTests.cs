@@ -8,7 +8,7 @@ using TcgDex.Querying;
 /// <remarks>
 /// <para>
 /// Written after mutation testing put this file at 67%. The survivors were not
-/// subtle: only <c>Name</c>, <c>Hp</c> and <c>Illustrator</c> were exercised
+/// subtle: only <c>Name</c>, <c>HitPoints</c> and <c>Illustrator</c> were exercised
 /// anywhere, so the other twelve fields could each have their line deleted or
 /// their GraphQL name replaced with an empty string and the whole suite stayed
 /// green.
@@ -35,7 +35,7 @@ public sealed class CardFilterTests
             Name = "Furret",
             Category = "Pokemon",
             Rarity = "Rare",
-            Hp = 110,
+            HitPoints = 110,
             Id = "swsh3-136",
             LocalId = "136",
             DexId = 162,
@@ -117,7 +117,7 @@ public sealed class CardFilterTests
 
     private static CardFilter NumberFilterFor(string property) => property switch
     {
-        "Hp" => new CardFilter { Hp = 7 },
+        "Hp" => new CardFilter { HitPoints = 7 },
         "DexId" => new CardFilter { DexId = 7 },
         "Retreat" => new CardFilter { Retreat = 7 },
         _ => throw new ArgumentOutOfRangeException(nameof(property), property, "Unmapped numeric filter."),

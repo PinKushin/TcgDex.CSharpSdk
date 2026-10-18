@@ -24,7 +24,7 @@ public sealed class ApiContractTests : LiveApiFixture
         card.Name.ShouldBe("Furret");
         card.Category.ShouldBe(CardCategories.Pokemon);
         card.Set.Id.ShouldBe("swsh3");
-        card.Hp.ShouldNotBeNull();
+        card.HitPoints.ShouldNotBeNull();
         card.Attacks.ShouldNotBeEmpty();
     }
 
@@ -195,7 +195,7 @@ public sealed class ApiContractTests : LiveApiFixture
         cards.ShouldAllBe(c => c.Name == "Furret");
 
         Card furret = cards.First(c => c.Id == "swsh3-136");
-        furret.Hp.ShouldBe(110);
+        furret.HitPoints.ShouldBe(110);
         furret.Types.ShouldBe(["Colorless"]);
         furret.Attacks.ShouldNotBeEmpty();
         furret.Set.Name.ShouldBe("Darkness Ablaze");

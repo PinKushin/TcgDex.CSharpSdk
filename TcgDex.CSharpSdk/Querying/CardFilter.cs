@@ -30,7 +30,7 @@ public sealed record CardFilter
     public string? Rarity { get; init; }
 
     /// <summary>Exact hit points.</summary>
-    public int? Hp { get; init; }
+    public int? HitPoints { get; init; }
 
     /// <summary>Card identifier.</summary>
     public string? Id { get; init; }
@@ -77,7 +77,7 @@ public sealed record CardFilter
         AppendText(builder, "name", Name);
         AppendText(builder, "category", Category);
         AppendText(builder, "rarity", Rarity);
-        AppendNumber(builder, "hp", Hp);
+        AppendNumber(builder, "hp", HitPoints);
         AppendText(builder, "id", Id);
         AppendText(builder, "localId", LocalId);
         AppendNumber(builder, "dexId", DexId);

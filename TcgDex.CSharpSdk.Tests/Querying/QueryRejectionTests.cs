@@ -120,12 +120,12 @@ public sealed class QueryRejectionTests
         // There is no "not greater than" operator; the caller should invert the
         // comparison themselves rather than get a silently wrong filter.
         NotSupportedException exception = Should.Throw<NotSupportedException>(
-            () => Query().Where(c => !(c.Hp > 100)));
+            () => Query().Where(c => !(c.HitPoints > 100)));
 
-        // The inner comparison is what gets named, not the negation — `Hp` is
+        // The inner comparison is what gets named, not the negation — `HitPoints` is
         // `int?`, so the tree carries a Convert around the constant and
         // asserting the full rendering would pin a compiler detail.
-        exception.Message.ShouldContain("c.Hp >");
+        exception.Message.ShouldContain("c.HitPoints >");
     }
 
     [Test]
@@ -186,7 +186,7 @@ public sealed class QueryRejectionTests
     {
         int? threshold = 90;
 
-        Query().Where(c => c.Hp > threshold).ToQueryString().ShouldBe("hp=gt:90");
+        Query().Where(c => c.HitPoints > threshold).ToQueryString().ShouldBe("hp=gt:90");
     }
 
     private sealed class CapturedValues

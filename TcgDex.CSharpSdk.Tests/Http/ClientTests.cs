@@ -104,7 +104,7 @@ public sealed class ClientTests
 
         CardQuery query = new CardQuery()
             .Where(c => c.Name == "Furret")
-            .Where(c => c.Hp > 100)
+            .Where(c => c.HitPoints > 100)
             .OrderByDescending(c => c.Name)
             .Page(2, 50);
 

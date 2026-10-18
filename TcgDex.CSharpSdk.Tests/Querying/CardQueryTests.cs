@@ -44,26 +44,26 @@ public sealed class CardQueryTests
     [TestCase(false)]
     public void GreaterThan_TranslatesToGtOperator(bool reversed)
     {
-        // `100 < c.Hp` means the same as `c.Hp > 100`; the operator must flip
+        // `100 < c.HitPoints` means the same as `c.HitPoints > 100`; the operator must flip
         // with the operands rather than being read off the node type.
         CardQuery query = reversed
-            ? Query().Where(c => 100 < c.Hp)
-            : Query().Where(c => c.Hp > 100);
+            ? Query().Where(c => 100 < c.HitPoints)
+            : Query().Where(c => c.HitPoints > 100);
 
         query.ToQueryString().ShouldBe("hp=gt:100");
     }
 
     [Test]
     public void GreaterThanOrEqual_TranslatesToGteOperator()
-        => Query().Where(c => c.Hp >= 100).ToQueryString().ShouldBe("hp=gte:100");
+        => Query().Where(c => c.HitPoints >= 100).ToQueryString().ShouldBe("hp=gte:100");
 
     [Test]
     public void LessThan_TranslatesToLtOperator()
-        => Query().Where(c => c.Hp < 100).ToQueryString().ShouldBe("hp=lt:100");
+        => Query().Where(c => c.HitPoints < 100).ToQueryString().ShouldBe("hp=lt:100");
 
     [Test]
     public void LessThanOrEqual_TranslatesToLteOperator()
-        => Query().Where(c => c.Hp <= 100).ToQueryString().ShouldBe("hp=lte:100");
+        => Query().Where(c => c.HitPoints <= 100).ToQueryString().ShouldBe("hp=lte:100");
 
     // ----- text matching -----
 
@@ -91,14 +91,14 @@ public sealed class CardQueryTests
 
     [Test]
     public void AndAlso_BecomesSeparateParameters()
-        => Query().Where(c => c.Category == "Pokemon" && c.Hp > 250).ToQueryString()
+        => Query().Where(c => c.Category == "Pokemon" && c.HitPoints > 250).ToQueryString()
             .ShouldBe("category=eq:Pokemon&hp=gt:250");
 
     [Test]
     public void ChainedWhere_BehavesAsAnd()
         => Query()
             .Where(c => c.Category == "Pokemon")
-            .Where(c => c.Hp > 250)
+            .Where(c => c.HitPoints > 250)
             .ToQueryString()
             .ShouldBe("category=eq:Pokemon&hp=gt:250");
 
@@ -113,7 +113,7 @@ public sealed class CardQueryTests
         // The API can only OR within a single field. Silently dropping half the
         // predicate would return wrong data, so this fails loudly instead.
         NotSupportedException exception = Should.Throw<NotSupportedException>(
-            () => Query().Where(c => c.Name == "Furret" || c.Hp > 100).ToQueryString());
+            () => Query().Where(c => c.Name == "Furret" || c.HitPoints > 100).ToQueryString());
 
         exception.Message.ShouldContain("name");
         exception.Message.ShouldContain("hp");
@@ -150,7 +150,7 @@ public sealed class CardQueryTests
         // an error anyone could debug.
         CardQuery baseQuery = Query().Where(c => c.Name == "Furret");
 
-        CardQuery narrowed = baseQuery.Where(c => c.Hp > 100);
+        CardQuery narrowed = baseQuery.Where(c => c.HitPoints > 100);
 
         baseQuery.ToQueryString().ShouldBe("name=eq:Furret");
         narrowed.ToQueryString().ShouldBe("name=eq:Furret&hp=gt:100");
@@ -194,7 +194,7 @@ public sealed class CardQueryTests
         // from the closure rather than compiled and invoked.
         int minimumHp = 250;
 
-        Query().Where(c => c.Hp > minimumHp).ToQueryString().ShouldBe("hp=gt:250");
+        Query().Where(c => c.HitPoints > minimumHp).ToQueryString().ShouldBe("hp=gt:250");
     }
 
     // ----- sorting and pagination -----
@@ -208,6 +208,13 @@ public sealed class CardQueryTests
     public void OrderByDescending_EmitsDescendingOrder()
         => Query().OrderByDescending(c => c.Name).ToQueryString()
             .ShouldBe("sort:field=name&sort:order=DESC");
+
+    [Test]
+    public void OrderBy_ARenamedProperty_SortsByItsWireName()
+        // HitPoints is "hp" on the wire; the camel-cased .NET name is not a
+        // field the API knows.
+        => Query().OrderBy(c => c.HitPoints).ToQueryString()
+            .ShouldBe("sort:field=hp&sort:order=ASC");
 
     [Test]
     public void Page_EmitsPaginationParameters()
@@ -225,7 +232,7 @@ public sealed class CardQueryTests
     public void FullQuery_CombinesFiltersSortAndPaginationInOrder()
         => Query()
             .Where(c => c.Name.Contains("Pikachu"))
-            .Where(c => c.Hp > 100)
+            .Where(c => c.HitPoints > 100)
             .OrderByDescending(c => c.Name)
             .Page(2, 50)
             .ToQueryString()
@@ -242,7 +249,7 @@ public sealed class CardQueryTests
         // top-level query parameters.
         string queryString = Query()
             .Where(c => c.Name == "Furret")
-            .Where(c => c.Hp > 100)
+            .Where(c => c.HitPoints > 100)
             .Page(1, 10)
             .ToQueryString();
 

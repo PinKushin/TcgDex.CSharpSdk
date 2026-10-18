@@ -156,7 +156,7 @@ public sealed class CachingTests : LiveApiFixture
             cached.ShouldNotBeNull();
 
             cached.Name.ShouldBe(live.Name);
-            cached.Hp.ShouldBe(live.Hp);
+            cached.HitPoints.ShouldBe(live.HitPoints);
             cached.Attacks.Count.ShouldBe(live.Attacks.Count);
             cached.Set.Id.ShouldBe(live.Set.Id);
             int? livePrintings = live.Pricing?.Tcgplayer?.Printings.Count;

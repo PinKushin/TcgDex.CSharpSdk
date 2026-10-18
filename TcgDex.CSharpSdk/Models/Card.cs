@@ -6,7 +6,7 @@ namespace TcgDex.Models;
 /// <remarks>
 /// <para>
 /// Which fields are populated depends on <see cref="Category"/>. Pokémon carry
-/// <see cref="Hp"/>, <see cref="Types"/>, <see cref="Attacks"/> and the rest of
+/// <see cref="HitPoints"/>, <see cref="Types"/>, <see cref="Attacks"/> and the rest of
 /// the battle data; Trainers carry <see cref="TrainerType"/> and
 /// <see cref="Effect"/>; Energy cards carry <see cref="EnergyType"/>. Anything
 /// category-specific is nullable because the API omits it entirely rather than
@@ -126,7 +126,8 @@ public sealed record Card
     // ----- Pokémon -----
 
     /// <summary>Hit points.</summary>
-    public int? Hp { get; init; }
+    [JsonPropertyName("hp")]
+    public int? HitPoints { get; init; }
 
     /// <summary>Elemental types, for example <c>["Grass"]</c>.</summary>
     public IReadOnlyList<string> Types

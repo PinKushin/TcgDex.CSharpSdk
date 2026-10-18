@@ -63,7 +63,7 @@ public sealed class GraphQlTests
     {
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, EmptyResult);
 
-        string query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret", Hp = 110 });
+        string query = await CaptureQueryAsync(handler, new CardFilter { Name = "Furret", HitPoints = 110 });
 
         query.ShouldContain("""filters:{name:"Furret",hp:110}""");
     }
@@ -180,7 +180,7 @@ public sealed class GraphQlTests
 
         Card card = cards.ShouldHaveSingleItem();
         card.Name.ShouldBe("Furret");
-        card.Hp.ShouldBe(110);
+        card.HitPoints.ShouldBe(110);
     }
 
     [Test]

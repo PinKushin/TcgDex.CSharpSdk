@@ -103,7 +103,7 @@ public class RoundTripBenchmarks : IDisposable
         foreach (CardBrief brief in briefs)
         {
             Card? card = await _client.Cards.GetAsync(brief.Id, CancellationToken.None).ConfigureAwait(false);
-            hp += card?.Hp ?? 0;
+            hp += card?.HitPoints ?? 0;
         }
 
         return hp;
@@ -121,7 +121,7 @@ public class RoundTripBenchmarks : IDisposable
 
         foreach (Card card in cards)
         {
-            hp += card.Hp ?? 0;
+            hp += card.HitPoints ?? 0;
         }
 
         return hp;

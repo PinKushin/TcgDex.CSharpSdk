@@ -90,7 +90,7 @@ public sealed class PricingOptOutTests
 
         card.Name.ShouldBe("Furret");
         card.Id.ShouldBe("swsh3-136");
-        card.Hp.ShouldBe(110);
+        card.HitPoints.ShouldBe(110);
         card.Rarity.ShouldBe("Uncommon");
         card.Illustrator.ShouldBe("tetsuya koizumi");
         card.Set.ShouldNotBeNull().Id.ShouldBe("swsh3");
