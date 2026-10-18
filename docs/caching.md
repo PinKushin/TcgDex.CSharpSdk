@@ -164,14 +164,15 @@ public sealed class CacheReport(TcgDexCacheStatistics stats)
 }
 ```
 
-Without a container, the handler counts what it did:
+Without a container, read the same counts from the handler's `Statistics`:
 
 ```csharp
 TcgDexCachingHandler handler = new(new MemoryTcgDexResponseCache());
+TcgDexCacheStatistics stats = handler.Statistics;
 
-handler.FreshHits;      // served with no network at all
-handler.Revalidations;  // refreshed by a 304, no body transferred
-handler.Misses;         // full responses fetched
+long fresh = stats.FreshHits;          // served with no network at all
+long revalidated = stats.Revalidations; // refreshed by a 304, no body transferred
+long fetched = stats.Misses;            // full responses fetched
 ```
 
 ## Without a container

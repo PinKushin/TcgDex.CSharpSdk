@@ -259,8 +259,9 @@ public sealed class DependencyInjectionTests
 
         (_, TcgDexCachingHandler after) = BuildChain(provider, AlwaysOk());
 
-        after.Misses.ShouldBe(1);
-        after.FreshHits.ShouldBe(1);
+        after.Statistics.Misses.ShouldBe(1);
+        after.Statistics.FreshHits.ShouldBe(1);
+        after.Statistics.ShouldBeSameAs(provider.GetRequiredService<TcgDexCacheStatistics>());
     }
 
     [Test]

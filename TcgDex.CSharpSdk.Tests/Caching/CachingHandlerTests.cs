@@ -52,7 +52,7 @@ public sealed class CachingHandlerTests
 
         inner.Requests.Count.ShouldBe(1, "the second read should not reach the network");
         second.ShouldBe(first);
-        handler.FreshHits.ShouldBe(1);
+        handler.Statistics.FreshHits.ShouldBe(1);
     }
 
     [Test]
@@ -104,7 +104,7 @@ public sealed class CachingHandlerTests
 
         // The 304 carries no body, so this can only have come from the cache.
         second.ShouldBe("""{"id":"swsh3-136"}""");
-        handler.Revalidations.ShouldBe(1);
+        handler.Statistics.Revalidations.ShouldBe(1);
     }
 
     [Test]
@@ -211,7 +211,7 @@ public sealed class CachingHandlerTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
         (await response.Content.ReadAsStringAsync(CancellationToken.None)).ShouldBeEmpty();
-        handler.Revalidations.ShouldBe(0);
+        handler.Statistics.Revalidations.ShouldBe(0);
 
         // The entry is untouched: still stale, still validated by "a".
         string next = await GetAsync(client);
@@ -237,7 +237,7 @@ public sealed class CachingHandlerTests
         using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
-        handler.Revalidations.ShouldBe(0);
+        handler.Statistics.Revalidations.ShouldBe(0);
 
         // Not evicted either: the next request still revalidates with "a".
         // Before the 304 branch existed, this response fell into the error
@@ -267,7 +267,7 @@ public sealed class CachingHandlerTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await response.Content.ReadAsStringAsync(CancellationToken.None)).ShouldBe("""{"id":"old"}""");
-        handler.Revalidations.ShouldBe(1);
+        handler.Statistics.Revalidations.ShouldBe(1);
     }
 
     [Test]
@@ -307,7 +307,7 @@ public sealed class CachingHandlerTests
         using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
-        handler.Revalidations.ShouldBe(0);
+        handler.Statistics.Revalidations.ShouldBe(0);
     }
 
     /// <summary>Sends the same message twice, running a hook in between.</summary>
@@ -357,7 +357,7 @@ public sealed class CachingHandlerTests
         inner.Requests.Count.ShouldBe(4);
         inner.Requests[3].Headers.IfNoneMatch.ToString().ShouldBe("\"b\"");
         body.ShouldBe("""{"id":"old"}""");
-        handler.Revalidations.ShouldBe(2);
+        handler.Statistics.Revalidations.ShouldBe(2);
     }
 
     [Test]
@@ -434,7 +434,7 @@ public sealed class CachingHandlerTests
 
         inner.Requests[1].Headers.GetValues("If-None-Match").ShouldBe(["*"]);
         response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
-        handler.Revalidations.ShouldBe(0);
+        handler.Statistics.Revalidations.ShouldBe(0);
 
         // Untouched: still stale, still validated by "a".
         (await GetAsync(client)).ShouldBe("""{"id":"old"}""");
@@ -489,7 +489,7 @@ public sealed class CachingHandlerTests
         using HttpResponseMessage response = await client.SendAsync(request, CancellationToken.None);
 
         inner.Requests.Count.ShouldBe(1);
-        handler.FreshHits.ShouldBe(1);
+        handler.Statistics.FreshHits.ShouldBe(1);
         request.Headers.IfNoneMatch.ShouldBeEmpty();
 
         // The note of which tag was ours comes off too, or the caller's message
@@ -573,7 +573,7 @@ public sealed class CachingHandlerTests
 
         inner.Requests[0].Headers.GetValues("If-None-Match").ShouldBe(["\"x\""]);
         response.StatusCode.ShouldBe(HttpStatusCode.NotModified);
-        handler.Revalidations.ShouldBe(0);
+        handler.Statistics.Revalidations.ShouldBe(0);
     }
 
     [Test]
@@ -644,7 +644,7 @@ public sealed class CachingHandlerTests
         await GetAsync(client);
 
         inner.Requests.Count.ShouldBe(2, "the third read should be a fresh hit");
-        handler.FreshHits.ShouldBe(1);
+        handler.Statistics.FreshHits.ShouldBe(1);
     }
 
     [Test]
@@ -789,7 +789,7 @@ public sealed class CachingHandlerTests
             responses.Count(r => r.StatusCode == HttpStatusCode.ServiceUnavailable).ShouldBe(1);
             responses.Count(r => r.IsSuccessStatusCode).ShouldBe(3);
             inner.Requests.Count.ShouldBeGreaterThan(1);
-            handler.Misses.ShouldBeGreaterThan(0);
+            handler.Statistics.Misses.ShouldBeGreaterThan(0);
         }
         finally
         {
@@ -811,8 +811,8 @@ public sealed class CachingHandlerTests
         await GetAsync(client, "https://api.tcgdex.net/v2/en/cards/base1-1");
         await GetAsync(client, CardUrl);
 
-        handler.Misses.ShouldBe(2, "two distinct URLs were fetched in full");
-        handler.FreshHits.ShouldBe(1);
+        handler.Statistics.Misses.ShouldBe(2, "two distinct URLs were fetched in full");
+        handler.Statistics.FreshHits.ShouldBe(1);
     }
 
     [Test]
@@ -1019,7 +1019,7 @@ public sealed class CachingHandlerTests
         time.Advance(TimeSpan.FromMinutes(2));
         await GetAsync(client);
 
-        handler.Revalidations.ShouldBe(1, "a two-minute-old card should be revalidated");
+        handler.Statistics.Revalidations.ShouldBe(1, "a two-minute-old card should be revalidated");
     }
 
     [Test]
