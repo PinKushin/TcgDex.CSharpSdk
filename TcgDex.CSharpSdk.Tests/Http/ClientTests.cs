@@ -133,7 +133,7 @@ public sealed class ClientTests
         RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
 
-        await CreateClient(handler).Random.CardAsync(CancellationToken.None);
+        await CreateClient(handler).Random.GetCardAsync(CancellationToken.None);
 
         handler.SingleRequestUri.ShouldBe("https://api.tcgdex.net/v2/en/random/card");
     }
@@ -144,7 +144,7 @@ public sealed class ClientTests
         RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "list-categories.json");
 
-        IReadOnlyList<string> categories = await CreateClient(handler).Catalog.CategoriesAsync(CancellationToken.None);
+        IReadOnlyList<string> categories = await CreateClient(handler).Catalog.GetCategoriesAsync(CancellationToken.None);
 
         handler.SingleRequestUri.ShouldBe("https://api.tcgdex.net/v2/en/categories");
         categories.ShouldContain("Pokemon");
@@ -158,7 +158,7 @@ public sealed class ClientTests
         RecordingHandler handler = new RecordingHandler()
             .RespondWithJsonFile(HttpStatusCode.OK, "list-retreats-int.json");
 
-        IReadOnlyList<int> retreats = await CreateClient(handler).Catalog.RetreatCostsAsync(CancellationToken.None);
+        IReadOnlyList<int> retreats = await CreateClient(handler).Catalog.GetRetreatCostsAsync(CancellationToken.None);
 
         handler.SingleRequestUri.ShouldBe("https://api.tcgdex.net/v2/en/retreats");
         retreats.ShouldBe([1, 2, 3, 4, 5]);

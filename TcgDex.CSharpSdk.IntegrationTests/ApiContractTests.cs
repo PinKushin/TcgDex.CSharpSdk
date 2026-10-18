@@ -247,7 +247,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task Catalog_ReturnsTheKnownValueSets()
     {
-        IReadOnlyList<string> categories = await Client.Catalog.CategoriesAsync(Timeout);
+        IReadOnlyList<string> categories = await Client.Catalog.GetCategoriesAsync(Timeout);
 
         categories.ShouldBe(["Energy", "Pokemon", "Trainer"], ignoreOrder: true);
     }
@@ -255,7 +255,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task Catalog_NumericEndpoints_DeserializeAsNumbers()
     {
-        IReadOnlyList<int> retreats = await Client.Catalog.RetreatCostsAsync(Timeout);
+        IReadOnlyList<int> retreats = await Client.Catalog.GetRetreatCostsAsync(Timeout);
 
         retreats.ShouldNotBeEmpty();
         retreats.ShouldAllBe(r => r > 0);
@@ -264,7 +264,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task Catalog_TrainerTypes_UsesTheHyphenatedPath()
     {
-        IReadOnlyList<string> trainerTypes = await Client.Catalog.TrainerTypesAsync(Timeout);
+        IReadOnlyList<string> trainerTypes = await Client.Catalog.GetTrainerTypesAsync(Timeout);
 
         trainerTypes.ShouldContain("Item");
         trainerTypes.ShouldContain("Supporter");
@@ -273,7 +273,7 @@ public sealed class ApiContractTests : LiveApiFixture
     [Test]
     public async Task Random_ReturnsAUsableCard()
     {
-        Card card = await Client.Random.CardAsync(Timeout);
+        Card card = await Client.Random.GetCardAsync(Timeout);
 
         // The value is genuinely unpredictable, so the prediction is about the
         // card rather than its contents: whatever came back must be a real card

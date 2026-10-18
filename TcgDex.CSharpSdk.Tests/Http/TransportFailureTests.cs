@@ -102,7 +102,7 @@ public sealed class TransportFailureTests
             .RespondWithJsonFile(HttpStatusCode.NotFound, "error-not-found.json");
 
         Should.ThrowAsync<TcgDexApiException>(async () =>
-            await CreateClient(handler).Catalog.RaritiesAsync(CancellationToken.None))
+            await CreateClient(handler).Catalog.GetRaritiesAsync(CancellationToken.None))
             .Result.ShouldNotBeNull();
     }
 

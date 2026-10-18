@@ -192,7 +192,7 @@ public sealed class ErrorKindTests
     public async Task Rest_RequiredEndpointMissing_IsInvalidResponse()
     {
         TcgDexApiException error = await Should.ThrowAsync<TcgDexApiException>(
-            () => Client(Answer(HttpStatusCode.NotFound, string.Empty)).Catalog.RaritiesAsync(CancellationToken.None));
+            () => Client(Answer(HttpStatusCode.NotFound, string.Empty)).Catalog.GetRaritiesAsync(CancellationToken.None));
 
         ShouldBe(error, TcgDexErrorKind.InvalidResponse, "https://api.tcgdex.net/v2/en/rarities");
     }

@@ -480,25 +480,25 @@ namespace TcgDex.Resources
     }
     public interface ICatalogResource
     {
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> CategoriesAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<int>> DexIdsAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> EnergyTypesAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<int>> HitPointsAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> IllustratorsAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> RaritiesAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> RegulationMarksAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<int>> RetreatCostsAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> StagesAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> SuffixesAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> TrainerTypesAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> TypesAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> VariantsAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetCategoriesAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<int>> GetDexIdsAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetEnergyTypesAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<int>> GetHitPointsAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetIllustratorsAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetRaritiesAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetRegulationMarksAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<int>> GetRetreatCostsAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetStagesAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetSuffixesAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetTrainerTypesAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetTypesAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetVariantsAsync(System.Threading.CancellationToken cancellationToken = default);
     }
     public interface IRandomResource
     {
-        System.Threading.Tasks.Task<TcgDex.Models.Card> CardAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<TcgDex.Models.Series> SerieAsync(System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<TcgDex.Models.CardSet> SetAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<TcgDex.Models.Card> GetCardAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<TcgDex.Models.Series> GetSeriesAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<TcgDex.Models.CardSet> GetSetAsync(System.Threading.CancellationToken cancellationToken = default);
     }
     public interface ISeriesResource
     {

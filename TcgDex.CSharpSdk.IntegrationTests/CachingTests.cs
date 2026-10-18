@@ -107,8 +107,8 @@ public sealed class CachingTests : LiveApiFixture
 
         using (http)
         {
-            IReadOnlyList<string> first = await client.Catalog.RaritiesAsync(Timeout);
-            IReadOnlyList<string> second = await client.Catalog.RaritiesAsync(Timeout);
+            IReadOnlyList<string> first = await client.Catalog.GetRaritiesAsync(Timeout);
+            IReadOnlyList<string> second = await client.Catalog.GetRaritiesAsync(Timeout);
 
             second.ShouldBe(first);
             cache.Revalidations.ShouldBe(1, "the second read should have been a 304");

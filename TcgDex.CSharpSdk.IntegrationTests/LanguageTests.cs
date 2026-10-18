@@ -69,7 +69,7 @@ public sealed class LanguageTests : LiveApiFixture
         using HttpClient httpClient = new();
         TcgDexClient client = new(httpClient, new TcgDexOptions { Language = language });
 
-        IReadOnlyList<string> categories = await client.Catalog.CategoriesAsync(Timeout);
+        IReadOnlyList<string> categories = await client.Catalog.GetCategoriesAsync(Timeout);
 
         // Counted rather than "not empty". The values themselves are translated
         // — French returns Dresseur, Pokémon and Énergie — so they cannot be
@@ -97,7 +97,7 @@ public sealed class LanguageTests : LiveApiFixture
         TcgDexClient client = new(httpClient, new TcgDexOptions { Language = language });
 
         IReadOnlyList<CardBrief> cards = await client.Cards.ListAsync(new CardQuery().Page(1, 5), Timeout);
-        IReadOnlyList<string> categories = await client.Catalog.CategoriesAsync(Timeout);
+        IReadOnlyList<string> categories = await client.Catalog.GetCategoriesAsync(Timeout);
 
         cards.ShouldNotBeNull();
         cards.ShouldBeEmpty();

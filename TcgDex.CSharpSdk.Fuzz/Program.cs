@@ -111,7 +111,7 @@ internal static class Program
                 case 0: Run(c => c.Cards.GetAsync("swsh3-136", CancellationToken.None), payload); break;
                 case 1: Run(c => c.Cards.ListAsync(CancellationToken.None), payload); break;
                 case 2: Run(c => c.Sets.GetAsync("swsh3", CancellationToken.None), payload); break;
-                case 3: Run(c => c.Catalog.RaritiesAsync(CancellationToken.None), payload); break;
+                case 3: Run(c => c.Catalog.GetRaritiesAsync(CancellationToken.None), payload); break;
                 case 4: ProblemDetails(payload); break;
                 case 5: GraphQl(payload); break;
                 default: QueryBuilding(payload); break;

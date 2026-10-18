@@ -120,13 +120,13 @@ internal sealed class SeriesResource(TcgDexTransport transport)
 internal sealed class RandomResource(TcgDexTransport transport)
     : ResourceBase(transport), IRandomResource
 {
-    public Task<Card> CardAsync(CancellationToken cancellationToken = default)
+    public Task<Card> GetCardAsync(CancellationToken cancellationToken = default)
         => Transport.GetRequiredAsync<Card>("random/card", cancellationToken);
 
-    public Task<CardSet> SetAsync(CancellationToken cancellationToken = default)
+    public Task<CardSet> GetSetAsync(CancellationToken cancellationToken = default)
         => Transport.GetRequiredAsync<CardSet>("random/set", cancellationToken);
 
-    public Task<Series> SerieAsync(CancellationToken cancellationToken = default)
+    public Task<Series> GetSeriesAsync(CancellationToken cancellationToken = default)
         => Transport.GetRequiredAsync<Series>("random/serie", cancellationToken);
 }
 
@@ -139,43 +139,43 @@ internal sealed class RandomResource(TcgDexTransport transport)
 internal sealed class CatalogResource(TcgDexTransport transport)
     : ResourceBase(transport), ICatalogResource
 {
-    public Task<IReadOnlyList<string>> CategoriesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetCategoriesAsync(CancellationToken cancellationToken = default)
         => Text("categories", cancellationToken);
 
-    public Task<IReadOnlyList<string>> RaritiesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetRaritiesAsync(CancellationToken cancellationToken = default)
         => Text("rarities", cancellationToken);
 
-    public Task<IReadOnlyList<string>> TypesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetTypesAsync(CancellationToken cancellationToken = default)
         => Text("types", cancellationToken);
 
-    public Task<IReadOnlyList<string>> IllustratorsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetIllustratorsAsync(CancellationToken cancellationToken = default)
         => Text("illustrators", cancellationToken);
 
-    public Task<IReadOnlyList<string>> StagesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetStagesAsync(CancellationToken cancellationToken = default)
         => Text("stages", cancellationToken);
 
-    public Task<IReadOnlyList<string>> SuffixesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetSuffixesAsync(CancellationToken cancellationToken = default)
         => Text("suffixes", cancellationToken);
 
-    public Task<IReadOnlyList<string>> VariantsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetVariantsAsync(CancellationToken cancellationToken = default)
         => Text("variants", cancellationToken);
 
-    public Task<IReadOnlyList<string>> EnergyTypesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetEnergyTypesAsync(CancellationToken cancellationToken = default)
         => Text("energy-types", cancellationToken);
 
-    public Task<IReadOnlyList<string>> RegulationMarksAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetRegulationMarksAsync(CancellationToken cancellationToken = default)
         => Text("regulation-marks", cancellationToken);
 
-    public Task<IReadOnlyList<string>> TrainerTypesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> GetTrainerTypesAsync(CancellationToken cancellationToken = default)
         => Text("trainer-types", cancellationToken);
 
-    public Task<IReadOnlyList<int>> HitPointsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<int>> GetHitPointsAsync(CancellationToken cancellationToken = default)
         => Numbers("hp", cancellationToken);
 
-    public Task<IReadOnlyList<int>> RetreatCostsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<int>> GetRetreatCostsAsync(CancellationToken cancellationToken = default)
         => Numbers("retreats", cancellationToken);
 
-    public Task<IReadOnlyList<int>> DexIdsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<int>> GetDexIdsAsync(CancellationToken cancellationToken = default)
         => Numbers("dex-ids", cancellationToken);
 
     private Task<IReadOnlyList<string>> Text(string path, CancellationToken cancellationToken)

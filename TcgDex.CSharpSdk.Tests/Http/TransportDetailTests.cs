@@ -72,7 +72,7 @@ public sealed class TransportDetailTests
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.NotFound, "{}");
 
         TcgDexApiException exception = Should.ThrowAsync<TcgDexApiException>(async () =>
-            await CreateClient(handler).Catalog.RaritiesAsync(CancellationToken.None)).Result;
+            await CreateClient(handler).Catalog.GetRaritiesAsync(CancellationToken.None)).Result;
 
         exception.Message.ShouldContain("rarities");
         exception.Message.ShouldContain("expected always to be available");
