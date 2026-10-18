@@ -100,23 +100,6 @@ public sealed class PricingOptOutTests
     }
 
     [Test]
-    public async Task WhenTurnedOff_PerVariantPricingIsStillPopulated()
-    {
-        // The option is documented as covering Card.Pricing only, and the
-        // contract modifier returns early for every type but Card. DetailedVariant
-        // has a "pricing" property of its own, so without that early return the
-        // skip converter would be attached to it too. This pins the documented
-        // scope: swsh3-136 carries a per-printing pricing block, and it survives.
-        using TcgDexClient client = CreateClient(deserializePricing: false);
-
-        Card card = (await client.Cards.GetAsync("swsh3-136", CancellationToken.None)).ShouldNotBeNull();
-
-        card.Pricing.ShouldBeNull();
-        card.VariantsDetailed[0].Pricing.ShouldNotBeNull()
-            .Cardmarket.ShouldNotBeNull().Avg.ShouldBe(0.08m);
-    }
-
-    [Test]
     public void WhenTurnedOff_TheSkipConverter_RejectsANullWriter()
     {
         JsonSerializerOptions contract = TcgDexJsonContracts.For(new TcgDexOptions { DeserializePricing = false });
