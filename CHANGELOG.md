@@ -78,6 +78,8 @@ the table below.
 - `AddTcgDexWithCaching` registers `TcgDexCacheOptions` through the options pattern, so
   `Configure<TcgDexCacheOptions>`, an `appsettings.json` binding and `IOptions<TcgDexCacheOptions>`
   now work alongside the `configureCache` delegate. Previously only the delegate was applied.
+  The merged options are validated at start-up, like `TcgDexOptions`: a `MaxEntries` below 1 or a
+  negative time-to-live fails with `OptionsValidationException`.
 - An unreadable `updated` timestamp on a card or a pricing block now reads as `null`, as
   `ReleaseDate` already did, instead of failing the whole card.
 
