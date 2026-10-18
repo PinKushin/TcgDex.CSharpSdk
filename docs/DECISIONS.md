@@ -706,3 +706,26 @@ cases would justify a public converter: that one, or a consumer modelling their 
 same quirk (a string-or-number field, a tolerant date). Making a type public later is not breaking,
 whereas making it internal after 1.0 would be, so internal is the default until someone asks.
 
+## 29. The doubtful renames: the owner's picks
+
+The naming pass (#25) left a list of names whose case was not clear-cut. On 2026-10-18 the owner
+chose from that list in a multiple-choice question. No further reasoning was given for any pick or
+rejection, and none is supplied here.
+
+**Renamed** (each keeps its JSON key through `[JsonPropertyName]`):
+
+- `Card.Retreat` / `CardFilter.Retreat` → `RetreatCost`
+- `Card.VariantsDetailed` → `DetailedVariants`
+- `Card.EvolveFrom` / `CardFilter.EvolveFrom` → `EvolvesFrom`
+- `ISetResource` → `ICardSetResource`
+- `GraphQl` → `GraphQL` in every public name (`TcgDexOptions.GraphQLEndpoint`,
+  `TcgDexErrorKind.GraphQLError`), with internal names following
+- `Card.Legal` / `CardSet.Legal` → `Legality`
+
+**Left as they are:** the type of `TcgDexProblem.Status`, `WPromo`, `Attack.Cost`, `Holo` and
+`CardQuery.Page`.
+
+**Kept from the first round:** the three renames the implementer added beyond the audit —
+`CardSetBrief`, `CardTrader`, and the plural `DexIds` / `Stamps`. `CardFilter.DexId` stays singular
+because it filters by one id; the 0.8.0 migration table says so.
+
