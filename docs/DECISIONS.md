@@ -763,3 +763,22 @@ per-push CI does not run the live tests either.
 The owner asked for this one-line change to be split out of the mutation-score work and merged the
 same day.
 
+## 32. No file's mutation score stays below its best without being examined
+
+After 0.8.0 the total was 92.45% against 92.57%, and I called that flat, within the ±2.7 noise.
+The owner overruled it: "if things are lower than they were anywhere, it needs looked at". The
+noise bound applies to the total, not to one file.
+
+Per file, against each file's best score in any past run counting only unit-test kills (#31), six
+files were lower: `TcgDexServiceCollectionExtensions` (89.1% from 100%), `ExpressionTranslator`
+(84% from 92%), `TcgDexClient` (81.2% from 87.5%), `CardImage` (87.1% from 93.1%),
+`MemoryTcgDexResponseCache` (87.1% from 91.3%) and `TcgDexTransport` (88.2% from 89.3%). Comparing
+the survivors by mutator, replacement and source line, not by count, showed which were new code and
+which had lost a test. Of the 33 survivors in those files, 21 now have a killing test, each checked
+by applying the mutant by hand, and 12 are written off in `docs/coverage.md` with a reason. One
+code comment that called a mutant equivalent was wrong: removing that early return makes a miss
+read the clock and `Remove` a key that was never stored.
+
+The rule from here: a file below its best-ever score is examined before a release or merge, whatever
+the total does.
+
