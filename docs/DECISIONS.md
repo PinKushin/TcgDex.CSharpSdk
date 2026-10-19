@@ -746,3 +746,20 @@ and the Discord post link the NuGet page and give the install command. The owner
 the GitHub release on Discord, which until now pointed only at source zips: "people havent
 actually seen a real release lol i think".
 
+## 31. Mutation runs skip the live-API tests
+
+Every Mutation run, including the daily 05:17 UTC one, discovered 894 tests: the 723 unit tests
+plus all 171 in `TcgDex.CSharpSdk.IntegrationTests`, because Stryker takes the solution
+(`stryker-config.json` names `TcgDex.CSharpSdk.Tests` as the only test project, but the solution
+brings the other one in). The live tests therefore called the real TCGdex API for every mutant
+they covered, and were credited with kills: 180 in run 39065526941, which inflated that run's
+per-file scores. The number of requests was not measured.
+
+`"test-case-filter": "TestCategory!=Integration"` excludes exactly the live tests, which all carry
+that category through `LiveApiFixture`, and keeps the hermetic `JsonShape` tests. A mutant only a
+live test used to kill now survives, and shows up as a gap in the unit suite. That is the point:
+per-push CI does not run the live tests either.
+
+The owner asked for this one-line change to be split out of the mutation-score work and merged the
+same day.
+
