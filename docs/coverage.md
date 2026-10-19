@@ -240,7 +240,8 @@ If every write-off below is correct, the scores rise to 94%, 89%, 90% and 100%.
 This is a projection from the per-mutant checks. No Stryker run measured it, because
 local runs are limited to an 8000-character span.
 
-Line numbers are those of `ddde9bd`, as printed in the report.
+Line numbers are those of `ddde9bd`, as printed in the report, except the `TcgDexTransport.cs`
+rows. Those are renumbered to `8ffde05`, where run 39177696453 reported the same eight mutants.
 
 | File:line | Mutator | Why it is not killed |
 |---|---|---|
@@ -254,12 +255,12 @@ Line numbers are those of `ddde9bd`, as printed in the report.
 | `BoundedContent.cs:145` | Conditional (true) | Equivalent. When capacity is 0, `new MemoryStream(0)` behaves the same as `new MemoryStream()`. |
 | `BoundedContent.cs:145` | Equality (`capacity >= 0`) | Equivalent, for the same reason: it differs from the original only at 0. |
 | `BoundedContent.cs:198` | Statement (`ArrayPool.Return` removed) | Not observable. The pool allocates a fresh array when one is not returned, so the only cost is allocation. `ArrayPool.Shared` caches per thread and per core, so asserting that an array is reused would be nondeterministic. |
-| `TcgDexTransport.cs:398` | Arithmetic (`*` to `/`) | Untestable without a clock seam: not equivalent. On Linux, where Stryker runs on CI, `Stopwatch.Frequency` (10⁹) makes the factor 10⁷/10⁹ = 0.01, so `/` divides by it instead of multiplying and logs a duration 10,000 times too large. Only on Windows is the factor 1. The value is logged only, and no test can bound it exactly without injecting the clock. `TheLoggedDuration_IsAPlausibleNumberOfMilliseconds` still catches a gross scale error. |
-| `TcgDexTransport.cs:417` | Conditional (false) | Equivalent. A blank body sent to the deserializer throws `JsonException`. That is caught at line 421 and returns the same `null`, so `IsBlank` is only a fast path. |
-| `TcgDexTransport.cs:422` | Block removal | Equivalent. Removing the block makes it return `default`, which is the same `null`. |
-| `TcgDexTransport.cs:430` | Block removal | Equivalent, for the same reason: it returns `default`, which is `null`. |
-| `TcgDexTransport.cs:444` | Logical (three variants) | Equivalent. When fewer whitespace bytes count as blank, those bodies go to the deserializer instead. It throws `JsonException`, which becomes the same `null`. |
-| `TcgDexTransport.cs:450` | Boolean (`true` to `false`) | Equivalent, for the same reason as line 444. |
+| `TcgDexTransport.cs:420` | Arithmetic (`*` to `/`) | Untestable without a clock seam: not equivalent. On Linux, where Stryker runs on CI, `Stopwatch.Frequency` (10⁹) makes the factor 10⁷/10⁹ = 0.01, so `/` divides by it instead of multiplying and logs a duration 10,000 times too large. Only on Windows is the factor 1. The value is logged only, and no test can bound it exactly without injecting the clock. `TheLoggedDuration_IsAPlausibleNumberOfMilliseconds` still catches a gross scale error. |
+| `TcgDexTransport.cs:439` | Conditional (false) | Equivalent. A blank body sent to the deserializer throws `JsonException`. That is caught at line 443 and returns the same `null`, so `IsBlank` is only a fast path. |
+| `TcgDexTransport.cs:444` | Block removal | Equivalent. Removing the block makes it return `default`, which is the same `null`. |
+| `TcgDexTransport.cs:452` | Block removal | Equivalent, for the same reason: it returns `default`, which is `null`. |
+| `TcgDexTransport.cs:466` | Logical (three variants) | Equivalent. When fewer whitespace bytes count as blank, those bodies go to the deserializer instead. It throws `JsonException`, which becomes the same `null`. |
+| `TcgDexTransport.cs:472` | Boolean (`true` to `false`) | Equivalent, for the same reason as line 466. |
 
 `RequestBudget.cs` has no write-offs. Both of its survivors are now killed.
 
@@ -267,8 +268,8 @@ Line numbers are those of `ddde9bd`, as printed in the report.
 
 GitHub Actions run 39057672321 (branch `test/mutation-weak-files`, merged as `63f02f8`) left 27
 undetected mutants in eight files. Thirteen now have a killing test, checked by hand the same way.
-`TcgDexTransport.cs` still has the eight survivors written off above, at the same line numbers, so
-it gets no new rows. The five rows below are the rest. Projected scores, if they are correct:
+`TcgDexTransport.cs` still had the eight survivors written off above, then at the same line numbers
+(renumbered since), so it gets no new rows. The five rows below are the rest. Projected scores, if they are correct:
 `ITcgDexResponseCache.cs` 100% (from 50%), `FlexibleStringConverter.cs` 100% (80%),
 `TcgDexJsonContracts.cs` 100% (81%), `TcgDexServiceCollectionExtensions.cs` 100% (81%),
 `TcgDexOptions.cs` 100% (86%), `TcgPlayerPricingConverter.cs` 89% (33 of 37, from 81%),
