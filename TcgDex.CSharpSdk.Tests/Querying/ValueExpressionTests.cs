@@ -184,6 +184,17 @@ public sealed class ValueExpressionTests
     }
 
     [Test]
+    public void ASpecialNameMethodThatIsNotAGetter_IsRejected()
+    {
+        // IsSpecialName alone is not the test: operators, event accessors and
+        // setters are special-name too, and only a get_ accessor is an indexer.
+        Lookalike lookalike = new();
+
+        Should.Throw<NotSupportedException>(() => Query(c => c.Name == lookalike.Slice(0)))
+            .Message.ShouldContain("Slice(0)");
+    }
+
+    [Test]
     public void ANullReceiver_IsRejectedNamingTheNode()
     {
         string? name = null;
@@ -311,6 +322,10 @@ public sealed class ValueExpressionTests
         private readonly string _name = "Furret";
 
         public string get_Item(int index) => _name.Substring(index);
+
+        /// <summary>Flagged special-name, like an accessor, but not a get_ one.</summary>
+        [System.Runtime.CompilerServices.SpecialName]
+        public string Slice(int index) => _name.Substring(index);
     }
 
     /// <summary>The query string, or the exception type when building it fails.</summary>

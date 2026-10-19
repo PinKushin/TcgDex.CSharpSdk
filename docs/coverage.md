@@ -309,18 +309,20 @@ Line numbers are those of `8ffde05`.
 ### Fourth round: the rest of the survivors, read one by one
 
 Mutation run 39189935172 (branch `fix/mutation-regressions`) left 51 survivors. Those in files that
-were not below their best had not been examined, so each was read. Fourteen now have a killing test,
+were not below their best had not been examined, so each was read. Sixteen now have a killing test,
 checked by hand: the two writer guards in `ReleaseDateConverter` and `TimestampConverter`, the null
 `variants_detailed` coalescing in `Card`, the `pageSize` guard and the cancellation check in
 `StreamAsync`, the `BoundedLru` bound, the tagless-entry slot in `DeserializedResponseCache`, the
 GraphQL error log, the `'9'` boundary in `Attack.BaseDamage`, and the five `ConfigureAwait` calls in
-`GraphQLTransport` and `StreamAsync`. The four below cannot be killed.
+`GraphQLTransport` and `StreamAsync`, the `"get_"` prefix of the indexer check in
+`ExpressionTranslator`, and the pricing-skip type check in `TcgDexJsonContracts`. The five below cannot be killed.
 
 | File:line | Mutator | Why it is not killed |
 |---|---|---|
 | `CardQuery.cs:178` | Statement (guard removed) | Equivalent. `ExpressionTranslator.SortFieldName`, called on the next line, runs the same `Guard.NotNull(selector)` and the parameter has the same name, so the exception has the same type, message and `ParamName`. `SortFieldName_ANullSelector_ThrowsNamingTheParameter` pins it. The guard stays because `OrderBy` is public and its contract should not depend on a helper. |
 | `BoundedLru.cs:167` | Statement (`return;` removed) | Equivalent. After a successful `TryAdd` the code falls through to `TryGetValue` and `TryUpdate` of the entry it just added, which succeed with the same value and return. It would differ only if `Evict` removed that very key in between, and `Evict` removes the oldest entry, never the one just stored. |
 | `TcgDexCacheOptions.cs:135` | Equality (`cards >= 0` to `cards > 0`) | Equivalent. The two differ only when the path begins with `/cards/` at index 0. Every request path starts with the language segment (`/v2/en/cards/...`), and an empty language is rejected, so index 0 has no input. |
+| `TcgDexJsonContracts.cs:106` | Statement (`return;` removed) | Equivalent today. For any type other than `Card` and `DetailedVariant` the loop below would run, and it only touches a property named `pricing`; no other model has one. It would start to matter if a model gained a `pricing` property, which the option would then skip as well. (`TcgDexJsonContracts.cs:104`, the check above it, is killed by `AFreshWithoutPricingContract_SkipsPricingOnTheCardAndOnEveryVariant`; the shared options cache their contracts per process, so only a freshly built one runs a mutated modifier.) |
 | `CardDiagnostics.cs:44` | Statement (`return;` removed) | Equivalent. With warnings disabled the walk would run, and every log call it makes is filtered by the generated logger's own `IsEnabled` check. The early return only saves the walk, which nothing observable depends on. |
 
 ## What coverage does not tell you
