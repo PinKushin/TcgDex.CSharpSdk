@@ -61,6 +61,16 @@ public sealed class ValueExpressionTests
         Query(c => c.Name == names[0]).ShouldBe("name=eq:Furret");
     }
 
+    [Test]
+    public void AStringCharacter_IsRead()
+    {
+        // The string indexer is String.get_Chars rather than get_Item, so it was
+        // rejected while every other indexer was accepted (DECISIONS #33).
+        string text = "Furret";
+
+        Query(c => c.Name == text[0].ToString()).ShouldBe("name=eq:F");
+    }
+
     // ----- parameterless instance methods -----
 
     [Test]

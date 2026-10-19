@@ -1,6 +1,7 @@
 namespace TcgDex.Tests.Models;
 
 using TcgDex.Models;
+using TcgDex.Serialization;
 
 /// <summary>
 /// Contract tests: every case here deserializes a response recorded from the
@@ -107,6 +108,8 @@ public sealed class CardContractTests
 
     [TestCase("50+", 50)]
     [TestCase("60", 60)]
+    [TestCase("9", 9)]
+    [TestCase("90", 90)]
     [TestCase("20×", 20)]
     [TestCase("×", null)]
     [TestCase("", null)]
@@ -213,6 +216,19 @@ public sealed class CardContractTests
         Card card = Fixture.Parse<Card>(json);
 
         card.LocalId.ShouldBe("136");
+    }
+
+    [Test]
+    public void Deserialize_ANullDetailedVariants_IsEmptyNotNull()
+    {
+        // Absent and null are different paths: an absent property never runs the
+        // init accessor, while an explicit null runs it with null and needs the
+        // `?? []` there.
+        Card card = JsonSerializer.Deserialize(
+            """{"id":"x-1","localId":"1","name":"X","category":"Pokemon","set":{"id":"s","name":"S"},"variants_detailed":null}""",
+            TcgDexJsonContext.Default.Card).ShouldNotBeNull();
+
+        card.DetailedVariants.ShouldBeEmpty();
     }
 
     [Test]

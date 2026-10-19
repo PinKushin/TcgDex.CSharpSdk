@@ -298,13 +298,30 @@ Line numbers are those of `8ffde05`.
 
 | File:line | Mutator | Why it is not killed |
 |---|---|---|
-| `CardImage.cs:63` | Logical (`\|\|` to `&&`) | Equivalent. Under the mutant a blank non-null base URL goes on to build `"{blank}/high.png"`, and `Absolute` rejects it because it has no http(s) scheme, so the result is the same `null`. The `is null` test cannot be removed instead: the netstandard2.0 reference assembly does not annotate `string.IsNullOrWhiteSpace`, and without the test that target fails to build with CS8602. |
+| `CardImage.cs:63` | Logical (`\|\|` to `&&`) | Equivalent. Under the mutant a blank non-null base URL goes on to build `"{blank}/high.png"`, and `Absolute` rejects it because it has no http(s) scheme, so the result is the same `null`. The `is null` test cannot be removed instead: the netstandard2.0 reference assembly does not annotate `string.IsNullOrWhiteSpace`, and without the test that target fails to build with CS8602. `ImageUrl_WithAWhitespaceBase_IsNull` runs the whitespace input and pins the `null`. |
 | `CardImage.cs:91` | Logical (`\|\|` to `&&`) | Equivalent, for the same reason: `"{blank}.png"` has no http(s) scheme, so `Absolute` returns `null`. |
 | `ExpressionTranslator.cs:340` | Statement (`throw;` removed), NoCoverage | Unreachable. `ExceptionDispatchInfo.Capture(...).Throw()` on the line before always throws. The `throw;` exists only because the compiler's definite-return analysis cannot see that, and `[DoesNotReturn]` affects nullable flow analysis, not reachability. |
 | `ExpressionTranslator.cs:386` | String (message to `$""`), NoCoverage | Unreachable. `ReadMember` is only called with a `MemberExpression.Member`. `MemberExpression` has no public constructor, and `Expression.Field`, `Expression.Property` and `Expression.MakeMemberAccess` reject any member that is not a field or a property, so the fallback arm has no input. |
 | `MemoryTcgDexResponseCache.cs:39` | Statement (guard removed) | Equivalent. The `BoundedLru` constructor, called two lines later, runs the same `Guard.NotLessThan(maxEntries, 1)`. Its parameter is also named `maxEntries`, so the exception has the same type, message and `ParamName`. The guard stays because this constructor is public, and its contract should not depend on a private field's constructor. |
 | `MemoryTcgDexResponseCache.cs:101` | Equality (`>` to `>=`) | Equivalent. The two differ only when the time-to-live is exactly `TimeSpan.MaxValue.Ticks / 12`, and then by 7 ticks. Both lifetimes are about 9.2×10¹⁸ ticks, which is longer than the whole `DateTimeOffset` range (about 3.2×10¹⁸), so line 107 clamps both to `DateTimeOffset.MaxValue`. |
 | `MemoryTcgDexResponseCache.cs:107` | Equality (`>` to `>=`) | Equivalent. At the boundary `now + absoluteLifetime` is exactly `DateTimeOffset.MaxValue`, the value the clamp returns. |
+
+### Fourth round: the rest of the survivors, read one by one
+
+Mutation run 39189935172 (branch `fix/mutation-regressions`) left 51 survivors. Those in files that
+were not below their best had not been examined, so each was read. Fourteen now have a killing test,
+checked by hand: the two writer guards in `ReleaseDateConverter` and `TimestampConverter`, the null
+`variants_detailed` coalescing in `Card`, the `pageSize` guard and the cancellation check in
+`StreamAsync`, the `BoundedLru` bound, the tagless-entry slot in `DeserializedResponseCache`, the
+GraphQL error log, the `'9'` boundary in `Attack.BaseDamage`, and the five `ConfigureAwait` calls in
+`GraphQLTransport` and `StreamAsync`. The four below cannot be killed.
+
+| File:line | Mutator | Why it is not killed |
+|---|---|---|
+| `CardQuery.cs:178` | Statement (guard removed) | Equivalent. `ExpressionTranslator.SortFieldName`, called on the next line, runs the same `Guard.NotNull(selector)` and the parameter has the same name, so the exception has the same type, message and `ParamName`. `SortFieldName_ANullSelector_ThrowsNamingTheParameter` pins it. The guard stays because `OrderBy` is public and its contract should not depend on a helper. |
+| `BoundedLru.cs:167` | Statement (`return;` removed) | Equivalent. After a successful `TryAdd` the code falls through to `TryGetValue` and `TryUpdate` of the entry it just added, which succeed with the same value and return. It would differ only if `Evict` removed that very key in between, and `Evict` removes the oldest entry, never the one just stored. |
+| `TcgDexCacheOptions.cs:135` | Equality (`cards >= 0` to `cards > 0`) | Equivalent. The two differ only when the path begins with `/cards/` at index 0. Every request path starts with the language segment (`/v2/en/cards/...`), and an empty language is rejected, so index 0 has no input. |
+| `CardDiagnostics.cs:44` | Statement (`return;` removed) | Equivalent. With warnings disabled the walk would run, and every log call it makes is filtered by the generated logger's own `IsEnabled` check. The early return only saves the walk, which nothing observable depends on. |
 
 ## What coverage does not tell you
 

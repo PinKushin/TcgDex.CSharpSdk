@@ -15,6 +15,14 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-18
+
+### Fixed
+
+- A string indexer is now accepted as a filter value, like every other indexer. `Where(c => c.Name == text[0].ToString())`
+  threw `NotSupportedException`, while `names[0]` on a list or array worked; the string indexer is named `Chars` rather
+  than `Item`, and the translator only recognised `Item`. Nothing that worked before changes.
+
 ## [0.8.0] - 2026-10-18
 
 The 1.0 naming pass: every public name now follows the .NET Framework Design Guidelines. Almost
@@ -535,7 +543,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.2...v0.6.3

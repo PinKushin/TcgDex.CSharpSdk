@@ -243,6 +243,25 @@ public sealed class LoggingTests
     }
 
     [Test]
+    public async Task GraphQLReportingErrors_LogsThemAtError()
+    {
+        // GraphQL answers 200 with an errors array, so the log is the only place
+        // the server's own wording survives besides the exception message.
+        RecordingHandler handler = new RecordingHandler().RespondWith(
+            HttpStatusCode.OK,
+            """{"errors":[{"message":"field boom is unknown"}]}""");
+
+        (TcgDexClient? client, RecordingLogger? log) = Build(handler);
+
+        await Should.ThrowAsync<TcgDexApiException>(
+            () => client.Cards.SearchDetailedAsync(new CardFilter { Name = "A" }, cancellationToken: CancellationToken.None));
+
+        LogEntry entry = log.Entries.Where(e => e.EventId == 1301).ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Error);
+        entry.Message.ShouldContain("field boom is unknown");
+    }
+
+    [Test]
     public async Task GraphQLDroppingAnUnresolvableEntry_LogsAtWarning()
     {
         // Dropping silently would leave a caller wondering why a card vanished.
