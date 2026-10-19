@@ -69,6 +69,26 @@ public sealed class ClientLifetimeTests
     }
 
     [Test]
+    public async Task TheContainerConstructor_AlsoLeavesTheFactorysHttpClientAlone()
+    {
+        // The constructor AddTcgDex uses. Its HttpClient comes from
+        // IHttpClientFactory, so disposing it with the transient SDK client would
+        // break the next resolution sharing that handler. Same delegation as the
+        // public overloads, and nothing exercised this one.
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
+
+        using HttpClient httpClient = new(handler);
+        TcgDexClient client = new(httpClient, new TcgDexOptions(), loggerFactory: null, sharedDeserialized: null);
+
+        client.Dispose();
+
+        Card? card = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+
+        card.ShouldNotBeNull().Name.ShouldBe("Furret");
+    }
+
+    [Test]
     public void EverythingIsLoggedUnderASingleCategory()
     {
         // The category is what a consumer writes a filter rule against, so
@@ -118,6 +138,21 @@ public sealed class ClientLifetimeTests
     {
         Should.Throw<ArgumentException>(
             () => TcgDexClient.Create(new TcgDexOptions { Language = "zz" }));
+    }
+
+    [Test]
+    public void Create_InvalidOptions_ThrowsBeforeRunningTheCacheCallback()
+    {
+        // The client's own constructor validates too, so the exception alone
+        // cannot show that Create checks first. The caller's cache callback can:
+        // it is the one piece of user code Create runs, and invalid options
+        // must stop Create before it.
+        bool configured = false;
+
+        Should.Throw<ArgumentException>(
+            () => TcgDexClient.Create(new TcgDexOptions { Language = "zz" }, configureCache: _ => configured = true));
+
+        configured.ShouldBeFalse();
     }
 
     [Test]
@@ -276,6 +311,34 @@ public sealed class ClientLifetimeTests
             new TcgDexOptions(), configureCache: _ => { });
 
         OutermostHandler(client).ShouldBeOfType<TcgDex.Caching.TcgDexCachingHandler>();
+    }
+
+    [Test]
+    public void Create_WithCaching_KeepsConnectionRecyclingBeneathTheCache()
+    {
+        // The cache wraps the handler Create configured. Without that inner
+        // handler every request fails ("The inner handler has not been
+        // assigned"), and with a different one the recycling and decompression
+        // promises silently stop applying to cached clients.
+        //
+        // Asserted on the chain rather than by sending a request: Create's
+        // handler talks to the live API, and a unit test never does.
+        using TcgDexClient client = TcgDexClient.Create(
+            new TcgDexOptions(), configureCache: _ => { });
+
+        HttpMessageHandler? inner = OutermostHandler(client)
+            .ShouldBeOfType<TcgDex.Caching.TcgDexCachingHandler>()
+            .InnerHandler;
+
+#if NETFRAMEWORK
+        inner.ShouldBeOfType<HttpClientHandler>().AutomaticDecompression
+            .ShouldBe(DecompressionMethods.GZip | DecompressionMethods.Deflate);
+#else
+        SocketsHttpHandler modernHandler = inner.ShouldBeOfType<SocketsHttpHandler>();
+
+        modernHandler.PooledConnectionLifetime.ShouldBe(TimeSpan.FromMinutes(2));
+        modernHandler.AutomaticDecompression.ShouldBe(DecompressionMethods.All);
+#endif
     }
 
     [Test]
