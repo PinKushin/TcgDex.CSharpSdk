@@ -96,7 +96,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: nupkg
-          path: ./artifacts/*.nupkg
+          path: |
+            ./artifacts/*.nupkg
+            ./artifacts/*.snupkg
 
   # macOS is claimed by inference otherwise: the package targets net8.0 and
   # net10.0, which run there, and nothing proved it. Free and unlimited on
@@ -224,6 +226,41 @@ jobs:
       - name: Run the native binary
         shell: pwsh
         run: ./TcgDex.CSharpSdk.AotSmokeTest/bin/Release/net10.0/win-x64/publish/TcgDex.CSharpSdk.AotSmokeTest.exe
+
+  # Installs the package the first job just built into a fresh project, the way a consumer does,
+  # and runs it on every target framework. Every other test reaches the library through a
+  # ProjectReference, which cannot see a missing target framework, README or icon, or a restore
+  # that picked up nuget.org's copy of the same version. See scripts/Test-Package.ps1.
+  #
+  # Both operating systems: Windows runs net472 (the netstandard2.0 asset) as well as net8.0 and
+  # net10.0, Linux runs the two modern targets.
+  package-smoke-test:
+    name: Package install smoke test (${{ matrix.os }})
+    needs: build-and-test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # Both: the smoke project runs on net8.0 and net10.0.
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68  # v6.0.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Download the package
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: nupkg
+          path: nupkg
+
+      - name: Install the package and run it
+        shell: pwsh
+        run: ./scripts/Test-Package.ps1 -PackageDirectory ./nupkg
 
   # Verify that every lane actually ran its expected number of tests. This catches: a filter that
   # matched nothing (silent 0 exit), a test host that died partway (prints a truncated "Passed!"),

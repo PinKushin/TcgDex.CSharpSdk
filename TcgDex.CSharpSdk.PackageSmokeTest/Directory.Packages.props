@@ -1,0 +1,10 @@
+<Project>
+
+  <!-- Central package management off, for the same reason Directory.Build.props is
+       empty: a consumer states its own versions. The nearest file wins, so this
+       also stops the repository's Directory.Packages.props applying here. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+</Project>

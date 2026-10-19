@@ -196,6 +196,12 @@ than by remembering it:
       SharpFuzz, no PublicApiGenerator, no test packages
 - [x] **Packs at 462 KB**, far inside nuget.org's ~250 MB limit, with three
       `lib` folders and XML docs in each
+- [x] **The packed package is installed and run** — `scripts/Test-Package.ps1` reads
+      the `.nupkg` and `.snupkg`, restores them into a fresh project from a feed
+      that maps `TcgDex.CSharpSdk` to the local copy alone, and runs a consumer on
+      net472, net8.0 and net10.0 (DECISIONS #34). CI does this on every push, on
+      Linux and Windows, and the release workflow does it on the exact package
+      before the push to nuget.org
 - [ ] **Version decided** — currently `0.1.0`, and the only judgement left
 
 ## Choosing the first version

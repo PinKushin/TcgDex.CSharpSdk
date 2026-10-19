@@ -1,0 +1,8 @@
+<Project>
+
+  <!-- Deliberately empty. This project plays a consumer, so it must not inherit the
+       repository's warnings-as-errors, analyzers or central package management:
+       a consumer has none of those. MSBuild uses the nearest Directory.Build.props
+       and does not read the one at the repository root unless this file imports it. -->
+
+</Project>
