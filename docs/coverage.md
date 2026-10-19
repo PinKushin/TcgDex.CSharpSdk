@@ -291,6 +291,8 @@ GitHub Actions run 39177696453 on `8ffde05` (0.8.0) was compared, file by file, 
 each file had ever reached, counting only kills by the hermetic unit tests. Kills by the live-API
 integration tests do not count, because those tests are not run on every push. Six files were below
 their best. Every survivor in them now has a killing test, checked by hand as above, or a row below.
+The exception is `TcgDexTransport.cs`, whose eight remaining survivors are the ones already written
+off in the first table, renumbered there.
 
 Line numbers are those of `8ffde05`.
 

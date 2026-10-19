@@ -53,7 +53,7 @@ public sealed class MemoryCacheTests
         => (await new MemoryTcgDexResponseCache().GetAsync("absent")).ShouldBeNull();
 
     [Test]
-    public async Task MissingKey_ReturnsWithoutReadingTheClockOrRemoving()
+    public async Task MissingKey_ReturnsWithoutReadingTheClock()
     {
         // A miss used to be able to fall through to the expiry check: the
         // default stored value is always in the past, so it still returned
