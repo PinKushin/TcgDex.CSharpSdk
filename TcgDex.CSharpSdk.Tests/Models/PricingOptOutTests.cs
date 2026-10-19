@@ -100,6 +100,11 @@ public sealed class PricingOptOutTests
     }
 
     [Test]
+    public void For_NullOptions_Throws()
+        => Should.Throw<ArgumentNullException>(() => TcgDexJsonContracts.For(null!))
+            .ParamName.ShouldBe("options");
+
+    [Test]
     public void WhenTurnedOff_TheSkipConverter_RejectsANullWriter()
     {
         JsonSerializerOptions contract = TcgDexJsonContracts.For(new TcgDexOptions { DeserializePricing = false });

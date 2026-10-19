@@ -20,6 +20,27 @@ public sealed class TransportTests
         return new TcgDexTransport(new HttpClient(handler), options);
     }
 
+    // ----- Construction -----
+
+    [Test]
+    public void Constructor_NullHttpClient_Throws()
+        => Should.Throw<ArgumentNullException>(() => new TcgDexTransport(null!, new TcgDexOptions()))
+            .ParamName.ShouldBe("httpClient");
+
+    [Test]
+    public void Constructor_NullOptions_Throws()
+        => Should.Throw<ArgumentNullException>(
+                () => new TcgDexTransport(new HttpClient(new RecordingHandler()), null!))
+            .ParamName.ShouldBe("options");
+
+    [Test]
+    public void Constructor_InvalidOptions_Throws()
+        => Should.Throw<ArgumentException>(
+                () => new TcgDexTransport(
+                    new HttpClient(new RecordingHandler()),
+                    new TcgDexOptions { Timeout = TimeSpan.Zero }))
+            .Message.ShouldContain("Timeout must be positive");
+
     // ----- URL construction -----
 
     [Test]

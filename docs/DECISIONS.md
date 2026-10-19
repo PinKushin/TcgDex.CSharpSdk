@@ -779,6 +779,13 @@ by applying the mutant by hand, and 12 are written off in `docs/coverage.md` wit
 code comment that called a mutant equivalent was wrong: removing that early return makes a miss
 read the clock and `Remove` a key that was never stored.
 
+The first run after those tests found five more survivors in `TcgDexTransport` (four constructor
+statements) and `TcgDexJsonContracts` (one guard). A run had "killed" them only through
+`PublicApiTests.ThePublicSurface_MatchesTheApprovedBaseline`, which cannot test a constructor guard,
+so those were accidental kills. Each now has a test that fails against exactly its mutant.
+`MemoryTcgDexResponseCache` still reads 90.3% against a best of 91.3%, but only because it has fewer
+mutants than it did (31, from 46): its three survivors are the written-off equivalents.
+
 The rule from here: a file below its best-ever score is examined before a release or merge, whatever
 the total does.
 

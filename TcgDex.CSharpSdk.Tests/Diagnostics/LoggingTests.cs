@@ -85,6 +85,25 @@ public sealed class LoggingTests
     }
 
     [Test]
+    public void AnHttpGraphQLEndpoint_WarnsThatTrafficIsPlaintext()
+    {
+        // The GraphQL endpoint is configured separately from BaseAddress, so a
+        // plaintext one must be reported on its own. Everything else is default,
+        // which keeps BaseAddress https and the warning single.
+        RecordingLogger log = new(LogLevel.Trace);
+
+        _ = new TcgDexClient(
+            new HttpClient(new RecordingHandler()),
+            new TcgDexOptions { GraphQLEndpoint = new Uri("http://api.tcgdex.net/v2/graphql") },
+            log.Factory);
+
+        LogEntry warning = log.Entries.Where(e => e.Level == LogLevel.Warning).ShouldHaveSingleItem();
+
+        warning.Message.ShouldContain("plaintext");
+        warning.Message.ShouldContain("http://api.tcgdex.net/v2/graphql");
+    }
+
+    [Test]
     public void AnHttpsBaseAddress_WarnsAboutNothing()
     {
         // The ordinary case must stay silent, or the warning becomes noise that
