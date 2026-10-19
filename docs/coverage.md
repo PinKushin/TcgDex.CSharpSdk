@@ -297,6 +297,9 @@ Line numbers are those of `8ffde05`.
 |---|---|---|
 | `CardImage.cs:63` | Logical (`\|\|` to `&&`) | Equivalent. Under the mutant a blank non-null base URL goes on to build `"{blank}/high.png"`, and `Absolute` rejects it because it has no http(s) scheme, so the result is the same `null`. The `is null` test cannot be removed instead: the netstandard2.0 reference assembly does not annotate `string.IsNullOrWhiteSpace`, and without the test that target fails to build with CS8602. |
 | `CardImage.cs:91` | Logical (`\|\|` to `&&`) | Equivalent, for the same reason: `"{blank}.png"` has no http(s) scheme, so `Absolute` returns `null`. |
+| `MemoryTcgDexResponseCache.cs:39` | Statement (guard removed) | Equivalent. The `BoundedLru` constructor, called two lines later, runs the same `Guard.NotLessThan(maxEntries, 1)`. Its parameter is also named `maxEntries`, so the exception has the same type, message and `ParamName`. The guard stays because this constructor is public, and its contract should not depend on a private field's constructor. |
+| `MemoryTcgDexResponseCache.cs:101` | Equality (`>` to `>=`) | Equivalent. The two differ only when the time-to-live is exactly `TimeSpan.MaxValue.Ticks / 12`, and then by 7 ticks. Both lifetimes are about 9.2×10¹⁸ ticks, which is longer than the whole `DateTimeOffset` range (about 3.2×10¹⁸), so line 107 clamps both to `DateTimeOffset.MaxValue`. |
+| `MemoryTcgDexResponseCache.cs:107` | Equality (`>` to `>=`) | Equivalent. At the boundary `now + absoluteLifetime` is exactly `DateTimeOffset.MaxValue`, the value the clamp returns. |
 
 ## What coverage does not tell you
 

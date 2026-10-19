@@ -53,6 +53,28 @@ public sealed class MemoryCacheTests
         => (await new MemoryTcgDexResponseCache().GetAsync("absent")).ShouldBeNull();
 
     [Test]
+    public async Task MissingKey_ReturnsWithoutReadingTheClockOrRemoving()
+    {
+        // A miss used to be able to fall through to the expiry check: the
+        // default stored value is always in the past, so it still returned
+        // null, but only after reading the clock and calling Remove on the key.
+        // Under concurrency that Remove can delete an entry another thread
+        // stored between the lookup and the removal. The clock read is the
+        // deterministic sign of the fall-through.
+        FakeTimeProvider clock = new();
+        MemoryTcgDexResponseCache cache = new(timeProvider: clock);
+
+        (await cache.GetAsync("absent")).ShouldBeNull();
+        clock.Reads.ShouldBe(0);
+
+        // The control: a hit does read the clock, once on write and once on read,
+        // so the counter is wired to the cache.
+        await cache.SetAsync("present", Response(), TimeSpan.FromMinutes(5));
+        (await cache.GetAsync("present")).ShouldNotBeNull();
+        clock.Reads.ShouldBe(2);
+    }
+
+    [Test]
     public async Task RemovedEntry_IsGone()
     {
         MemoryTcgDexResponseCache cache = new();
