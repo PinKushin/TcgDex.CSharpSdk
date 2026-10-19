@@ -309,9 +309,19 @@ jobs:
       # skip-converter null-writer guard, and three option-validation message tests.
       # Its WhenTurnedOff_PerVariantPricingIsStillPopulated was dropped: 0.7.0 reversed
       # that behaviour (DECISIONS #21), and WhenTurnedOff_PerVariantPricingIsNullToo pins it.
+      # Then by fourteen (net10.0 737, net8.0 736, net472 731), the survivors a per-file
+      # comparison found below their best score (DECISIONS #32): DependencyInjection,
+      # TcgDexClient, CardImage, MemoryTcgDexResponseCache, ExpressionTranslator, transport.
+      # Then by five (net10.0 742, net8.0 741, net472 736): the transport constructor guards
+      # and GraphQL plaintext warning, and TcgDexJsonContracts.For(null).
+      # Then by sixteen (net10.0 758, net8.0 757, net472 752): the survivors in files that were
+      # not below their best (DECISIONS #32), the string indexer in a filter value (#33), and
+      # three ConfigureAwait tests for GraphQL and StreamAsync in ContextCaptureTests.
+      # Then by two (net10.0 760, net8.0 759, net472 754): a special-name method that is not a
+      # getter, and a freshly built without-pricing contract.
       - name: ubuntu net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 723 -Label 'ubuntu net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 760 -Label 'ubuntu net10.0'
 
       - name: ubuntu offline integration tests
         shell: pwsh
@@ -319,16 +329,16 @@ jobs:
 
       - name: macOS net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 723 -Label 'macOS net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 760 -Label 'macOS net10.0'
 
       - name: Windows net472 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 717 -Label 'Windows net472'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 754 -Label 'Windows net472'
 
       - name: Windows net8.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 722 -Label 'Windows net8.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 759 -Label 'Windows net8.0'
 
       - name: Windows net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 723 -Label 'Windows net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 760 -Label 'Windows net10.0'

@@ -159,6 +159,10 @@ public sealed class RequestTimeoutTests
             () => client.Cards.GetAsync("swsh3-136", CancellationToken.None).GetAwaiter().GetResult());
 
         error.Message.ShouldContain("timed out", Case.Insensitive);
+
+        // The advice is the actionable part: which setting to raise, and when
+        // raising it is the right fix rather than a workaround.
+        error.Message.ShouldContain("Raise TcgDexOptions.Timeout if this endpoint is legitimately this slow.");
     }
 
     [Test]

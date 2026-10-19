@@ -269,7 +269,7 @@ internal static class ExpressionTranslator
     /// <para>
     /// A captured local becomes a field on a compiler-generated closure, so it
     /// is read reflectively. Beyond that, the common value shapes are
-    /// interpreted: array elements, indexers (<c>list[i]</c>), parameterless
+    /// interpreted: array elements, indexers (<c>list[i]</c>, <c>text[0]</c>), parameterless
     /// instance methods (<c>name.Trim()</c>), conversions and user-defined
     /// conversion operators. Each is a
     /// metadata read or a <see cref="MethodBase.Invoke(object, object[])"/> of a
@@ -314,7 +314,7 @@ internal static class ExpressionTranslator
                 return ((Array)Receiver(index.Left, expression)).GetValue(Convert.ToInt64(Evaluate(index.Right), CultureInfo.InvariantCulture));
 
             case MethodCallExpression { Object: not null } call
-                when call.Arguments.Count == 0 || call.Method.IsSpecialName && string.Equals(call.Method.Name, "get_Item", StringComparison.Ordinal):
+                when call.Arguments.Count == 0 || call.Method.IsSpecialName && call.Method.Name.StartsWith("get_", StringComparison.Ordinal):
                 return Invoke(call.Method, Receiver(call.Object, expression), call.Arguments.Select(Evaluate).ToArray());
 
             default:

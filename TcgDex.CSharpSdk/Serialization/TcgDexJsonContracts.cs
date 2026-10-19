@@ -92,8 +92,11 @@ internal static class TcgDexJsonContracts
     /// on <c>TcgDexCacheOptions.IsCatalogPath</c>, for the same reason.
     /// </para>
     /// </remarks>
-    private static JsonSerializerOptions BuildWithoutPricing()
+    internal static JsonSerializerOptions BuildWithoutPricing()
     {
+        // internal, not private, so a test can build a fresh one. The shared
+        // instance is built once per process and caches its resolved contracts,
+        // so a test that goes through For() sees whichever modifier ran first.
         // No cast to IJsonTypeInfoResolver: JsonSerializerContext implements it,
         // so the extension method binds directly.
         IJsonTypeInfoResolver resolver = TcgDexJsonContext.Default

@@ -240,7 +240,8 @@ If every write-off below is correct, the scores rise to 94%, 89%, 90% and 100%.
 This is a projection from the per-mutant checks. No Stryker run measured it, because
 local runs are limited to an 8000-character span.
 
-Line numbers are those of `ddde9bd`, as printed in the report.
+Line numbers are those of `ddde9bd`, as printed in the report, except the `TcgDexTransport.cs`
+rows. Those are renumbered to `8ffde05`, where run 39177696453 reported the same eight mutants.
 
 | File:line | Mutator | Why it is not killed |
 |---|---|---|
@@ -254,12 +255,12 @@ Line numbers are those of `ddde9bd`, as printed in the report.
 | `BoundedContent.cs:145` | Conditional (true) | Equivalent. When capacity is 0, `new MemoryStream(0)` behaves the same as `new MemoryStream()`. |
 | `BoundedContent.cs:145` | Equality (`capacity >= 0`) | Equivalent, for the same reason: it differs from the original only at 0. |
 | `BoundedContent.cs:198` | Statement (`ArrayPool.Return` removed) | Not observable. The pool allocates a fresh array when one is not returned, so the only cost is allocation. `ArrayPool.Shared` caches per thread and per core, so asserting that an array is reused would be nondeterministic. |
-| `TcgDexTransport.cs:398` | Arithmetic (`*` to `/`) | Untestable without a clock seam: not equivalent. On Linux, where Stryker runs on CI, `Stopwatch.Frequency` (10⁹) makes the factor 10⁷/10⁹ = 0.01, so `/` divides by it instead of multiplying and logs a duration 10,000 times too large. Only on Windows is the factor 1. The value is logged only, and no test can bound it exactly without injecting the clock. `TheLoggedDuration_IsAPlausibleNumberOfMilliseconds` still catches a gross scale error. |
-| `TcgDexTransport.cs:417` | Conditional (false) | Equivalent. A blank body sent to the deserializer throws `JsonException`. That is caught at line 421 and returns the same `null`, so `IsBlank` is only a fast path. |
-| `TcgDexTransport.cs:422` | Block removal | Equivalent. Removing the block makes it return `default`, which is the same `null`. |
-| `TcgDexTransport.cs:430` | Block removal | Equivalent, for the same reason: it returns `default`, which is `null`. |
-| `TcgDexTransport.cs:444` | Logical (three variants) | Equivalent. When fewer whitespace bytes count as blank, those bodies go to the deserializer instead. It throws `JsonException`, which becomes the same `null`. |
-| `TcgDexTransport.cs:450` | Boolean (`true` to `false`) | Equivalent, for the same reason as line 444. |
+| `TcgDexTransport.cs:420` | Arithmetic (`*` to `/`) | Untestable without a clock seam: not equivalent. On Linux, where Stryker runs on CI, `Stopwatch.Frequency` (10⁹) makes the factor 10⁷/10⁹ = 0.01, so `/` divides by it instead of multiplying and logs a duration 10,000 times too large. Only on Windows is the factor 1. The value is logged only, and no test can bound it exactly without injecting the clock. `TheLoggedDuration_IsAPlausibleNumberOfMilliseconds` still catches a gross scale error. |
+| `TcgDexTransport.cs:439` | Conditional (false) | Equivalent. A blank body sent to the deserializer throws `JsonException`. That is caught at line 443 and returns the same `null`, so `IsBlank` is only a fast path. |
+| `TcgDexTransport.cs:444` | Block removal | Equivalent. Removing the block makes it return `default`, which is the same `null`. |
+| `TcgDexTransport.cs:452` | Block removal | Equivalent, for the same reason: it returns `default`, which is `null`. |
+| `TcgDexTransport.cs:466` | Logical (three variants) | Equivalent. When fewer whitespace bytes count as blank, those bodies go to the deserializer instead. It throws `JsonException`, which becomes the same `null`. |
+| `TcgDexTransport.cs:472` | Boolean (`true` to `false`) | Equivalent, for the same reason as line 466. |
 
 `RequestBudget.cs` has no write-offs. Both of its survivors are now killed.
 
@@ -267,8 +268,8 @@ Line numbers are those of `ddde9bd`, as printed in the report.
 
 GitHub Actions run 39057672321 (branch `test/mutation-weak-files`, merged as `63f02f8`) left 27
 undetected mutants in eight files. Thirteen now have a killing test, checked by hand the same way.
-`TcgDexTransport.cs` still has the eight survivors written off above, at the same line numbers, so
-it gets no new rows. The five rows below are the rest. Projected scores, if they are correct:
+`TcgDexTransport.cs` still had the eight survivors written off above, then at the same line numbers
+(renumbered since), so it gets no new rows. The five rows below are the rest. Projected scores, if they are correct:
 `ITcgDexResponseCache.cs` 100% (from 50%), `FlexibleStringConverter.cs` 100% (80%),
 `TcgDexJsonContracts.cs` 100% (81%), `TcgDexServiceCollectionExtensions.cs` 100% (81%),
 `TcgDexOptions.cs` 100% (86%), `TcgPlayerPricingConverter.cs` 89% (33 of 37, from 81%),
@@ -283,6 +284,46 @@ Line numbers are those of `63f02f8`.
 | `TcgPlayerPricingConverter.cs:68` | Conditional (false) | Equivalent. `GetString()` returns `null` on a `Null` token, the same value the branch supplies. |
 | `TcgPlayerPricingConverter.cs:84` | Statement (`continue` removed) | Equivalent. `JsonSerializer.Deserialize` on a `Null` token returns `null` for the reference type `TcgPlayerPrice`, and the `price is not null` check below then skips it, as `continue` did. |
 | `TcgDexUserAgent.cs:71` | String (`"unknown"` to `""`), NoCoverage | Untestable without a seam: not equivalent. If reached, the header would carry no version. It is reached only when `Assembly.GetName().Version` is `null`, which happens for a dynamically emitted assembly and never for this compiled one, and `BuildProduct` is a private static initialiser. |
+
+### Third round: files below their best score
+
+GitHub Actions run 39177696453 on `8ffde05` (0.8.0) was compared, file by file, with the best score
+each file had ever reached, counting only kills by the hermetic unit tests. Kills by the live-API
+integration tests do not count, because those tests are not run on every push. Six files were below
+their best. Every survivor in them now has a killing test, checked by hand as above, or a row below.
+The exception is `TcgDexTransport.cs`, whose eight remaining survivors are the ones already written
+off in the first table, renumbered there.
+
+Line numbers are those of `8ffde05`.
+
+| File:line | Mutator | Why it is not killed |
+|---|---|---|
+| `CardImage.cs:63` | Logical (`\|\|` to `&&`) | Equivalent. Under the mutant a blank non-null base URL goes on to build `"{blank}/high.png"`, and `Absolute` rejects it because it has no http(s) scheme, so the result is the same `null`. The `is null` test cannot be removed instead: the netstandard2.0 reference assembly does not annotate `string.IsNullOrWhiteSpace`, and without the test that target fails to build with CS8602. `ImageUrl_WithAWhitespaceBase_IsNull` runs the whitespace input and pins the `null`. |
+| `CardImage.cs:91` | Logical (`\|\|` to `&&`) | Equivalent, for the same reason: `"{blank}.png"` has no http(s) scheme, so `Absolute` returns `null`. |
+| `ExpressionTranslator.cs:340` | Statement (`throw;` removed), NoCoverage | Unreachable. `ExceptionDispatchInfo.Capture(...).Throw()` on the line before always throws. The `throw;` exists only because the compiler's definite-return analysis cannot see that, and `[DoesNotReturn]` affects nullable flow analysis, not reachability. |
+| `ExpressionTranslator.cs:386` | String (message to `$""`), NoCoverage | Unreachable. `ReadMember` is only called with a `MemberExpression.Member`. `MemberExpression` has no public constructor, and `Expression.Field`, `Expression.Property` and `Expression.MakeMemberAccess` reject any member that is not a field or a property, so the fallback arm has no input. |
+| `MemoryTcgDexResponseCache.cs:39` | Statement (guard removed) | Equivalent. The `BoundedLru` constructor, called two lines later, runs the same `Guard.NotLessThan(maxEntries, 1)`. Its parameter is also named `maxEntries`, so the exception has the same type, message and `ParamName`. The guard stays because this constructor is public, and its contract should not depend on a private field's constructor. |
+| `MemoryTcgDexResponseCache.cs:101` | Equality (`>` to `>=`) | Equivalent. The two differ only when the time-to-live is exactly `TimeSpan.MaxValue.Ticks / 12`, and then by 7 ticks. Both lifetimes are about 9.2×10¹⁸ ticks, which is longer than the whole `DateTimeOffset` range (about 3.2×10¹⁸), so line 107 clamps both to `DateTimeOffset.MaxValue`. |
+| `MemoryTcgDexResponseCache.cs:107` | Equality (`>` to `>=`) | Equivalent. At the boundary `now + absoluteLifetime` is exactly `DateTimeOffset.MaxValue`, the value the clamp returns. |
+
+### Fourth round: the rest of the survivors, read one by one
+
+Mutation run 39189935172 (branch `fix/mutation-regressions`) left 51 survivors. Those in files that
+were not below their best had not been examined, so each was read. Sixteen now have a killing test,
+checked by hand: the two writer guards in `ReleaseDateConverter` and `TimestampConverter`, the null
+`variants_detailed` coalescing in `Card`, the `pageSize` guard and the cancellation check in
+`StreamAsync`, the `BoundedLru` bound, the tagless-entry slot in `DeserializedResponseCache`, the
+GraphQL error log, the `'9'` boundary in `Attack.BaseDamage`, and the five `ConfigureAwait` calls in
+`GraphQLTransport` and `StreamAsync`, the `"get_"` prefix of the indexer check in
+`ExpressionTranslator`, and the pricing-skip type check in `TcgDexJsonContracts`. The five below cannot be killed.
+
+| File:line | Mutator | Why it is not killed |
+|---|---|---|
+| `CardQuery.cs:178` | Statement (guard removed) | Equivalent. `ExpressionTranslator.SortFieldName`, called on the next line, runs the same `Guard.NotNull(selector)` and the parameter has the same name, so the exception has the same type, message and `ParamName`. `SortFieldName_ANullSelector_ThrowsNamingTheParameter` pins it. The guard stays because `OrderBy` is public and its contract should not depend on a helper. |
+| `BoundedLru.cs:167` | Statement (`return;` removed) | Equivalent. After a successful `TryAdd` the code falls through to `TryGetValue` and `TryUpdate` of the entry it just added, which succeed with the same value and return. It would differ only if `Evict` removed that very key in between, and `Evict` removes the oldest entry, never the one just stored. |
+| `TcgDexCacheOptions.cs:135` | Equality (`cards >= 0` to `cards > 0`) | Equivalent. The two differ only when the path begins with `/cards/` at index 0. Every request path starts with the language segment (`/v2/en/cards/...`), and an empty language is rejected, so index 0 has no input. |
+| `TcgDexJsonContracts.cs:106` | Statement (`return;` removed) | Equivalent today. For any type other than `Card` and `DetailedVariant` the loop below would run, and it only touches a property named `pricing`; no other model has one. It would start to matter if a model gained a `pricing` property, which the option would then skip as well. (`TcgDexJsonContracts.cs:104`, the check above it, is killed by `AFreshWithoutPricingContract_SkipsPricingOnTheCardAndOnEveryVariant`; the shared options cache their contracts per process, so only a freshly built one runs a mutated modifier.) |
+| `CardDiagnostics.cs:44` | Statement (`return;` removed) | Equivalent. With warnings disabled the walk would run, and every log call it makes is filtered by the generated logger's own `IsEnabled` check. The early return only saves the walk, which nothing observable depends on. |
 
 ## What coverage does not tell you
 

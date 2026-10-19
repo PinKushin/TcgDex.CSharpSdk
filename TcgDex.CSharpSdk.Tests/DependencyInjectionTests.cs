@@ -213,6 +213,21 @@ public sealed class DependencyInjectionTests
     }
 
     [Test]
+    public void AddTcgDex_CalledTwice_MessageSaysWhatToDoAndWhy()
+    {
+        // The remedy and the consequence are the actionable part: call once,
+        // because a second call's options would be ignored. Each fragment comes
+        // from a separate literal, so each is asserted.
+        ServiceCollection services = new();
+        services.AddTcgDex();
+
+        string message = Should.Throw<InvalidOperationException>(() => services.AddTcgDex()).Message;
+
+        message.ShouldContain("Call one of them once and configure everything in that call");
+        message.ShouldContain("second call's options would otherwise be ignored.");
+    }
+
+    [Test]
     public void AddTcgDexWithCaching_AfterAddTcgDex_Throws()
     {
         ServiceCollection services = new();
@@ -241,6 +256,28 @@ public sealed class DependencyInjectionTests
         primary.Requests.ShouldBe(2);
         first.ShouldNotBeNull();
         second.ShouldBeSameAs(first);
+    }
+
+    [Test]
+    public async Task ParsedModels_CacheDisabledWithZero_ResolvesAndParsesEveryResponse()
+    {
+        // The control for the test above. Zero turns the parsed-model cache off,
+        // and the cache cannot be built at zero, so the container must not try:
+        // resolving the client would throw. With the cache off, each response is
+        // parsed afresh, so the two calls return different objects.
+        Primary primary = AlwaysOk(Fixture.ReadText("set-full.json"));
+        ServiceCollection services = new();
+        services.AddTcgDex(o => o.MaxDeserializedCacheEntries = 0).ConfigurePrimaryHttpMessageHandler(() => primary);
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        CardSet? first = await provider.GetRequiredService<ITcgDexClient>().Sets.GetAsync("swsh3");
+        CardSet? second = await provider.GetRequiredService<ITcgDexClient>().Sets.GetAsync("swsh3");
+
+        primary.Requests.ShouldBe(2);
+        first.ShouldNotBeNull();
+        second.ShouldNotBeNull();
+        second.ShouldNotBeSameAs(first);
     }
 
     // ----- cache options -----
@@ -299,6 +336,26 @@ public sealed class DependencyInjectionTests
 
         Should.NotThrow(() => provider.GetRequiredService<IStartupValidator>().Validate());
         provider.GetRequiredService<TcgDexCacheOptions>().MaxEntries.ShouldBe(1);
+    }
+
+    [Test]
+    public void CacheOptionsValidator_ValidOptions_ReportsSuccess()
+    {
+        // Asked directly, because the options pipeline cannot tell the
+        // difference: it throws only on a non-empty failure list, so a validator
+        // answering Fail with no messages passes startup validation exactly as
+        // Success does. Any other consumer of IValidateOptions would see a
+        // failure for options that are valid.
+        ServiceCollection services = new();
+        services.AddTcgDexWithCaching();
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        IValidateOptions<TcgDexCacheOptions> validator = provider.GetServices<IValidateOptions<TcgDexCacheOptions>>().Single();
+
+        ValidateOptionsResult result = validator.Validate(Options.DefaultName, new TcgDexCacheOptions());
+
+        result.Succeeded.ShouldBeTrue();
+        result.Failed.ShouldBeFalse();
     }
 
     private static void Set(TcgDexCacheOptions options, string property, int value)

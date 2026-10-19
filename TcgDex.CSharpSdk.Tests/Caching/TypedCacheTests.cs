@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using TcgDex;
+using TcgDex.Caching;
 using TcgDex.Models;
 using TcgDex.Tests.Http;
 
@@ -30,6 +31,23 @@ using TcgDex.Tests.Http;
 public sealed class TypedCacheTests
 {
     private static string Card() => Fixture.ReadText("card-pokemon-full.json");
+
+    [Test]
+    public void ATaglessEntry_DoesNotEvictOneThatCanBeServed()
+    {
+        // A tagless model can never be served, so storing one only costs a slot. In
+        // a store of one it would push out the entry that can be served, which is
+        // visible as a miss on a key that was stored with a tag.
+        DeserializedResponseCache cache = new(1);
+        Uri tagged = new("https://api.tcgdex.net/v2/en/cards/swsh3-136");
+        Uri tagless = new("https://api.tcgdex.net/v2/en/cards/base1-4");
+
+        cache.Set(tagged, "W/\"v1\"", "kept");
+        cache.Set(tagless, null, "never served");
+
+        cache.TryGet(tagged, "W/\"v1\"", out string value).ShouldBeTrue();
+        value.ShouldBe("kept");
+    }
 
     /// <summary>Serves the card with a caller-controlled ETag, counting requests.</summary>
     private sealed class TaggedHandler(string body) : HttpMessageHandler

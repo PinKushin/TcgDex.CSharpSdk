@@ -85,6 +85,25 @@ public sealed class LoggingTests
     }
 
     [Test]
+    public void AnHttpGraphQLEndpoint_WarnsThatTrafficIsPlaintext()
+    {
+        // The GraphQL endpoint is configured separately from BaseAddress, so a
+        // plaintext one must be reported on its own. Everything else is default,
+        // which keeps BaseAddress https and the warning single.
+        RecordingLogger log = new(LogLevel.Trace);
+
+        _ = new TcgDexClient(
+            new HttpClient(new RecordingHandler()),
+            new TcgDexOptions { GraphQLEndpoint = new Uri("http://api.tcgdex.net/v2/graphql") },
+            log.Factory);
+
+        LogEntry warning = log.Entries.Where(e => e.Level == LogLevel.Warning).ShouldHaveSingleItem();
+
+        warning.Message.ShouldContain("plaintext");
+        warning.Message.ShouldContain("http://api.tcgdex.net/v2/graphql");
+    }
+
+    [Test]
     public void AnHttpsBaseAddress_WarnsAboutNothing()
     {
         // The ordinary case must stay silent, or the warning becomes noise that
@@ -221,6 +240,25 @@ public sealed class LoggingTests
         await client.Cards.SearchDetailedAsync(new CardFilter { Name = "A" }, cancellationToken: CancellationToken.None);
 
         log.Entries.ShouldContain(e => e.EventId == 1300);
+    }
+
+    [Test]
+    public async Task GraphQLReportingErrors_LogsThemAtError()
+    {
+        // GraphQL answers 200 with an errors array, so the log is the only place
+        // the server's own wording survives besides the exception message.
+        RecordingHandler handler = new RecordingHandler().RespondWith(
+            HttpStatusCode.OK,
+            """{"errors":[{"message":"field boom is unknown"}]}""");
+
+        (TcgDexClient? client, RecordingLogger? log) = Build(handler);
+
+        await Should.ThrowAsync<TcgDexApiException>(
+            () => client.Cards.SearchDetailedAsync(new CardFilter { Name = "A" }, cancellationToken: CancellationToken.None));
+
+        LogEntry entry = log.Entries.Where(e => e.EventId == 1301).ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Error);
+        entry.Message.ShouldContain("field boom is unknown");
     }
 
     [Test]

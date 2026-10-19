@@ -763,3 +763,48 @@ per-push CI does not run the live tests either.
 The owner asked for this one-line change to be split out of the mutation-score work and merged the
 same day.
 
+## 32. No file's mutation score stays below its best without being examined
+
+After 0.8.0 the total was 92.45% against 92.57%, and I called that flat, within the ±2.7 noise.
+The owner overruled it: "if things are lower than they were anywhere, it needs looked at". The
+noise bound applies to the total, not to one file.
+
+Per file, against each file's best score in any past run counting only unit-test kills (#31), six
+files were lower: `TcgDexServiceCollectionExtensions` (89.1% from 100%), `ExpressionTranslator`
+(84% from 92%), `TcgDexClient` (81.2% from 87.5%), `CardImage` (87.1% from 93.1%),
+`MemoryTcgDexResponseCache` (87.1% from 91.3%) and `TcgDexTransport` (88.2% from 89.3%). Comparing
+the survivors by mutator, replacement and source line, not by count, showed which were new code and
+which had lost a test. Of the 33 survivors in those files, 21 now have a killing test, each checked
+by applying the mutant by hand, and 12 are written off in `docs/coverage.md` with a reason. One
+code comment that called a mutant equivalent was wrong: removing that early return makes a miss
+read the clock and `Remove` a key that was never stored.
+
+The first run after those tests found five more survivors in `TcgDexTransport` (four constructor
+statements) and `TcgDexJsonContracts` (one guard). A run had "killed" them only through
+`PublicApiTests.ThePublicSurface_MatchesTheApprovedBaseline`, which cannot test a constructor guard,
+so those were accidental kills. Each now has a test that fails against exactly its mutant.
+`MemoryTcgDexResponseCache` still reads 90.3% against a best of 91.3%, but only because it has fewer
+mutants than it did (31, from 46): its three survivors are the written-off equivalents.
+
+The survivors in files that were not below their best were read as well, because the owner asked
+for everything that "might be able to be killed": fourteen more got a killing test and four are
+written off in `docs/coverage.md` (fourth round). Among them, one comment that said a survivor "only
+shows up as a lower hit rate, invisible to an assertion about a value" was wrong: a tagless entry in a
+full `DeserializedResponseCache` evicts one that can be served, which a test can see.
+
+The rule from here: a file below its best-ever score is examined before a release or merge, whatever
+the total does.
+
+## 33. A string indexer is accepted as a filter value; shipped as 0.8.1
+
+The translator evaluates the value side of a filter by interpretation (#4, #11). It accepted
+`names[0]` on an array, a list and an `IReadOnlyList`, but rejected `text[0]`, because the string
+indexer is `String.get_Chars` and the check looked for `get_Item` only. Nothing pinned either
+behaviour. The question put to the owner was whether to accept both or reject both, with a
+recommendation to accept both because the same kind of expression should behave the same way. The
+owner: "ok accept both". The check now accepts any indexer getter (`get_` plus arguments).
+
+Shipped as a patch release, 0.8.1, not a minor one: under #24 only a breaking change on 0.x bumps the
+minor version, and this makes an input that threw work without changing anything that worked. The
+owner confirmed the release: "yes, fix everything we have tallked about and do the release".
+

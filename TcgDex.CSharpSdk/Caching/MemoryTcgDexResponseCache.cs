@@ -51,12 +51,12 @@ public sealed class MemoryTcgDexResponseCache : ITcgDexResponseCache
         Guard.NotNullOrWhiteSpace(key);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // A miss returns here. It would also return null by falling through to
-        // the expiry check below, because the stored value is a struct and a
-        // default DateTimeOffset is always in the past — so mutation testing
-        // reports removing this block as equivalent, and it is. It stays
-        // because arriving at "expired" for something that was never stored is
-        // the wrong reason to be right.
+        // A miss returns here. The result is the same null if it fell through to
+        // the expiry check below, because a default DateTimeOffset is always in
+        // the past, but the path is not the same: it would read the clock and
+        // then Remove a key that was never stored, and under concurrency that
+        // Remove can delete an entry another thread has just stored.
+        // MissingKey_ReturnsWithoutReadingTheClock pins this.
         if (!_entries.TryGet(key, out (CachedResponse Response, DateTimeOffset ExpiresAt) entry))
         {
             return new ValueTask<CachedResponse?>((CachedResponse?)null);

@@ -100,6 +100,27 @@ public sealed class PricingOptOutTests
     }
 
     [Test]
+    public void AFreshWithoutPricingContract_SkipsPricingOnTheCardAndOnEveryVariant()
+    {
+        // The shared WithoutPricing options are built once per process and cache
+        // their resolved contracts, so a change to the modifier only takes effect
+        // in the first test that reaches them. A fresh build runs the modifier
+        // for this test whatever ran before it.
+        JsonSerializerOptions fresh = TcgDexJsonContracts.BuildWithoutPricing();
+
+        Card card = JsonSerializer.Deserialize<Card>(Fixture.ReadText("card-pokemon-full.json"), fresh).ShouldNotBeNull();
+
+        card.Pricing.ShouldBeNull();
+        card.DetailedVariants.Count.ShouldBe(2);
+        card.DetailedVariants.ShouldAllBe(v => v.Pricing == null);
+    }
+
+    [Test]
+    public void For_NullOptions_Throws()
+        => Should.Throw<ArgumentNullException>(() => TcgDexJsonContracts.For(null!))
+            .ParamName.ShouldBe("options");
+
+    [Test]
     public void WhenTurnedOff_TheSkipConverter_RejectsANullWriter()
     {
         JsonSerializerOptions contract = TcgDexJsonContracts.For(new TcgDexOptions { DeserializePricing = false });

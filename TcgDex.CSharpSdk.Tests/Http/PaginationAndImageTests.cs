@@ -85,6 +85,52 @@ public sealed class PaginationAndImageTests
     }
 
     [Test]
+    public async Task StreamAsync_WithAPageSizeBelowOne_NamesPageSizeAndSendsNothing()
+    {
+        // Without the guard the zero reaches CardQuery.Page, which also throws but
+        // names itemsPerPage, a parameter the caller of StreamAsync never passed.
+        RecordingHandler handler = new();
+
+        ArgumentOutOfRangeException exception = await Should.ThrowAsync<ArgumentOutOfRangeException>(async () =>
+        {
+            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 0, CancellationToken.None))
+            {
+            }
+        });
+
+        exception.ParamName.ShouldBe("pageSize");
+        handler.Requests.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task StreamAsync_WithACancelledToken_SendsNothing()
+    {
+        using CancellationTokenSource cancelled = new();
+        cancelled.Cancel();
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
+
+        await Should.ThrowAsync<OperationCanceledException>(async () =>
+        {
+            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 2, cancelled.Token))
+            {
+            }
+        });
+
+        handler.Requests.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void ImageUrl_WithAWhitespaceBase_IsNull()
+    {
+        // The `is null ||` in front of IsNullOrWhiteSpace exists for nullable flow
+        // analysis on netstandard2.0, so mutation testing cannot tell the two apart
+        // and the write-off in docs/coverage.md rests on this: a blank base has no
+        // http(s) scheme and yields null whether or not the check catches it.
+        ImageUrl.Build("   ").ShouldBeNull();
+        ImageUrl.BuildAsset("   ").ShouldBeNull();
+    }
+
+    [Test]
     public async Task StreamAsync_WithNoResults_YieldsNothing()
     {
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
@@ -324,11 +370,15 @@ public sealed class PaginationAndImageTests
             () => ImageUrl.BuildAsset("https://x", (ImageFormat)99));
 
     [Test]
-    public void ImageUrl_WithAnUnknownEnumValue_Throws()
+    public void ImageUrl_WithAnUnknownEnumValue_ThrowsNamingWhichValueIsUnknown()
     {
+        // The message is what tells a caller which of the two enums was out of
+        // range, so it is asserted, not just the exception type.
         Should.Throw<ArgumentOutOfRangeException>(
-            () => ImageUrl.Build("https://x", (ImageQuality)99));
+            () => ImageUrl.Build("https://x", (ImageQuality)99))
+            .Message.ShouldContain("Unknown image quality.");
         Should.Throw<ArgumentOutOfRangeException>(
-            () => ImageUrl.Build("https://x", ImageQuality.High, (ImageFormat)99));
+            () => ImageUrl.Build("https://x", ImageQuality.High, (ImageFormat)99))
+            .Message.ShouldContain("Unknown image format.");
     }
 }

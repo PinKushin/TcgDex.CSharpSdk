@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using TcgDex;
 using TcgDex.Caching;
+using TcgDex.Models;
+using TcgDex.Querying;
 using TcgDex.Tests.Caching;
 
 /// <summary>
@@ -300,6 +302,70 @@ public sealed class ContextCaptureTests
         Task work = await AssertNoPostsAsync(() => client.Cards.GetAsync("swsh3-136", CancellationToken.None), gate);
 
         work.Exception!.InnerException.ShouldBeOfType<TcgDexApiException>().Message.ShouldContain("on fire");
+    }
+
+    // ----- GraphQL and streaming -----
+
+    [Test]
+    public async Task GraphQL_ResumesOffTheCallersContext_AfterTheSend()
+    {
+        Handler handler = new(
+            () => Json(
+                HttpStatusCode.OK,
+                """{"data":{"cards":[{"id":"a","name":"A","category":"Pokemon","localId":"1","set":{"id":"s","name":"S"}}]}}"""),
+            gated: true);
+        using TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
+
+        Task work = await AssertNoPostsAsync(
+            () => client.Cards.SearchDetailedAsync(new CardFilter { Name = "A" }, cancellationToken: CancellationToken.None),
+            handler.Gate);
+
+        work.Status.ShouldBe(TaskStatus.RanToCompletion);
+    }
+
+    [Test]
+    public async Task GraphQL_ResumesOffTheCallersContext_AfterReadingTheBody()
+    {
+        // The send completes at once, so the caller's context is still current at
+        // the body read, and only that read is held open.
+        TaskCompletionSource<bool> gate = new();
+        byte[] payload = System.Text.Encoding.UTF8.GetBytes(
+            """{"data":{"cards":[{"id":"a","name":"A","category":"Pokemon","localId":"1","set":{"id":"s","name":"S"}}]}}""");
+
+        Handler handler = new(
+            () => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(new GatedStream(payload, gate.Task)),
+            },
+            gated: false);
+
+        using TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
+
+        Task work = await AssertNoPostsAsync(
+            () => client.Cards.SearchDetailedAsync(new CardFilter { Name = "A" }, cancellationToken: CancellationToken.None),
+            gate);
+
+        work.Status.ShouldBe(TaskStatus.RanToCompletion);
+    }
+
+    [Test]
+    public async Task AStream_ResumesOffTheCallersContext_AfterAPage()
+    {
+        Handler handler = new(() => Json(HttpStatusCode.OK, "[]"), gated: true);
+        using TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
+
+        // The test's own await must not capture the context either, or it would
+        // be the post this test is counting.
+        Task work = await AssertNoPostsAsync(
+            async () =>
+            {
+                await foreach (CardBrief _ in client.Cards.StreamAsync(new CardQuery(), 2, CancellationToken.None).ConfigureAwait(false))
+                {
+                }
+            },
+            handler.Gate);
+
+        work.Status.ShouldBe(TaskStatus.RanToCompletion);
     }
 
     // ----- the bounded body read -----

@@ -87,11 +87,11 @@ internal sealed class DeserializedResponseCache
     internal void Set<T>(Uri uri, string? etag, T value)
         where T : class
     {
-        // Efficiency rather than correctness, and mutation testing is right that
-        // deleting it changes no result: TryGet rejects an empty tag before it
-        // ever looks, so a tagless entry could never be served. What it would do
-        // is occupy a slot and push out an entry that can be, which only shows
-        // up as a lower hit rate — invisible to an assertion about a value.
+        // Efficiency rather than correctness for the entry itself: TryGet rejects
+        // an empty tag before it ever looks, so a tagless entry could never be
+        // served. What it would do is occupy a slot and push out an entry that can
+        // be, which shows as a miss on a tagged key in a full store.
+        // ATaglessEntry_DoesNotEvictOneThatCanBeServed pins it.
         if (etag is null)
         {
             return;

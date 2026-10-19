@@ -28,6 +28,21 @@ public sealed class ConverterGuardTests
             .ParamName.ShouldBe("writer");
 
     [Test]
+    public void ReleaseDate_Write_WithNullWriter_NamesTheWriter()
+        => Should.Throw<ArgumentNullException>(
+                () => new ReleaseDateConverter().Write(null!, new DateTime(2020, 2, 7), JsonSerializerOptions.Default))
+            .ParamName.ShouldBe("writer");
+
+    [Test]
+    public void Timestamp_Write_WithNullWriter_NamesTheWriter()
+        => Should.Throw<ArgumentNullException>(
+                () => new TimestampConverter().Write(
+                    null!,
+                    new DateTimeOffset(2020, 2, 7, 0, 0, 0, TimeSpan.Zero),
+                    JsonSerializerOptions.Default))
+            .ParamName.ShouldBe("writer");
+
+    [Test]
     public void TcgPlayerPricing_Write_WithNullWriter_NamesTheWriter()
         => Should.Throw<ArgumentNullException>(
                 () => new TcgPlayerPricingConverter().Write(null!, Parse(), TcgDexJsonContext.Default.Options))

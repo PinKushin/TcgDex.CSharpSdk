@@ -20,7 +20,14 @@ internal sealed class FakeTimeProvider : TimeProvider
 {
     private DateTimeOffset _now = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
-    public override DateTimeOffset GetUtcNow() => _now;
+    /// <summary>How many times the clock has been read.</summary>
+    internal int Reads { get; private set; }
+
+    public override DateTimeOffset GetUtcNow()
+    {
+        Reads++;
+        return _now;
+    }
 
     internal void Advance(TimeSpan amount) => _now += amount;
 }
