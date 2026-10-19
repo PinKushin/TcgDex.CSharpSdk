@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Installs the PACKED TcgDex.CSharpSdk the way a consumer does and runs it.
+       Every other test reaches the library through a ProjectReference, which cannot
+       see a package that is missing a target framework, the README, the icon, or
+       that carries a stale copy of itself.
+
+       Not in TcgDex.CSharpSdk.sln, and not meant to be built directly: there is no
+       package to restore until scripts/Test-Package.ps1 has packed one and written a
+       nuget.config that points at it. SmokeSdkVersion has no default on purpose, so
+       building this by hand fails at restore instead of testing something else. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- net472 runs the netstandard2.0 asset, which is the only way to execute it.
+         It only runs on Windows, so it is listed only there; the script checks that
+         every framework it expects was actually run. -->
+    <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">net472;net8.0;net10.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(OS)' != 'Windows_NT'">net8.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RootNamespace>TcgDex.PackageSmokeTest</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TcgDex.CSharpSdk" Version="$(SmokeSdkVersion)" />
+  </ItemGroup>
+
+  <!-- The concrete service collection, which a consumer brings. Versions follow the
+       line the SDK itself resolves on each target. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+  </ItemGroup>
+
+</Project>

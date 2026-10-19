@@ -808,3 +808,35 @@ Shipped as a patch release, 0.8.1, not a minor one: under #24 only a breaking ch
 minor version, and this makes an input that threw work without changing anything that worked. The
 owner confirmed the release: "yes, fix everything we have tallked about and do the release".
 
+## 34. The packed package is installed and run, in CI and before every publish
+
+Before 1.0 the owner asked what would show the API is stable, and the first thing put on the list
+was installing the built package into a fresh project. His reply: "install smoke tests first, those
+whould really already be there". They were not. CI ran `dotnet pack` and uploaded the result, and the
+AOT smoke test reaches the library through a `ProjectReference`; nothing installed the package, so a
+missing target framework, README or icon, or README links that only work on GitHub, would have passed
+every check.
+
+`scripts/Test-Package.ps1` reads the `.nupkg` and `.snupkg` (the `lib` assets and XML docs for
+netstandard2.0, net8.0 and net10.0, README, icon, nuspec licence, icon, readme and commit, one
+dependency group per target, no `.pdb` in the `.nupkg`, no repo-relative link in the packaged README),
+restores `TcgDex.CSharpSdk.PackageSmokeTest` from it and runs it. That project is a consumer: it is
+outside the solution, inherits nothing from the repository's build props, and uses the public API
+only. It runs on net472, which loads the netstandard2.0 asset, as well as net8.0 and net10.0.
+
+Two things make it able to fail rather than just run:
+
+- **nuget.org already has the version in the csproj**, so a restore that is not pinned would install
+  the published package and pass. The restore uses a `nuget.config` with package source mapping that
+  sends `TcgDex.CSharpSdk` to the local feed alone, into an empty packages folder, and the program
+  fails unless the assembly it loaded carries the version and the git commit that were just packed.
+  Mapping the id to nuget.org by hand made it fail on all three frameworks, naming the published
+  commit.
+- **The frameworks are listed in the script**, not read from the project, so one that silently drops
+  out fails the run. Dropping net8.0 from the library failed it five ways.
+
+CI runs it on Ubuntu and Windows after the package is built and uploads the symbols package with it;
+the release workflow runs it on `./artifacts` before the NuGet login, on Linux, so the netstandard2.0
+asset is covered at release time by CI's Windows lane. It is not a required check: that is branch
+protection, which is the owner's to change.
+

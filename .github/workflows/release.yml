@@ -115,6 +115,13 @@ jobs:
           --configuration Release --no-build
           -o ./artifacts -p:Version="$VERSION"
 
+      # The package that is about to ship, installed into a fresh project and run on net8.0 and
+      # net10.0. Linux cannot run net472, so the netstandard2.0 asset is covered by CI's Windows
+      # lane instead. See scripts/Test-Package.ps1.
+      - name: Smoke test the package
+        shell: pwsh
+        run: ./scripts/Test-Package.ps1 -PackageDirectory ./artifacts
+
       - name: Show what will be published
         run: ls -la ./artifacts
 
