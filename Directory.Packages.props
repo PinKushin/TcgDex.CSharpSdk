@@ -118,7 +118,7 @@
   <ItemGroup>
     <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
     <PackageVersion Include="Roslynator.Analyzers" Version="5.0.1" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.303" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.312" />
   </ItemGroup>
 
 </Project>
