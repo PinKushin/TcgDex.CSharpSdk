@@ -356,9 +356,11 @@ jobs:
       # three ConfigureAwait tests for GraphQL and StreamAsync in ContextCaptureTests.
       # Then by two (net10.0 760, net8.0 759, net472 754): a special-name method that is not a
       # getter, and a freshly built without-pricing contract.
+      # Then by one on net10.0 only (761; net8.0 759, net472 754): the public-API test that the
+      # dependency-injection entry points are in the baseline. PublicApiTests is net10.0-only.
       - name: ubuntu net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 760 -Label 'ubuntu net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 761 -Label 'ubuntu net10.0'
 
       - name: ubuntu offline integration tests
         shell: pwsh
@@ -366,7 +368,7 @@ jobs:
 
       - name: macOS net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 760 -Label 'macOS net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 761 -Label 'macOS net10.0'
 
       - name: Windows net472 unit tests
         shell: pwsh
@@ -378,4 +380,4 @@ jobs:
 
       - name: Windows net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 760 -Label 'Windows net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 761 -Label 'Windows net10.0'

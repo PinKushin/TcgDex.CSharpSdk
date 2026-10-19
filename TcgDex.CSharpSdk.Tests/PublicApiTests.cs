@@ -43,16 +43,35 @@ public sealed class PublicApiTests
     /// <summary>Where the accepted surface lives, relative to this file.</summary>
     private const string BaselineFileName = "PublicApi.approved.cs";
 
-    [Test]
-    public void ThePublicSurface_MatchesTheApprovedBaseline()
-    {
-        string actual = typeof(TcgDexClient).Assembly.GeneratePublicApi(new ApiGeneratorOptions
+    /// <summary>The published surface as the generator prints it.</summary>
+    private static string GenerateSurface()
+        => typeof(TcgDexClient).Assembly.GeneratePublicApi(new ApiGeneratorOptions
         {
             // The generated header carries the assembly version, which changes
             // on every version bump and would make the baseline churn for a
             // reason that is not an API change.
             IncludeAssemblyAttributes = false,
+
+            // The generator treats every Microsoft.* and System.* namespace as
+            // not part of the public API, so the DI entry points, which are
+            // conventionally placed in Microsoft.Extensions.DependencyInjection,
+            // were left out of the baseline and could change unnoticed.
+            AllowNamespacePrefixes = ["Microsoft.Extensions.DependencyInjection"],
         });
+
+    [Test]
+    public void ThePublicSurface_IncludesTheDependencyInjectionEntryPoints()
+    {
+        string actual = GenerateSurface();
+
+        actual.ShouldContain("AddTcgDex(");
+        actual.ShouldContain("AddTcgDexWithCaching(");
+    }
+
+    [Test]
+    public void ThePublicSurface_MatchesTheApprovedBaseline()
+    {
+        string actual = GenerateSurface();
 
         string baselinePath = Path.Combine(SourceDirectory(), BaselineFileName);
 
