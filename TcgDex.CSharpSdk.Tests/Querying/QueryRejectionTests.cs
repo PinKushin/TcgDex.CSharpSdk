@@ -65,6 +65,12 @@ public sealed class QueryRejectionTests
         // message could be deleted with the assertions above still passing.
         exception.Message.ShouldContain("single field");
         exception.Message.ShouldContain("one query per field");
+
+        // The advice is split across two string literals; asserting only the
+        // first let the second ("and combine the results, ...") become empty
+        // and still pass, leaving the caller told to split the query but not
+        // what to do with the halves.
+        exception.Message.ShouldContain("and combine the results, or narrow the predicate.");
     }
 
     [Test]

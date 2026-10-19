@@ -205,6 +205,15 @@ public sealed class TranslatorDefensiveTests
     public void SortFieldNames_AreResolvedOnAnyModel()
         => ExpressionTranslator.SortFieldName<Probe, int>(p => p.Score).ShouldBe("score");
 
+    [Test]
+    public void SortFieldName_ANullSelector_ThrowsNamingTheParameter()
+    {
+        // Without the guard the first use is `selector.Body`, which throws a
+        // NullReferenceException naming nothing.
+        Should.Throw<ArgumentNullException>(() => ExpressionTranslator.SortFieldName<Probe, int>(null!))
+            .ParamName.ShouldBe("selector");
+    }
+
     // ----- value formatting fallbacks -----
 
     [Test]
@@ -220,5 +229,19 @@ public sealed class TranslatorDefensiveTests
     public void AFormattableValue_UsesInvariantCulture()
         => ExpressionTranslator.Format(1234.56m).ShouldBe("1234.56");
 
+    [Test]
+    public void AValueWhoseToStringIsNull_FormatsAsEmpty()
+    {
+        // object.ToString() is declared string?; a filter value must still
+        // render as text, and the empty string is the only text that adds
+        // nothing the caller did not supply.
+        ExpressionTranslator.Format(new NullText()).ShouldBe(string.Empty);
+    }
+
     private static string MakeName() => "Furret";
+
+    private sealed class NullText
+    {
+        public override string? ToString() => null;
+    }
 }

@@ -106,6 +106,36 @@ public sealed class ValueExpressionTests
         Query(c => c.HitPoints >= hp).ShouldBe("hp=gte:70");
     }
 
+    [Test]
+    public void AFloatingValueCastToANullableIntegral_IsTruncated()
+    {
+        // The target is int?, so truncation has to look through Nullable<T>:
+        // int? is not a primitive, and Convert.ChangeType cannot target it.
+        double hp = 3.7;
+
+        Query(c => c.HitPoints == (int?)hp).ShouldBe("hp=eq:3");
+    }
+
+    [Test]
+    public void ABoxingConversionToAnInterface_KeepsTheValue()
+    {
+        // A value already of the target type passes through. Convert.ChangeType
+        // has no route to an interface and would throw for a boxed int.
+        int hp = 70;
+
+        Query(c => c.HitPoints == (int?)(IComparable)hp).ShouldBe("hp=eq:70");
+    }
+
+    [Test]
+    public void ACharWidenedToInt_IsNotTruncatedAsFloating()
+    {
+        // Only floating values are truncated. A char routed through
+        // Convert.ToDecimal throws instead of becoming its code point.
+        char letter = 'A';
+
+        Query(c => c.HitPoints == letter).ShouldBe("hp=eq:65");
+    }
+
     // ----- what stays unsupported names the node -----
 
     [Test]
@@ -129,6 +159,18 @@ public sealed class ValueExpressionTests
 
         Should.Throw<NotSupportedException>(() => Query(c => c.Name == (flag ? "a" : "b")))
             .Message.ShouldContain("IIF");
+    }
+
+    [Test]
+    public void AnOrdinaryMethodNamedGetItem_IsRejected()
+    {
+        // Only a real indexer (a special-name get_Item) is read with
+        // arguments. A plain method that merely shares the name is still a
+        // method with arguments.
+        Lookalike lookalike = new();
+
+        Should.Throw<NotSupportedException>(() => Query(c => c.Name == lookalike.get_Item(0)))
+            .Message.ShouldContain("get_Item(0)");
     }
 
     [Test]
@@ -192,6 +234,16 @@ public sealed class ValueExpressionTests
     }
 
     [Test]
+    public void ALiftedOperatorOnAValue_IsInvoked()
+    {
+        // The counterpart of the null case: a lifted conversion of a value
+        // still calls the operator.
+        Level? five = new Level(5);
+
+        Query(c => c.HitPoints == (int?)five).ShouldBe("hp=eq:5");
+    }
+
+    [Test]
     public void AThrowingOperator_SurfacesTheCallersException()
     {
         Wrapper wrapper = new(null);
@@ -241,6 +293,14 @@ public sealed class ValueExpressionTests
         public string Boom() => throw new InvalidOperationException(_message);
 
         public string Bang => throw new InvalidOperationException(_message);
+    }
+
+    /// <summary>A method named like an indexer accessor without being one.</summary>
+    private sealed class Lookalike
+    {
+        private readonly string _name = "Furret";
+
+        public string get_Item(int index) => _name.Substring(index);
     }
 
     /// <summary>The query string, or the exception type when building it fails.</summary>
