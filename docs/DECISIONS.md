@@ -837,6 +837,9 @@ Two things make it able to fail rather than just run:
 
 CI runs it on Ubuntu and Windows after the package is built and uploads the symbols package with it;
 the release workflow runs it on `./artifacts` before the NuGet login, on Linux, so the netstandard2.0
-asset is covered at release time by CI's Windows lane. It is not a required check: that is branch
-protection, which is the owner's to change.
+asset is covered at release time by CI's Windows lane. It was first added as an ordinary job, since
+required checks are branch protection and the owner's to change; he then asked for it: "make it
+required". Both matrix jobs, `Package install smoke test (ubuntu-latest)` and `(windows-latest)`,
+joined the six required checks on 2026-10-19, making eight. A flaky restore from nuget.org therefore
+blocks a merge until the job is re-run, which is the price of the check being worth having.
 
