@@ -284,6 +284,20 @@ Line numbers are those of `63f02f8`.
 | `TcgPlayerPricingConverter.cs:84` | Statement (`continue` removed) | Equivalent. `JsonSerializer.Deserialize` on a `Null` token returns `null` for the reference type `TcgPlayerPrice`, and the `price is not null` check below then skips it, as `continue` did. |
 | `TcgDexUserAgent.cs:71` | String (`"unknown"` to `""`), NoCoverage | Untestable without a seam: not equivalent. If reached, the header would carry no version. It is reached only when `Assembly.GetName().Version` is `null`, which happens for a dynamically emitted assembly and never for this compiled one, and `BuildProduct` is a private static initialiser. |
 
+### Third round: files below their best score
+
+GitHub Actions run 39177696453 on `8ffde05` (0.8.0) was compared, file by file, with the best score
+each file had ever reached, counting only kills by the hermetic unit tests. Kills by the live-API
+integration tests do not count, because those tests are not run on every push. Six files were below
+their best. Every survivor in them now has a killing test, checked by hand as above, or a row below.
+
+Line numbers are those of `8ffde05`.
+
+| File:line | Mutator | Why it is not killed |
+|---|---|---|
+| `CardImage.cs:63` | Logical (`\|\|` to `&&`) | Equivalent. Under the mutant a blank non-null base URL goes on to build `"{blank}/high.png"`, and `Absolute` rejects it because it has no http(s) scheme, so the result is the same `null`. The `is null` test cannot be removed instead: the netstandard2.0 reference assembly does not annotate `string.IsNullOrWhiteSpace`, and without the test that target fails to build with CS8602. |
+| `CardImage.cs:91` | Logical (`\|\|` to `&&`) | Equivalent, for the same reason: `"{blank}.png"` has no http(s) scheme, so `Absolute` returns `null`. |
+
 ## What coverage does not tell you
 
 100% line coverage means every line ran, not that behaviour is correct. A suite

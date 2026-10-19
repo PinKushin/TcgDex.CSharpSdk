@@ -324,11 +324,15 @@ public sealed class PaginationAndImageTests
             () => ImageUrl.BuildAsset("https://x", (ImageFormat)99));
 
     [Test]
-    public void ImageUrl_WithAnUnknownEnumValue_Throws()
+    public void ImageUrl_WithAnUnknownEnumValue_ThrowsNamingWhichValueIsUnknown()
     {
+        // The message is what tells a caller which of the two enums was out of
+        // range, so it is asserted, not just the exception type.
         Should.Throw<ArgumentOutOfRangeException>(
-            () => ImageUrl.Build("https://x", (ImageQuality)99));
+            () => ImageUrl.Build("https://x", (ImageQuality)99))
+            .Message.ShouldContain("Unknown image quality.");
         Should.Throw<ArgumentOutOfRangeException>(
-            () => ImageUrl.Build("https://x", ImageQuality.High, (ImageFormat)99));
+            () => ImageUrl.Build("https://x", ImageQuality.High, (ImageFormat)99))
+            .Message.ShouldContain("Unknown image format.");
     }
 }
