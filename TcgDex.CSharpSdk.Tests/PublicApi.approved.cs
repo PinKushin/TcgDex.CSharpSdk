@@ -1,3 +1,11 @@
+namespace Microsoft.Extensions.DependencyInjection
+{
+    public static class TcgDexServiceCollectionExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IHttpClientBuilder AddTcgDex(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<TcgDex.TcgDexOptions>? configure = null) { }
+        public static Microsoft.Extensions.DependencyInjection.IHttpClientBuilder AddTcgDexWithCaching(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<TcgDex.TcgDexOptions>? configure = null, System.Action<TcgDex.Caching.TcgDexCacheOptions>? configureCache = null) { }
+    }
+}
 namespace TcgDex.Caching
 {
     public sealed class CachedResponse

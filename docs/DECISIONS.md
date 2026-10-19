@@ -843,3 +843,17 @@ required". Both matrix jobs, `Package install smoke test (ubuntu-latest)` and `(
 joined the six required checks on 2026-10-19, making eight. A flaky restore from nuget.org therefore
 blocks a merge until the job is re-run, which is the price of the check being worth having.
 
+## 35. The dependency-injection entry points are in the pinned public API
+
+Found while building the package smoke test (#34): `PublicApi.approved.cs` had no `AddTcgDex` or
+`AddTcgDexWithCaching`. PublicApiGenerator treats every `Microsoft.*` and `System.*` namespace as not
+part of the public API unless told otherwise, and the extension methods sit in
+`Microsoft.Extensions.DependencyInjection`, the convention for them. So the way most consumers
+register the SDK could change without the test that exists for exactly that noticing. I said it
+sounded like a bug; the owner: "fix that it soundss like a bug".
+
+`AllowNamespacePrefixes` now names that one namespace, and the baseline gains the two methods (8 lines,
+nothing else). `ThePublicSurface_IncludesTheDependencyInjectionEntryPoints` fails if they ever leave it,
+so the allow-list cannot be dropped quietly. Changing the signature of `AddTcgDex` now fails the baseline
+test at the line of the method; before, it passed.
+
