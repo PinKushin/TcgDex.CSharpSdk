@@ -493,23 +493,34 @@ serie  (id: ID, filters: SerieFilters): Serie
    `Int cannot represent non-integer value: "gt:100"`. No ranges, OR, wildcards, or null checks.
 3. **No pricing.** `Card` has no `pricing` field, and `DetailedVariants` exposes only
    `type`, `subtype`, `size`, `stamp`, `foil` — no `variantId`, no `pricing`.
-4. **A broad filter can fail outright on a schema/data mismatch.** Verified 2026-08-08:
+4. **A schema/data mismatch makes GraphQL report errors for perfectly valid cards.** Found
+   2026-08-08, re-verified 2026-10-20:
 
    ```
-   POST /v2/graphql  { cards(filters: { rarity: "Common" }) { … attacks { name } } }
+   POST /v2/graphql  { cards(filters: { rarity: "Common" }) { id attacks { name } } }
 
    Cannot return null for non-nullable field AttacksListItem.name.
    ```
 
-   The schema declares `AttacksListItem.name` non-nullable, but some cards have attacks with no
-   name. GraphQL cannot return a partial list for a non-nullable field, so the *entire query*
-   errors rather than omitting the offending card. A narrow filter that happens to miss those
-   cards succeeds, which makes this look intermittent — it is not; it is determined by whether
-   the result set contains an unnamed attack.
+   The schema declares `AttacksListItem.name` as `String!`, but some cards have attacks with no
+   `name` key at all. `dp5-65` (Glameow, Majestic Dawn) is one: REST returns its attacks as
+   `[{"cost":["Colorless"]},{"cost":["Colorless","Colorless"],"damage":10}]`. A page of 10 commons
+   that contains it comes back as **HTTP 200 with the data for all 10 cards, `attacks: [null, null]`
+   on that one, and an `errors` array** with a `path` per violation. The server follows the GraphQL
+   rule that a null for a non-null field propagates to the nearest nullable parent, which here is
+   the list item, so no card is lost.
+
+   It does **not** fail the whole query. An earlier version of this section said it did; that
+   described the SDK, not the server, and was corrected on 2026-10-20. What fails is this SDK's
+   policy: any entry in `errors` makes `SearchDetailedAsync` throw `TcgDexApiException`, rather than
+   hand back a card whose attacks are null. A narrow filter that misses such cards has no errors,
+   which makes this look intermittent. It is determined by whether the result contains an unnamed
+   attack.
 
    The same cards deserialize without complaint over REST, which types the field as optional.
-   **Consequence:** a caller cannot rely on `SearchDetailedAsync` for broad filters, and the SDK
-   surfaces the error as `TcgDexApiException` rather than pretending to a partial result.
+   **Consequence:** a caller cannot rely on `SearchDetailedAsync` for broad filters. **Upstream:**
+   this is a schema bug, since `name` should be nullable as it is in REST; the same shape as
+   `Card.rarity` in [`learnings.md`](learnings.md).
 
 ### Where GraphQL wins
 
