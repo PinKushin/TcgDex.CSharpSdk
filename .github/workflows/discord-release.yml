@@ -1,0 +1,85 @@
+name: Announce release on Discord
+
+# Posts one message to a Discord channel when a GitHub release is PUBLISHED (a draft becoming public, a prerelease
+# included). The channel's webhook URL is a SECRET: it lives in the repository secret DISCORD_WEBHOOK_URL and nowhere in
+# this repository. Set it once with `gh secret set DISCORD_WEBHOOK_URL`; to stop the posts, delete the secret.
+#
+# Why no third-party action: the post is one curl call, so there is no action to pin or to trust with the URL. The release
+# fields are passed through `env:` and into jq with --arg, never interpolated into the script text, so a release title or
+# body cannot inject shell. `allowed_mentions` is empty, so a release note that contains @everyone pings nobody.
+#
+# `workflow_dispatch` posts a clearly marked test message, the control that proves the secret and the channel work
+# without publishing a release.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print the payload instead of posting it (needs no secret)'
+        type: boolean
+        default: false
+      body:
+        description: 'Test body for the message (manual runs only)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.event.release.tag_name }}
+          NAME: ${{ github.event.release.name }}
+          URL: ${{ github.event.release.html_url }}
+          BODY: ${{ github.event.release.body }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+          REPO: ${{ github.repository }}
+          SERVER: ${{ github.server_url }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          TEST_BODY: ${{ inputs.body }}
+        run: |
+          if [ "$DRY_RUN" != "true" ] && [ -z "$WEBHOOK_URL" ]; then
+            echo "::error::the repository secret DISCORD_WEBHOOK_URL is not set"
+            exit 1
+          fi
+
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            TAG="test"; NAME="Test message from the release workflow"; URL="$SERVER/$REPO/releases"
+            BODY="${TEST_BODY:-This is a test of the Discord announcement; no release was published.}"; PRERELEASE="false"
+          fi
+          # A release with no name shows its tag; one with no notes shows a plain line, not an empty embed.
+          [ -n "$NAME" ] || NAME="$TAG"
+          [ -n "$BODY" ] || BODY="(no release notes)"
+
+          # An embed description holds 4096 characters; leave room for the cut-off note.
+          if [ "${#BODY}" -gt 3500 ]; then
+            BODY="${BODY:0:3500}"$'\n\n'"...the notes continue on the release page."
+          fi
+
+          if [ "$PRERELEASE" = "true" ]; then KIND="prerelease"; COLOR=15105570; else KIND="release"; COLOR=3066993; fi
+
+          payload=$(jq -n \
+            --arg title "$NAME" --arg url "$URL" --arg body "$BODY" --arg tag "$TAG" --arg kind "$KIND" \
+            --arg repo "$REPO" --argjson color "$COLOR" \
+            '{ username: "Releases", allowed_mentions: { parse: [] },
+               embeds: [ { title: $title, url: $url, description: $body, color: $color,
+                           footer: { text: ($repo + " " + $tag + " (" + $kind + ")") } } ] }')
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "DRY RUN, nothing posted. Payload:"
+            echo "$payload" | jq .
+            echo "description length: $(echo "$payload" | jq '.embeds[0].description | length'); allowed_mentions.parse entries: $(echo "$payload" | jq '.allowed_mentions.parse | length')"
+            exit 0
+          fi
+
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "$payload" "$WEBHOOK_URL")
+          echo "Discord answered HTTP $code (204 means accepted)"
+          [ "$code" = "204" ] || { echo "::error::Discord did not accept the message (HTTP $code)"; exit 1; }
