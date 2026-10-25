@@ -24,14 +24,17 @@ public sealed record Card
     // so a `= []` default is silently discarded and an omitted JSON array
     // arrives as null. These backing fields keep every collection non-null for
     // an absent property, an explicit JSON null, and a null passed by a caller.
-    private readonly IReadOnlyList<DetailedVariant> _detailedVariants = [];
-    private readonly IReadOnlyList<Booster> _boosters = [];
-    private readonly IReadOnlyList<string> _types = [];
-    private readonly IReadOnlyList<int> _dexIds = [];
-    private readonly IReadOnlyList<Attack> _attacks = [];
-    private readonly IReadOnlyList<Ability> _abilities = [];
-    private readonly IReadOnlyList<WeaknessOrResistance> _weaknesses = [];
-    private readonly IReadOnlyList<WeaknessOrResistance> _resistances = [];
+    //
+    // Each is a ValueList, so the record's own equality compares the items
+    // rather than the list instances (DECISIONS #40).
+    private readonly IReadOnlyList<DetailedVariant> _detailedVariants = ValueList<DetailedVariant>.Empty;
+    private readonly IReadOnlyList<Booster> _boosters = ValueList<Booster>.Empty;
+    private readonly IReadOnlyList<string> _types = ValueList<string>.Empty;
+    private readonly IReadOnlyList<int> _dexIds = ValueList<int>.Empty;
+    private readonly IReadOnlyList<Attack> _attacks = ValueList<Attack>.Empty;
+    private readonly IReadOnlyList<Ability> _abilities = ValueList<Ability>.Empty;
+    private readonly IReadOnlyList<WeaknessOrResistance> _weaknesses = ValueList<WeaknessOrResistance>.Empty;
+    private readonly IReadOnlyList<WeaknessOrResistance> _resistances = ValueList<WeaknessOrResistance>.Empty;
 
     // ----- always present -----
 
@@ -73,7 +76,7 @@ public sealed record Card
     public IReadOnlyList<DetailedVariant> DetailedVariants
     {
         get => _detailedVariants;
-        init => _detailedVariants = value ?? [];
+        init => _detailedVariants = ValueList<DetailedVariant>.From(value);
     }
 
     /// <summary>
@@ -119,7 +122,7 @@ public sealed record Card
     public IReadOnlyList<Booster> Boosters
     {
         get => _boosters;
-        init => _boosters = value ?? [];
+        init => _boosters = ValueList<Booster>.From(value);
     }
 
     /// <summary>
@@ -138,7 +141,7 @@ public sealed record Card
     public IReadOnlyList<string> Types
     {
         get => _types;
-        init => _types = value ?? [];
+        init => _types = ValueList<string>.From(value);
     }
 
     /// <summary>National Pokédex numbers this card depicts.</summary>
@@ -146,7 +149,7 @@ public sealed record Card
     public IReadOnlyList<int> DexIds
     {
         get => _dexIds;
-        init => _dexIds = value ?? [];
+        init => _dexIds = ValueList<int>.From(value);
     }
 
     /// <summary>The Pokémon this one evolves from.</summary>
@@ -166,28 +169,28 @@ public sealed record Card
     public IReadOnlyList<Attack> Attacks
     {
         get => _attacks;
-        init => _attacks = value ?? [];
+        init => _attacks = ValueList<Attack>.From(value);
     }
 
     /// <summary>The card's abilities.</summary>
     public IReadOnlyList<Ability> Abilities
     {
         get => _abilities;
-        init => _abilities = value ?? [];
+        init => _abilities = ValueList<Ability>.From(value);
     }
 
     /// <summary>Types this Pokémon is weak to.</summary>
     public IReadOnlyList<WeaknessOrResistance> Weaknesses
     {
         get => _weaknesses;
-        init => _weaknesses = value ?? [];
+        init => _weaknesses = ValueList<WeaknessOrResistance>.From(value);
     }
 
     /// <summary>Types this Pokémon resists.</summary>
     public IReadOnlyList<WeaknessOrResistance> Resistances
     {
         get => _resistances;
-        init => _resistances = value ?? [];
+        init => _resistances = ValueList<WeaknessOrResistance>.From(value);
     }
 
     /// <summary>The retreat cost, in energy.</summary>

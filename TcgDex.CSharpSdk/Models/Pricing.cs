@@ -99,6 +99,10 @@ public sealed record CardmarketPricing
 [JsonConverter(typeof(Serialization.TcgPlayerPricingConverter))]
 public sealed record TcgPlayerPricing
 {
+    // A ValueDictionary, so the record's own equality compares the entries
+    // rather than the dictionary instances (DECISIONS #40).
+    private readonly IReadOnlyDictionary<string, TcgPlayerPrice> _printings = ValueDictionary<string, TcgPlayerPrice>.Empty;
+
     /// <summary>Currency code; <c>"USD"</c> for this source.</summary>
     public string? Unit { get; init; }
 
@@ -112,8 +116,11 @@ public sealed record TcgPlayerPricing
     /// Price blocks keyed by printing name, for example <c>"normal"</c>,
     /// <c>"holofoil"</c> or <c>"reverse-holofoil"</c>.
     /// </summary>
-    public IReadOnlyDictionary<string, TcgPlayerPrice> Printings { get; init; }
-        = new Dictionary<string, TcgPlayerPrice>(StringComparer.Ordinal);
+    public IReadOnlyDictionary<string, TcgPlayerPrice> Printings
+    {
+        get => _printings;
+        init => _printings = ValueDictionary<string, TcgPlayerPrice>.From(value);
+    }
 
     /// <summary>
     /// Gets the price block for a printing, or <see langword="null"/> when the
