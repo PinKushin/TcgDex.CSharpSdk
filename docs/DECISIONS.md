@@ -947,3 +947,24 @@ Fable's three first steps: write the compatibility contract (rows 1, 2, 12), set
 and turn on package validation with SHA-pinned actions and a CI gate on release (rows 4 to 7). It found
 nothing against the interface decisions in #36.
 
+## 38. The Discord announcement is called from the release workflow
+
+The owner, 2026-10-25, after 0.9.0 published: "i dont think the sdk sent the update notification to the
+discord, i see nothing." He was right. `discord-release.yml` (PR #95, secret set 2026-10-21) had **no runs at
+all**. It listens for `release: published`, but `release.yml` creates the GitHub Release with the built-in
+`GITHUB_TOKEN`, and GitHub does not start workflows from events that token causes (`workflow_dispatch` and
+`repository_dispatch` are the exceptions). So the trigger it was built on could never fire for a tag-driven
+release. Nothing had exercised it first: the manual `workflow_dispatch` test message was never run either.
+
+The fix: `discord-release.yml` also takes `workflow_call` with a `tag`, and a new `announce` job in
+`release.yml` (after `publish`, tag pushes only) calls it. The workflow reads the release back with
+`gh release view`, so the fields have one source and a tag that does not exist fails loudly instead of
+posting an empty message. A manual `workflow_dispatch` with a `tag` announces an existing release, which is
+how 0.9.0 is announced late. The `release` trigger stays for a release a person publishes by hand, which does
+fire it; the two cannot both fire for one release. The announce is its own job so a Discord failure cannot fail
+or re-run the NuGet publish, and the publish workflow's file name and job are untouched (the trusted
+publishing policy names `release.yml`).
+
+Verified with a dry run from the branch before merging (no secret needed); the first real post is the late
+0.9.0 announcement, which is the owner's call because it is outward-facing.
+
