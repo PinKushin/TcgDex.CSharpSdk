@@ -23,7 +23,7 @@ public sealed record Series
 {
     // See Card for why collections need a backing field rather than an
     // initializer: the JSON source generator discards initializers.
-    private readonly IReadOnlyList<CardSetBrief> _sets = [];
+    private readonly IReadOnlyList<CardSetBrief> _sets = ValueList<CardSetBrief>.Empty;
 
     /// <summary>The series identifier, for example <c>"swsh"</c>.</summary>
     public required string Id { get; init; }
@@ -52,6 +52,6 @@ public sealed record Series
     public IReadOnlyList<CardSetBrief> Sets
     {
         get => _sets;
-        init => _sets = value ?? [];
+        init => _sets = ValueList<CardSetBrief>.From(value);
     }
 }

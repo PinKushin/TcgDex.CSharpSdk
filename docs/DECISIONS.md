@@ -925,7 +925,7 @@ before acting, and replace its status here. Evidence paths are Fable's.
 |---|---|---|---|---|
 | 1 | blocker | `SECURITY.md` says nothing is published to NuGet and lists only `main` as supported | `SECURITY.md:30-36` | **confirmed** 2026-10-25: read the lines; 0.9.0 is live on NuGet |
 | 2 | blocker | No written compatibility contract: SemVer scope, the interface-growth rule (#36), TFM lifecycle, `[Obsolete]` lead time, how long an old major gets fixes. .NET 8 reaches end of life 2026-11-10, so decide if `net8.0` stays | `CHANGELOG.md:5-6`, `SECURITY.md:28-36` | **confirmed** 2026-10-25: no SemVer, deprecation or support-window text in the README, SECURITY.md, CONTRIBUTING.md or `docs/*.md` (only the CHANGELOG header names SemVer). `docs/learnings.md:127` notes the net8.0 end-of-life date but nothing decides it |
-| 3 | blocker | Models are `record`s holding `IReadOnlyList<T>`, so two cards from identical JSON may not compare equal; record to class later is breaking (#26 did it for `CachedResponse`) | `Models/Card.cs:21,27-34`, `PublicApi.approved.cs:177` | **confirmed by measurement** 2026-10-25: two `Card`s deserialized from the same JSON (one `types` entry) gave `Equals` false, `==` false and different hash codes. Cards whose collections are all empty compare equal, because `[]` is a shared empty array, so the bug shows only on real data. No model overrides `Equals` |
+| 3 | blocker | Models are `record`s holding `IReadOnlyList<T>`, so two cards from identical JSON may not compare equal; record to class later is breaking (#26 did it for `CachedResponse`) | `Models/Card.cs:21,27-34`, `PublicApi.approved.cs:177` | **confirmed by measurement** 2026-10-25: two `Card`s deserialized from the same JSON (one `types` entry) gave `Equals` false, `==` false and different hash codes. Cards whose collections are all empty compare equal, because `[]` is a shared empty array, so the bug shows only on real data. No model overrides `Equals`. **Fixed** in #40 |
 | 4 | blocker | No `EnablePackageValidation` with a baseline; the API baseline test is net10.0-only and does not check binary compatibility | `TcgDex.CSharpSdk.csproj:56-80` | **confirmed** 2026-10-25: no `EnablePackageValidation`, `PackageValidationBaselineVersion` or ApiCompat setting in any csproj, props, targets or workflow |
 | 5 | should | `release.yml` does not require green CI on the tagged commit; unit tests on Ubuntu only, no net472, coverage gate or AOT smoke; a comment claims net472 runs | `release.yml:97-123` | unverified |
 | 6 | should | Publish job's actions pinned by tag, not SHA | `release.yml:47,49,136,153` | unverified |
@@ -991,4 +991,36 @@ wrote them as the least surprising defaults and he should confirm or change them
 - Only the latest release of the current major gets fixes (one maintainer).
 - The wire requests, log wording and exception messages are not API; the exception types, `Kind`, and log
   categories are.
+
+## 40. Models compare by value, through two internal wrapper collections
+
+Blocker 3 of #37, confirmed by measurement: two `Card`s from the same JSON were not equal, because a record's
+synthesised equality compares an `IReadOnlyList<T>` by reference. The owner asked for it fixed ("Fix the four
+confirmed blockers ... model equality"); he gave no view on how.
+
+**Chosen:** `ValueList<T>` and `ValueDictionary<TKey, TValue>` (internal), stored by each collection property's
+setter. The property types stay `IReadOnlyList<T>` and `IReadOnlyDictionary<K, V>`, so `PublicApi.approved.cs` is
+unchanged (the baseline test passes untouched). The records keep their synthesised equality, which now does the
+right thing for every collection, including any property added later.
+
+**Rejected:**
+- Dropping `record` for `class`, which Fable offered. It removes `with`, `==` and `IEquatable<T>` from every model,
+  a much larger break than the bug.
+- A hand-written `Equals` and `GetHashCode` on each record. `Card` alone has about thirty properties; a property
+  added later and forgotten would silently drop out of the comparison.
+
+**Semantics:** lists compare in order, item by item with the item's own equality; dictionaries compare by entries
+in any order. Null, absent and `[]` are all the same empty list. The wrapper holds the list it is given rather than
+copying it, so it costs one small object per non-empty collection and nothing else changes. A model's text
+(`ToString`) now shows `[Fire, Water]` instead of the list's type name.
+
+**Found while testing:** Shouldly's `ShouldBe` compares two lists, and two dictionaries, entry by entry in
+enumeration order, and never calls `Equals`. An assertion written that way cannot test a wrapper's equality, and
+the dictionary test failed for exactly that reason before it was changed to call `Equals`. The record-level tests are
+unaffected: a record is not an enumerable, so Shouldly uses its `Equals`.
+
+**Not measured:** the extra allocation on a large deserialization. By size alone it is one 24-byte object (header
+plus one reference) per non-empty collection, so at most eight per `Card`; no benchmark was run. The SDK's stated
+position is lighter on allocations than the other C# SDK (`docs/comparison.md`), and this has not been
+re-checked against it.
 

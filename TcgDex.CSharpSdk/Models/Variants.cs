@@ -35,7 +35,7 @@ public sealed record DetailedVariant
 {
     // See Card for why collections need a backing field rather than an
     // initializer: the JSON source generator discards initializers.
-    private readonly IReadOnlyList<string> _stamp = [];
+    private readonly IReadOnlyList<string> _stamp = ValueList<string>.Empty;
 
     /// <summary>The variant name, matching a <see cref="Variants"/> flag — for example <c>"normal"</c>.</summary>
     public string? Type { get; init; }
@@ -51,7 +51,7 @@ public sealed record DetailedVariant
     public IReadOnlyList<string> Stamps
     {
         get => _stamp;
-        init => _stamp = value ?? [];
+        init => _stamp = ValueList<string>.From(value);
     }
 
     /// <summary>The foil treatment, when this printing has one.</summary>

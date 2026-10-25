@@ -7,7 +7,7 @@ public sealed record Attack
 {
     // See Card for why collections need a backing field rather than an
     // initializer: the JSON source generator discards initializers.
-    private readonly IReadOnlyList<string> _cost = [];
+    private readonly IReadOnlyList<string> _cost = ValueList<string>.Empty;
 
     /// <summary>
     /// The attack's printed name, or <see langword="null"/> when the API omits
@@ -26,7 +26,7 @@ public sealed record Attack
     public IReadOnlyList<string> Cost
     {
         get => _cost;
-        init => _cost = value ?? [];
+        init => _cost = ValueList<string>.From(value);
     }
 
     /// <summary>
