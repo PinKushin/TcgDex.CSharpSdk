@@ -972,10 +972,10 @@ Verified with a dry run from the branch before merging (no secret needed); the f
 
 Blockers 1 and 2 of #37 (`SECURITY.md` still said nothing was published; no written compatibility
 promise). The owner, 2026-10-25: "Fix the four confirmed blockers: SECURITY.md, the compatibility contract
-(versioning doc, I will decide net8.0 with you)". On `net8.0`, asked with a recommendation, he chose
-**keep `net8.0`; drop it in a minor release once its runtime is out of support** (his answer was the
-recommended option; no further reasoning given). The reason it is safe is the fallback: a consumer on a
-dropped framework gets the `netstandard2.0` asset, so nothing stops compiling.
+(versioning doc, I will decide net8.0 with you)". On `net8.0` he first chose, from a recommendation of mine,
+**keep `net8.0`; drop it in a minor release once its runtime is out of support** (no reasoning given). That
+was **reversed the same day**, see the amendment below: **a target framework is dropped only in a major
+version.**
 
 `docs/versioning.md` states what each of patch, minor and major may contain, what is public API (the pinned
 `PublicApi.approved.cs`), the interface rule, the target-framework rule above, and what is not promised.
@@ -1005,9 +1005,14 @@ the code reviews of #40). What changed and why:
 - **The `net8.0` drop was described too kindly.** I said only "framework-specific tuning" is lost. Checked against
   `docs/getting-started.md` and the csproj: a `net8.0` consumer falling back to `netstandard2.0` loses prompt
   cancellation mid-body, `PooledConnectionLifetime` (so stale DNS on a long-lived client), and the trimming and
-  AOT declaration, and gains five package dependencies. The owner chose "drop in a minor after end of life"
-  on the premise that nothing is lost but tuning, so **that premise should be put to him again**. The page now
-  lists the costs and calls the rule a permission, not an obligation; a major version remains the alternative.
+  AOT declaration, and gains five package dependencies. His first choice, "drop in a minor after end of life",
+  rested on the premise that nothing is lost but tuning, so I put the premise to him again with the costs.
+  **Reversed by the owner, 2026-10-25: "No. Dropping a target framework should only happen in a major version."**
+  He gave no further reasoning; the costs above are the reason I had put in front of him. Both positions, so the
+  reversal can be defended later: *drop in a minor after end of life* (a smaller matrix once a runtime is out of
+  support) against *only in a major* (an upgrade within a major never costs anyone those behaviours). `net8.0`
+  therefore ships for as long as `1.x` does, whatever its runtime's support status, and its first chance to go is
+  the next major after its end of life. `docs/versioning.md` says so and lists dropping a TFM under Major.
 - Not changed: `FlexibleStringConverter` is internal on purpose (#28); the page's "not in that file is not public
   API" is right, and the attribute that names it only shows up in the generated file.
 

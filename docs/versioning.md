@@ -20,8 +20,8 @@ namespace that is not in that file, is not public API and can change in any rele
 | Release | May contain | Never contains |
 |---|---|---|
 | **Patch** (`1.0.1`) | Bug fixes, documentation, dependency updates that change no documented behaviour | New public members, a change to documented behaviour |
-| **Minor** (`1.1.0`) | New public types, new members on classes (never on an interface, below), new overloads, new optional properties on `CardFilter`, `CardQuery`, `TcgDexOptions` and the models, new enum values, `[Obsolete]` markings, dropping an end-of-life target framework (below) | Removing or renaming a public member, changing a signature (**adding a parameter, even an optional one, is a signature change**: it breaks compiled callers, so it ships as a new overload), changing what a documented call returns for the same input |
-| **Major** (`2.0.0`) | Anything above, plus removals and signature changes, and new members on an interface | |
+| **Minor** (`1.1.0`) | New public types, new members on classes (never on an interface, below), new overloads, new optional properties on `CardFilter`, `CardQuery`, `TcgDexOptions` and the models, new enum values, `[Obsolete]` markings | Removing or renaming a public member, **dropping a target framework**, changing a signature (**adding a parameter, even an optional one, is a signature change**: it breaks compiled callers, so it ships as a new overload), changing what a documented call returns for the same input |
+| **Major** (`2.0.0`) | Anything above, plus removals and signature changes, new members on an interface, and dropping a target framework | |
 
 **A fix is not a break.** Making a call do what its documentation always said, or what it plainly should have,
 is a patch even when a caller had come to depend on the defect; the changelog says so. `0.9.0`'s `StreamAsync`
@@ -58,20 +58,20 @@ The package ships `net10.0`, `net8.0` and `netstandard2.0`. NuGet picks the clos
 `netstandard2.0` serves .NET Framework and the older .NET versions; the table in
 [getting started](getting-started.md#which-assembly-you-get) lists which framework gets which asset.
 
-A target framework may be **dropped in a minor release once its runtime is out of support**. The API is the
-same on every asset, so nothing stops compiling: a consumer on the dropped framework falls back to the
-`netstandard2.0` asset. It is not free, though, and the changelog names the drop and its costs. For `net8.0`
-(out of support 2026-11-10, so the first candidate) a consumer would lose:
+A target framework is **dropped only in a major version**, never in a minor or a patch, even after its runtime
+is out of support.
+
+The reason is that a drop is not free for the people on it. The API is the same on every asset, so nothing
+stops compiling: a consumer on the dropped framework falls back to the `netstandard2.0` asset. But for `net8.0`
+(out of support 2026-11-10) that consumer would lose:
 
 - immediate cancellation while a response body is streaming (it becomes best-effort);
 - `PooledConnectionLifetime`, so a long-lived client can hold a connection and miss a DNS change;
 - the trimming and Native AOT declaration, which the `netstandard2.0` asset cannot make;
 - and would gain the extra package dependencies that asset carries.
 
-If those costs make a drop unacceptable at the time, it waits for a major version instead; this rule is a
-permission, not an obligation.
-
-A target framework is never dropped while its runtime is supported.
+An upgrade within a major version should not cost anyone that, so `net8.0` ships for as long as `1.x` does,
+whatever its runtime's support status. The first major version after its end of life is where it can go.
 
 ## Deprecation
 

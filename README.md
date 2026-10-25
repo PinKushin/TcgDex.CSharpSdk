@@ -321,7 +321,7 @@ In this repository:
 ## Versioning
 
 The package follows Semantic Versioning. What a patch, minor and major release may change, when a
-deprecated member may be removed, and when a target framework may be dropped are in
+deprecated member may be removed, and that a target framework is dropped only in a major version are in
 [Versioning and compatibility](https://pinkushin.github.io/TcgDex.CSharpSdk/versioning.html).
 
 ## Security
