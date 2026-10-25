@@ -968,3 +968,27 @@ publishing policy names `release.yml`).
 Verified with a dry run from the branch before merging (no secret needed); the first real post is the late
 0.9.0 announcement, which is the owner's call because it is outward-facing.
 
+## 39. The versioning contract: `docs/versioning.md`
+
+Blockers 1 and 2 of #37 (`SECURITY.md` still said nothing was published; no written compatibility
+promise). The owner, 2026-10-25: "Fix the four confirmed blockers: SECURITY.md, the compatibility contract
+(versioning doc, I will decide net8.0 with you)". On `net8.0`, asked with a recommendation, he chose
+**keep `net8.0`; drop it in a minor release once its runtime is out of support** (his answer was the
+recommended option; no further reasoning given). The reason it is safe is the fallback: a consumer on a
+dropped framework gets the `netstandard2.0` asset, so nothing stops compiling.
+
+`docs/versioning.md` states what each of patch, minor and major may contain, what is public API (the pinned
+`PublicApi.approved.cs`), the interface rule, the target-framework rule above, and what is not promised.
+`SECURITY.md` now says only the latest release is supported and points there.
+
+**Proposed by me and not yet confirmed by the owner:** these four rules were not decided in conversation, I
+wrote them as the least surprising defaults and he should confirm or change them before 1.0:
+- A minor release may add a member to the consumer-facing interfaces (`ITcgDexClient` and the resource
+  interfaces); only `ITcgDexResponseCache`, the real extension point, is frozen for the whole major.
+  #36 says growth should go onto sealed types, and this is the fallback when it cannot.
+- `[Obsolete]` comes in a minor release and removal is no earlier than the next major, with no minimum number
+  of minors between.
+- Only the latest release of the current major gets fixes (one maintainer).
+- The wire requests, log wording and exception messages are not API; the exception types, `Kind`, and log
+  categories are.
+

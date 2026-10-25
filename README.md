@@ -318,6 +318,12 @@ In this repository:
 - [`docs/learnings.md`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/docs/learnings.md)
   — non-obvious behaviour discovered while building it.
 
+## Versioning
+
+The package follows Semantic Versioning. What a patch, minor and major release may change, how
+long a deprecated member lives, and when a target framework is dropped are in
+[Versioning and compatibility](https://pinkushin.github.io/TcgDex.CSharpSdk/versioning.html).
+
 ## Security
 
 Found a vulnerability? **Report it privately** through
