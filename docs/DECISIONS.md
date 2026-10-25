@@ -925,7 +925,7 @@ before acting, and replace its status here. Evidence paths are Fable's.
 |---|---|---|---|---|
 | 1 | blocker | `SECURITY.md` says nothing is published to NuGet and lists only `main` as supported | `SECURITY.md:30-36` | **confirmed** 2026-10-25: read the lines; 0.9.0 is live on NuGet |
 | 2 | blocker | No written compatibility contract: SemVer scope, the interface-growth rule (#36), TFM lifecycle, `[Obsolete]` lead time, how long an old major gets fixes. .NET 8 reaches end of life 2026-11-10, so decide if `net8.0` stays | `CHANGELOG.md:5-6`, `SECURITY.md:28-36` | **confirmed** 2026-10-25: no SemVer, deprecation or support-window text in the README, SECURITY.md, CONTRIBUTING.md or `docs/*.md` (only the CHANGELOG header names SemVer). `docs/learnings.md:127` notes the net8.0 end-of-life date but nothing decides it |
-| 3 | blocker | Models are `record`s holding `IReadOnlyList<T>`, so two cards from identical JSON may not compare equal; record to class later is breaking (#26 did it for `CachedResponse`) | `Models/Card.cs:21,27-34`, `PublicApi.approved.cs:177` | **confirmed by measurement** 2026-10-25: two `Card`s deserialized from the same JSON (one `types` entry) gave `Equals` false, `==` false and different hash codes. Cards whose collections are all empty compare equal, because `[]` is a shared empty array, so the bug shows only on real data. No model overrides `Equals` |
+| 3 | blocker | Models are `record`s holding `IReadOnlyList<T>`, so two cards from identical JSON may not compare equal; record to class later is breaking (#26 did it for `CachedResponse`) | `Models/Card.cs:21,27-34`, `PublicApi.approved.cs:177` | **confirmed by measurement** 2026-10-25: two `Card`s deserialized from the same JSON (one `types` entry) gave `Equals` false, `==` false and different hash codes. Cards whose collections are all empty compare equal, because `[]` is a shared empty array, so the bug shows only on real data. No model overrides `Equals`. **Fixed** in #40 |
 | 4 | blocker | No `EnablePackageValidation` with a baseline; the API baseline test is net10.0-only and does not check binary compatibility | `TcgDex.CSharpSdk.csproj:56-80` | **confirmed** 2026-10-25: no `EnablePackageValidation`, `PackageValidationBaselineVersion` or ApiCompat setting in any csproj, props, targets or workflow |
 | 5 | should | `release.yml` does not require green CI on the tagged commit; unit tests on Ubuntu only, no net472, coverage gate or AOT smoke; a comment claims net472 runs | `release.yml:97-123` | unverified |
 | 6 | should | Publish job's actions pinned by tag, not SHA | `release.yml:47,49,136,153` | unverified |
@@ -968,6 +968,62 @@ publishing policy names `release.yml`).
 Verified with a dry run from the branch before merging (no secret needed); the first real post is the late
 0.9.0 announcement, which is the owner's call because it is outward-facing.
 
+## 39. The versioning contract: `docs/versioning.md`
+
+Blockers 1 and 2 of #37 (`SECURITY.md` still said nothing was published; no written compatibility
+promise). The owner, 2026-10-25: "Fix the four confirmed blockers: SECURITY.md, the compatibility contract
+(versioning doc, I will decide net8.0 with you)". On `net8.0`, asked with a recommendation, he chose
+**keep `net8.0`; drop it in a minor release once its runtime is out of support** (his answer was the
+recommended option; no further reasoning given). The reason it is safe is the fallback: a consumer on a
+dropped framework gets the `netstandard2.0` asset, so nothing stops compiling.
+
+`docs/versioning.md` states what each of patch, minor and major may contain, what is public API (the pinned
+`PublicApi.approved.cs`), the interface rule, the target-framework rule above, and what is not promised.
+`SECURITY.md` now says only the latest release is supported and points there.
+
+**Proposed by me and not yet confirmed by the owner:** these four rules were not decided in conversation, I
+wrote them as the least surprising defaults and he should confirm or change them before 1.0:
+- A minor release may add a member to the consumer-facing interfaces (`ITcgDexClient` and the resource
+  interfaces); only `ITcgDexResponseCache`, the real extension point, is frozen for the whole major.
+  #36 says growth should go onto sealed types, and this is the fallback when it cannot.
+- `[Obsolete]` comes in a minor release and removal is no earlier than the next major, with no minimum number
+  of minors between.
+- Only the latest release of the current major gets fixes (one maintainer).
+- The wire requests, log wording and exception messages are not API; the exception types, `Kind`, and log
+  categories are.
+
+## 40. Models compare by value, through two internal wrapper collections
+
+Blocker 3 of #37, confirmed by measurement: two `Card`s from the same JSON were not equal, because a record's
+synthesised equality compares an `IReadOnlyList<T>` by reference. The owner asked for it fixed ("Fix the four
+confirmed blockers ... model equality"); he gave no view on how.
+
+**Chosen:** `ValueList<T>` and `ValueDictionary<TKey, TValue>` (internal), stored by each collection property's
+setter. The property types stay `IReadOnlyList<T>` and `IReadOnlyDictionary<K, V>`, so `PublicApi.approved.cs` is
+unchanged (the baseline test passes untouched). The records keep their synthesised equality, which now does the
+right thing for every collection, including any property added later.
+
+**Rejected:**
+- Dropping `record` for `class`, which Fable offered. It removes `with`, `==` and `IEquatable<T>` from every model,
+  a much larger break than the bug.
+- A hand-written `Equals` and `GetHashCode` on each record. `Card` alone has about thirty properties; a property
+  added later and forgotten would silently drop out of the comparison.
+
+**Semantics:** lists compare in order, item by item with the item's own equality; dictionaries compare by entries
+in any order. Null, absent and `[]` are all the same empty list. The wrapper holds the list it is given rather than
+copying it, so it costs one small object per non-empty collection and nothing else changes. A model's text
+(`ToString`) now shows `[Fire, Water]` instead of the list's type name.
+
+**Found while testing:** Shouldly's `ShouldBe` compares two lists, and two dictionaries, entry by entry in
+enumeration order, and never calls `Equals`. An assertion written that way cannot test a wrapper's equality, and
+the dictionary test failed for exactly that reason before it was changed to call `Equals`. The record-level tests are
+unaffected: a record is not an enumerable, so Shouldly uses its `Equals`.
+
+**Not measured:** the extra allocation on a large deserialization. By size alone it is one 24-byte object (header
+plus one reference) per non-empty collection, so at most eight per `Card`; no benchmark was run. The SDK's stated
+position is lighter on allocations than the other C# SDK (`docs/comparison.md`), and this has not been
+re-checked against it.
+
 ## 41. `dotnet pack` validates the package against the last release
 
 Blocker 4 of #37: nothing stopped a release from breaking an assembly someone had already compiled against.
@@ -976,17 +1032,34 @@ compatibility or at whether the three target frameworks still expose the same AP
 the four confirmed blockers ... package validation"); he gave no view on the settings.
 
 `EnablePackageValidation` with `PackageValidationBaselineVersion` 0.9.0 and `EnableStrictModeForCompatibleTfms`
-in the library csproj. Measured before and after, on one change: renaming the public
-`MemoryTcgDexResponseCache.Clear()` packed without a word before, and fails the pack after with `CP0002: Member
-'void ...Clear()' exists on` the baseline, once for each of `net10.0`, `net8.0` and `netstandard2.0`. The
-unmodified code packs clean, with no warnings, including in strict mode.
+in the library csproj. Measured on 2026-10-25 with `dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj -c Release`
+on one change: renaming the public `MemoryTcgDexResponseCache.Clear()` packed without a word before, and fails
+the pack after with `CP0002: Member 'void ...Clear()' exists on` the baseline, once for each of `net10.0`,
+`net8.0` and `netstandard2.0`. The unmodified code packs clean, with no warnings, including in strict mode. (Not
+yet in `VERIFICATION.md`; it is a one-line measurement that the command above reproduces.)
 
 **The baseline has to move.** It is the release just published, so it is bumped in the PR that prepares the next
-one, and it is 0.9.0 until 1.0.0 ships. An intended break before 1.0.0 goes in `CompatibilitySuppressions.xml`
-(generated with `-p:ApiCompatGenerateSuppressionFile=true`), recorded here, not by lowering the check. Forgetting
-to move it is not dangerous (every break against an older release is still caught); it only makes the check
-looser about what the newer release added.
+one, and it is 0.9.0 until 1.0.0 ships. While the version being packed equals the baseline (as at 0.9.0), the
+check compares the package with its own published copy and proves nothing; it starts to bite at the next
+version. An intended break before 1.0.0 goes in `CompatibilitySuppressions.xml` (generated with
+`-p:ApiCompatGenerateSuppressionFile=true`, one entry per member per target framework), recorded here, not by
+lowering the check. Forgetting to move it is not dangerous (every break against an older release is still
+caught); it only makes the check looser about what the newer release added, and after 1.0.0 an unmoved 0.9.0
+baseline would let 1.0.x break 1.0.0 unnoticed wherever 0.9.0 allows it. **Nothing gates this**: `release.yml`
+checks `<Version>` and the CHANGELOG against the tag but not the baseline. A release-time check that the
+baseline is the previous published tag is the obvious addition, and was not built.
 
-**Cost:** `pack` now restores the baseline package from nuget.org, so a flaky restore can fail it, as the package
-smoke test already can (#34).
+**Cost, corrected after review.** I first wrote that `pack` restores the baseline. It does not: the baseline is
+a `downloadDependencies` entry in `project.assets.json`, so it comes down at **restore**, in every job that
+restores the library (macOS, Windows, net472, Stryker, AOT, fuzz, benchmarks), and a missing or unlisted 0.9.0
+fails them all with NU1102. Those jobs already restore from nuget.org, so the added exposure is one package
+that exists and cannot be unlisted without the owner doing it, but it is repo-wide, not pack-only. Checked by
+reading `obj/project.assets.json` after a plain `dotnet restore`.
+
+`release.yml` packs with `-p:Version=...`; that only changes the version being validated, not the baseline, so it
+is unaffected, and a prerelease tag compares fine.
+
+**Open:** whether `EnableStrictModeForCompatibleTfms` is already the default under `EnablePackageValidation`. It
+is set explicitly, which is harmless if so. A future API that exists on net10.0 but not on net8.0 or
+netstandard2.0 now fails the pack and needs a suppression, which is the "same API on all three" promise.
 

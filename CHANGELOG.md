@@ -15,6 +15,14 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+### Fixed
+
+- Models now compare by value, collections included. Two `Card`s deserialized from the same JSON were never equal
+  (`==`, `Equals` and `GetHashCode` disagreed), because the collections they hold were compared by reference.
+  This covers `Card`, `Attack`, `DetailedVariant`, `Series`, `CardSet` and `TcgPlayerPricing`. Order matters for
+  a list and not for the printings of a price. A model's text (`ToString`) now shows a collection's items instead of
+  its type name. No signature changes.
+
 ## [0.9.0] - 2026-10-25
 
 The last interface change before 1.0 (DECISIONS #36): public interfaces cannot gain parameters or members after

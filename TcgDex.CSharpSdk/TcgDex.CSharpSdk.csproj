@@ -81,7 +81,8 @@
 
   <!--
     Package validation (DECISIONS #41). `dotnet pack` compares this build with the last release and fails on a
-    binary-incompatible change, on every target framework. PublicApi.approved.cs pins the source-level surface
+    removed or changed public API (binary or source), on every target framework, and under strict mode on an API
+    that one framework has and another lacks. The baseline package itself is downloaded at restore, not at pack. PublicApi.approved.cs pins the source-level surface
     on net10.0 only; this is the check that a 1.0.x cannot quietly break an assembly someone already compiled
     against, and that the three target frameworks keep exposing the same API.
 
