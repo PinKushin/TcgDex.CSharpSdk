@@ -31,9 +31,9 @@ rules out as a patch: `StreamAsync` began honouring the query's page size, which
 it shipped as a breaking change.
 
 **Binary compatibility is the firm promise; source compatibility is best effort.** One caveat: the assembly
-version currently tracks the package version rather than being pinned to the major, so a .NET Framework consumer
-(who gets the `netstandard2.0` asset) sees a new assembly version on every release, patches included. Whether to
-pin it is not decided. A new overload can make an
+version tracks the package version rather than being pinned to the major, so a .NET Framework consumer (who gets
+the `netstandard2.0` asset) sees a new assembly version on every release, patches included, and may need a binding
+redirect for it. A new overload can make an
 existing call that passes `null` ambiguous, a parameter rename breaks named arguments, and a nullability change can
 add a warning. These are avoided where possible and named in the changelog when they happen. They are not on their
 own a reason for a major version.
@@ -84,6 +84,12 @@ stops compiling: a consumer on the dropped framework falls back to the `netstand
 
 An upgrade within a major version should not cost anyone that, so `net8.0` ships for as long as `1.x` does,
 whatever its runtime's support status. The first major version after its end of life is where it can go.
+
+## Language version
+
+Using the models needs **C# 11 or later** (the compiler in the .NET 7 SDK and Visual Studio 2022 17.4 onward),
+because their public types have `required` members, which an older compiler cannot construct. Raising that
+minimum is a major-version change, since it can stop a consumer's build.
 
 ## Deprecation
 

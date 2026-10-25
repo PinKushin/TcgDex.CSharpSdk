@@ -991,8 +991,8 @@ version.**
 `PublicApi.approved.cs`), the interface rule, the target-framework rule above, and what is not promised.
 `SECURITY.md` now says only the latest release is supported and points there.
 
-**Proposed by me and not yet confirmed by the owner:** these four rules were not decided in conversation, I
-wrote them as the least surprising defaults and he should confirm or change them before 1.0:
+**Proposed by me, confirmed by the owner on 2026-10-25 (see "Resolved" below):** these four rules were not decided
+in conversation at first; I wrote them as the least surprising defaults:
 - ~~A minor release may add a member to the consumer-facing interfaces.~~ **Reversed, see the amendment below.**
 - `[Obsolete]` comes in a minor release and removal is no earlier than the next major, with no minimum number
   of minors between.
@@ -1038,14 +1038,26 @@ minor with a changelog entry); the page now says binary compatibility is firm an
 effort (a new overload can make a `null` argument ambiguous), that a dependency major bump is not a patch, that a
 serialized model is not a format promise, and how the contract is enforced.
 
-**Still open, not decided:** the assembly version strategy (pin `AssemblyVersion` to the major, or let it track the
-package version as now) matters for .NET Framework binding redirects through the `netstandard2.0` asset and is not
-stated; no `[Experimental]` or preview tier exists; no minimum C# or SDK version is stated. Each is a question for
-the owner before 1.0, none was touched here.
+**Resolved with the owner, 2026-10-25.** I explained the four open items in plain terms with a recommendation each;
+his reply: "that all seems good". That settles:
+- **The four proposed rules above are confirmed** (no interface gains a member within a major; `[Obsolete]` first
+  and removal no earlier than the next major; only the latest release of the current major gets fixes; wire
+  requests, log wording and exception messages are not API). This is after his earlier lean ("i think your
+  proposals are good") and after the amended text and both reviews.
+- **No preview tier.** Nothing is waiting for one and adding it later is additive. Revisit only if a feature needs it.
+- **A language minimum is stated:** C# 11 or later, because the public types have `required` members (20 in
+  `PublicApi.approved.cs`); raising it is a major-version change. The page says so. Not tested with an older
+  compiler; it follows from `required` being a C# 11 feature.
 
-**Owner's view on the four proposed rules:** "i think your proposals are good". That is a lean, given while the
-reviews were still pending, not a sign-off on the amended text; the rules above stay marked as proposed until he
-reads the page as amended.
+**Assembly version: not decided, and the status quo stands.** I recommended pinning `AssemblyVersion` to the major
+(so a .NET Framework consumer on the `netstandard2.0` asset needs no new binding redirect for a minor or patch). The
+owner, same day: "wait actually i probably wont pin though, that seems objectively bad". "Probably" and the
+reasoning are his; I did not agree it is objectively bad and said so, so this is a lean, not a settled decision.
+The case against pinning: the DLL's own version then no longer identifies the release, which makes diagnostics and
+stack traces less direct, and many libraries (Microsoft's own packages among them) do not pin. The case for it
+(Newtonsoft.Json does): upgrades within a major never touch binding. Neither is wrong, and the cost of not pinning
+is real but narrow (.NET Framework consumers). **Until he says otherwise the assembly version tracks the package
+version, and the versioning page says exactly that.**
 
 **Release timing (the owner, 2026-10-25):** "i actualy asked tcgdex if they wanted me to stay pre 1.0 until they
 took a look, no reply yet". So 1.0.0 is waiting on TCGdex's answer as well as the soak (#30); nothing here sets a
