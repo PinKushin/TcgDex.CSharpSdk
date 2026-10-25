@@ -15,6 +15,11 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-25
+
+The last interface change before 1.0 (DECISIONS #36): public interfaces cannot gain parameters or members after
+1.0 without a major version, so paging and the catalog were reshaped now.
+
 ### Changed
 
 - **Breaking, source level:** paging moved off the method signatures, ahead of 1.0. Public interfaces cannot gain
@@ -570,7 +575,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.3...v0.7.0

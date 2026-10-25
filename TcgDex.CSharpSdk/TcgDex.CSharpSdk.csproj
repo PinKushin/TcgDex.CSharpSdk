@@ -55,7 +55,7 @@
   <!-- NuGet package metadata. -->
   <PropertyGroup>
     <PackageId>TcgDex.CSharpSdk</PackageId>
-    <Version>0.8.1</Version>
+    <Version>0.9.0</Version>
     <Authors>PinKushin</Authors>
     <Description>A .NET SDK for the TCGdex Pokemon TCG API - strongly typed models, C# queries translated to the REST filter syntax, ETag caching, and opt-in GraphQL. .NET 8, .NET 10 and netstandard2.0 (.NET Framework, Unity); trim- and Native AOT-safe. No API key needed.</Description>
     <PackageTags>tcgdex;pokemon;pokemon-tcg;tcg;trading-card-game;pokemon-cards;tcg-pocket;api-client;sdk;rest;graphql;aot;unity</PackageTags>
