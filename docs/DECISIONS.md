@@ -910,3 +910,40 @@ builder, and unifying them would be a bigger change than this PR.
 Fable listed. It would make `ListAsync(cancellationToken)` stop compiling for every caller, to head off a
 third overload that no interface has asked for. Recorded as a known trade-off, not a regret.
 
+## 37. The pre-1.0 checklist: Fable's cold read, none of it verified yet
+
+Asked on 2026-10-25, after 0.9.0 (#36): "what else should be done before a real 1.0 release, have fable
+answer that question too, without the context of our 'plan' for release right noww". Fable ran with no
+release plan, no soak timeline and none of my conclusions, and was told to form its own list from the
+code, tests, CI and package metadata before reading this file. The owner then agreed to record it
+here ("sure").
+
+**Every row is Fable's claim, not a measurement.** None has been checked against the code. Check each
+before acting, and replace its status here. Evidence paths are Fable's.
+
+| # | Sev | Item | Evidence | Status |
+|---|---|---|---|---|
+| 1 | blocker | `SECURITY.md` says nothing is published to NuGet and lists only `main` as supported | `SECURITY.md:30-36` | unverified |
+| 2 | blocker | No written compatibility contract: SemVer scope, the interface-growth rule (#36), TFM lifecycle, `[Obsolete]` lead time, how long an old major gets fixes. .NET 8 reaches end of life 2026-11-10, so decide if `net8.0` stays | `CHANGELOG.md:5-6`, `SECURITY.md:28-36` | unverified |
+| 3 | blocker | Models are `record`s holding `IReadOnlyList<T>`, so two cards from identical JSON may not compare equal; record to class later is breaking (#26 did it for `CachedResponse`) | `Models/Card.cs:21,27-34`, `PublicApi.approved.cs:177` | unverified |
+| 4 | blocker | No `EnablePackageValidation` with a baseline; the API baseline test is net10.0-only and does not check binary compatibility | `TcgDex.CSharpSdk.csproj:56-80` | unverified |
+| 5 | should | `release.yml` does not require green CI on the tagged commit; unit tests on Ubuntu only, no net472, coverage gate or AOT smoke; a comment claims net472 runs | `release.yml:97-123` | unverified |
+| 6 | should | Publish job's actions pinned by tag, not SHA | `release.yml:47,49,136,153` | unverified |
+| 7 | should | No `ContinuousIntegrationBuild`, no `global.json` | `Directory.Build.props:45` | unverified |
+| 8 | should | No 429 handling; `TcgDexApiException` exposes no `Retry-After`. Additive later, but 1.0 docs should say what a rate-limited caller sees | `TcgDexApiException.cs:46-73` | unverified |
+| 9 | should | `StreamAsync` ignores the query's page number. Decided in #36; Fable still flags it | `Resources/Resources.cs` | decided, re-open only if the owner wants |
+| 10 | should | `ITcgDexClient` has no escape hatch for a new resource group | `TcgDexClient.cs:17-33` | partly decided (#36) |
+| 11 | should | `required` on `Id`, `Name`, `LocalId`, `Category`, `Set`: one upstream card missing `name` fails the whole `ListAsync` | `Models/CardBrief.cs:18,31,34` | unverified |
+| 12 | should | `docs/publishing.md` stale (version, secret name, dates) | `docs/publishing.md:205,328-330,364` | unverified |
+| 13 | nice | Three `TcgDexApiException` constructors give `Kind = Unspecified` | `TcgDexApiException.cs:20-37` | unverified |
+| 14 | nice | `TcgDexClient.Create(configureCache: ...)` validates differently from the DI path | `TcgDexClient.cs:272-275` | unverified |
+| 15 | question | `AddTcgDex` throws on a second call; the convention is idempotent | `TcgDexServiceCollectionExtensions.cs:57-66` | decided in #23 |
+| 16 | nice | `ReleaseDate` is `DateTime?`, `Updated` is `DateTimeOffset?` | `ReleaseDateConverter.cs:5-9` | decided in #22 |
+| 17 | nice | Docs: `index.md` omits netstandard2.0; README says .NET Framework 4.6.1+ but only net472 runs; `PublicApiTests` remark about `IAsyncEnumerable` is wrong; thread-safety and the `"TcgDex"` log category are not documented publicly | `docs/index.md:11`, `README.md:26,218`, `PublicApiTests.cs:33-38` | unverified |
+| 18 | nice | No signing, no `CODEOWNERS` or templates; tag protection for `v*` not visible in the repo; `CONTRIBUTING.md` bans `--no-build` while the workflows use it | `release.yml:107,115`, `CONTRIBUTING.md:67` | unverified |
+| 19 | nice | The netstandard2.0 asset is never run on a modern Core runtime, only net472 | `TcgDexClient.cs:237-263` | unverified |
+
+Fable's three first steps: write the compatibility contract (rows 1, 2, 12), settle model equality (row 3),
+and turn on package validation with SHA-pinned actions and a CI gate on release (rows 4 to 7). It found
+nothing against the interface decisions in #36.
+
