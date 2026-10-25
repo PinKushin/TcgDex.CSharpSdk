@@ -1024,3 +1024,42 @@ plus one reference) per non-empty collection, so at most eight per `Card`; no be
 position is lighter on allocations than the other C# SDK (`docs/comparison.md`), and this has not been
 re-checked against it.
 
+## 41. `dotnet pack` validates the package against the last release
+
+Blocker 4 of #37: nothing stopped a release from breaking an assembly someone had already compiled against.
+`PublicApi.approved.cs` pins the source-level surface, but on net10.0 only, and it does not look at binary
+compatibility or at whether the three target frameworks still expose the same API. The owner asked for it ("Fix
+the four confirmed blockers ... package validation"); he gave no view on the settings.
+
+`EnablePackageValidation` with `PackageValidationBaselineVersion` 0.9.0 and `EnableStrictModeForCompatibleTfms`
+in the library csproj. Measured on 2026-10-25 with `dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj -c Release`
+on one change: renaming the public `MemoryTcgDexResponseCache.Clear()` packed without a word before, and fails
+the pack after with `CP0002: Member 'void ...Clear()' exists on` the baseline, once for each of `net10.0`,
+`net8.0` and `netstandard2.0`. The unmodified code packs clean, with no warnings, including in strict mode. (Not
+yet in `VERIFICATION.md`; it is a one-line measurement that the command above reproduces.)
+
+**The baseline has to move.** It is the release just published, so it is bumped in the PR that prepares the next
+one, and it is 0.9.0 until 1.0.0 ships. While the version being packed equals the baseline (as at 0.9.0), the
+check compares the package with its own published copy and proves nothing; it starts to bite at the next
+version. An intended break before 1.0.0 goes in `CompatibilitySuppressions.xml` (generated with
+`-p:ApiCompatGenerateSuppressionFile=true`, one entry per member per target framework), recorded here, not by
+lowering the check. Forgetting to move it is not dangerous (every break against an older release is still
+caught); it only makes the check looser about what the newer release added, and after 1.0.0 an unmoved 0.9.0
+baseline would let 1.0.x break 1.0.0 unnoticed wherever 0.9.0 allows it. **Nothing gates this**: `release.yml`
+checks `<Version>` and the CHANGELOG against the tag but not the baseline. A release-time check that the
+baseline is the previous published tag is the obvious addition, and was not built.
+
+**Cost, corrected after review.** I first wrote that `pack` restores the baseline. It does not: the baseline is
+a `downloadDependencies` entry in `project.assets.json`, so it comes down at **restore**, in every job that
+restores the library (macOS, Windows, net472, Stryker, AOT, fuzz, benchmarks), and a missing or unlisted 0.9.0
+fails them all with NU1102. Those jobs already restore from nuget.org, so the added exposure is one package
+that exists and cannot be unlisted without the owner doing it, but it is repo-wide, not pack-only. Checked by
+reading `obj/project.assets.json` after a plain `dotnet restore`.
+
+`release.yml` packs with `-p:Version=...`; that only changes the version being validated, not the baseline, so it
+is unaffected, and a prerelease tag compares fine.
+
+**Open:** whether `EnableStrictModeForCompatibleTfms` is already the default under `EnablePackageValidation`. It
+is set explicitly, which is harmless if so. A future API that exists on net10.0 but not on net8.0 or
+netstandard2.0 now fails the pack and needs a suppression, which is the "same API on all three" promise.
+
