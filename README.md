@@ -320,8 +320,8 @@ In this repository:
 
 ## Versioning
 
-The package follows Semantic Versioning. What a patch, minor and major release may change, how
-long a deprecated member lives, and when a target framework is dropped are in
+The package follows Semantic Versioning. What a patch, minor and major release may change, when a
+deprecated member may be removed, and when a target framework may be dropped are in
 [Versioning and compatibility](https://pinkushin.github.io/TcgDex.CSharpSdk/versioning.html).
 
 ## Security

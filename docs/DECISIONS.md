@@ -983,14 +983,37 @@ dropped framework gets the `netstandard2.0` asset, so nothing stops compiling.
 
 **Proposed by me and not yet confirmed by the owner:** these four rules were not decided in conversation, I
 wrote them as the least surprising defaults and he should confirm or change them before 1.0:
-- A minor release may add a member to the consumer-facing interfaces (`ITcgDexClient` and the resource
-  interfaces); only `ITcgDexResponseCache`, the real extension point, is frozen for the whole major.
-  #36 says growth should go onto sealed types, and this is the fallback when it cannot.
+- ~~A minor release may add a member to the consumer-facing interfaces.~~ **Reversed, see the amendment below.**
 - `[Obsolete]` comes in a minor release and removal is no earlier than the next major, with no minimum number
   of minors between.
 - Only the latest release of the current major gets fixes (one maintainer).
 - The wire requests, log wording and exception messages are not API; the exception types, `Kind`, and log
   categories are.
+
+**Amended 2026-10-25, after three independent reviews of the merged page** (a sonnet diff review of the docs and
+the code reviews of #40). What changed and why:
+- **The interface rule was backwards.** I had written that a minor release may add a member to a consumer-facing
+  interface. The reviewer pointed out that this contradicts the CHANGELOG for 0.9.0 and #36, whose whole reason for
+  moving paging was that an interface cannot gain a member or parameter without breaking every hand-written
+  implementer, which is a major change under semver. The page now says what #36 says: **no interface gains a
+  member within a major**, and growth goes onto sealed types and the `GetValuesAsync` escape hatch. This is still
+  my proposal, now the stricter one; it is the owner's to confirm.
+- **Adding an optional parameter is a signature change**, not a minor addition, because it breaks compiled callers;
+  it ships as an overload.
+- Added: a fix is a patch even if someone depended on the defect; new model members must be optional; enums may
+  gain values; `CachedResponse` and `TcgDexCacheOptions` are extension points too.
+- **The `net8.0` drop was described too kindly.** I said only "framework-specific tuning" is lost. Checked against
+  `docs/getting-started.md` and the csproj: a `net8.0` consumer falling back to `netstandard2.0` loses prompt
+  cancellation mid-body, `PooledConnectionLifetime` (so stale DNS on a long-lived client), and the trimming and
+  AOT declaration, and gains five package dependencies. The owner chose "drop in a minor after end of life"
+  on the premise that nothing is lost but tuning, so **that premise should be put to him again**. The page now
+  lists the costs and calls the rule a permission, not an obligation; a major version remains the alternative.
+- Not changed: `FlexibleStringConverter` is internal on purpose (#28); the page's "not in that file is not public
+  API" is right, and the attribute that names it only shows up in the generated file.
+
+**Release timing (the owner, 2026-10-25):** "i actualy asked tcgdex if they wanted me to stay pre 1.0 until they
+took a look, no reply yet". So 1.0.0 is waiting on TCGdex's answer as well as the soak (#30); nothing here sets a
+date.
 
 ## 40. Models compare by value, through two internal wrapper collections
 
