@@ -37,7 +37,7 @@ public sealed class GraphQLTests
         int? itemsPerPage = null)
     {
         await CreateClient(handler).Cards
-            .SearchDetailedAsync(filter, page, itemsPerPage, CancellationToken.None);
+            .SearchDetailedAsync(filter with { Page = page, ItemsPerPage = itemsPerPage }, CancellationToken.None);
 
         using JsonDocument document = JsonDocument.Parse(handler.SingleRequestBody);
 
@@ -248,8 +248,8 @@ public sealed class GraphQLTests
 
         Should.ThrowAsync<ArgumentOutOfRangeException>(async () =>
                 await CreateClient(handler).Cards.SearchDetailedAsync(
-                    new CardFilter { Name = "Furret" }, page, itemsPerPage, CancellationToken.None))
-            .Result.ParamName.ShouldBe(page is not null ? "page" : "itemsPerPage");
+                    new CardFilter { Name = "Furret", Page = page, ItemsPerPage = itemsPerPage }, CancellationToken.None))
+            .Result.ParamName.ShouldBe(page is not null ? "Page" : "ItemsPerPage");
 
         handler.Requests.ShouldBeEmpty("validation happens before anything is sent");
     }

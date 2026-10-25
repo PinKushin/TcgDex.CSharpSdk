@@ -132,6 +132,9 @@ public sealed class CardQuery
         return new CardQuery(_filters, _sortField, _sortOrder, page, itemsPerPage);
     }
 
+    /// <summary>The page size set by <see cref="Page"/>, or <see langword="null"/>.</summary>
+    internal int? ItemsPerPage => _itemsPerPage;
+
     /// <summary>
     /// Renders the query as a URL query string, without a leading <c>?</c>.
     /// </summary>

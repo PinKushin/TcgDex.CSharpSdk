@@ -39,13 +39,14 @@ public interface ICardResource
     /// Searches for cards and returns each one <em>fully detailed</em> in a
     /// single request, using GraphQL.
     /// </summary>
-    /// <param name="filter">Equality filters. GraphQL supports no other kind.</param>
-    /// <param name="page">Optional 1-based page number.</param>
-    /// <param name="itemsPerPage">Optional page size.</param>
+    /// <param name="filter">
+    /// Equality filters, and optionally <see cref="Querying.CardFilter.Page"/> and
+    /// <see cref="Querying.CardFilter.ItemsPerPage"/>. GraphQL supports no other kind of filter.
+    /// </param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The matching cards, fully populated.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="filter"/> is null.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="page"/> or <paramref name="itemsPerPage"/> is less than one.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The filter's page or page size is less than one.</exception>
     /// <exception cref="TcgDexApiException">The query failed or the server reported errors.</exception>
     /// <remarks>
     /// <para>
@@ -63,19 +64,19 @@ public interface ICardResource
     /// </remarks>
     Task<IReadOnlyList<Card>> SearchDetailedAsync(
         Querying.CardFilter filter,
-        int? page = null,
-        int? itemsPerPage = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Streams every card matching a query, fetching pages as they are consumed.
     /// </summary>
-    /// <param name="query">Filters and sorting. Any page set on it is ignored.</param>
-    /// <param name="pageSize">How many results to fetch per request.</param>
+    /// <param name="query">
+    /// Filters and sorting. The items-per-page given to <see cref="Querying.CardQuery.Page"/>
+    /// is how many results each request fetches (100 when unset); its page number is ignored,
+    /// because the stream starts at the first page.
+    /// </param>
     /// <param name="cancellationToken">Stops enumeration and cancels the in-flight request.</param>
     /// <returns>An async sequence over every match.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="query"/> is null.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="pageSize"/> is less than one.</exception>
     /// <remarks>
     /// <para>
     /// The API reports no total count and sends no pagination headers, so the
@@ -90,7 +91,6 @@ public interface ICardResource
     /// </remarks>
     IAsyncEnumerable<CardBrief> StreamAsync(
         Querying.CardQuery query,
-        int pageSize = 100,
         CancellationToken cancellationToken = default);
 }
 
@@ -223,4 +223,30 @@ public interface ICatalogResource
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every dex id in use.</returns>
     Task<IReadOnlyList<int>> GetDexIdsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads any text enumeration endpoint by name, for one this SDK has no named method for yet.
+    /// </summary>
+    /// <param name="name">The endpoint, for example <c>"rarities"</c>; escaped as a single path segment.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>Every value in use.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is empty, whitespace, <c>"."</c> or <c>".."</c>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+    /// <remarks>
+    /// Upstream adds enumeration endpoints over time. A named method per endpoint
+    /// would be a new interface member each time, which cannot ship without a
+    /// major version, so this is the way to reach a new one in between
+    /// (DECISIONS #36).
+    /// </remarks>
+    Task<IReadOnlyList<string>> GetValuesAsync(string name, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads any numeric enumeration endpoint by name, like <see cref="GetValuesAsync"/>.
+    /// </summary>
+    /// <param name="name">The endpoint, for example <c>"hp"</c>; escaped as a single path segment.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>Every value in use.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is empty, whitespace, <c>"."</c> or <c>".."</c>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+    Task<IReadOnlyList<int>> GetNumberValuesAsync(string name, CancellationToken cancellationToken = default);
 }

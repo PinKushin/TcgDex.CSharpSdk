@@ -66,6 +66,21 @@ public sealed record CardFilter
     public int? RetreatCost { get; init; }
 
     /// <summary>
+    /// The 1-based page to fetch. Unset asks the server for its default, the first page.
+    /// </summary>
+    /// <remarks>
+    /// Paging is part of the filter, not an argument of the search, so it can
+    /// grow (sorting is next) without changing the interface (DECISIONS #36).
+    /// A value below one makes the search throw <see cref="ArgumentOutOfRangeException"/>.
+    /// </remarks>
+    public int? Page { get; init; }
+
+    /// <summary>
+    /// How many cards per page. Unset asks the server for its default page size.
+    /// </summary>
+    public int? ItemsPerPage { get; init; }
+
+    /// <summary>
     /// Renders the filter as a GraphQL argument list, or an empty string when
     /// nothing is set.
     /// </summary>

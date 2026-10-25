@@ -50,6 +50,23 @@ internal static class Guard
 #endif
         string? value,
         [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => NotNullOrWhiteSpaceNamed(value, paramName);
+
+    /// <summary>
+    /// <see cref="NotNullOrWhiteSpace"/> for a caller that must name the argument itself, because
+    /// the expression it holds is not the name of the public argument the user wrote.
+    /// </summary>
+    /// <remarks>
+    /// Kept apart from the caller-info version: passing an explicit name to a
+    /// <c>CallerArgumentExpression</c> parameter hides the caller info, which analyzer S3236 rightly
+    /// flags as a mistake in the ordinary case.
+    /// </remarks>
+    internal static void NotNullOrWhiteSpaceNamed(
+#if !NETSTANDARD2_0
+        [System.Diagnostics.CodeAnalysis.NotNull]
+#endif
+        string? value,
+        string? paramName)
     {
         if (value is null)
         {
@@ -70,6 +87,13 @@ internal static class Guard
         int? value,
         int minimum,
         [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => NotLessThanNamed(value, minimum, paramName);
+
+    /// <summary>
+    /// <see cref="NotLessThan"/> for a caller that must name the argument itself; see
+    /// <see cref="NotNullOrWhiteSpaceNamed"/> for why this is a separate method.
+    /// </summary>
+    internal static void NotLessThanNamed(int? value, int minimum, string? paramName)
     {
         if (value < minimum)
         {

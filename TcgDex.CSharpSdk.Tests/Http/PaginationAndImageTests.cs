@@ -37,7 +37,7 @@ public sealed class PaginationAndImageTests
 
         List<CardBrief> cards = new();
 
-        await foreach (CardBrief card in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 3, CancellationToken.None))
+        await foreach (CardBrief card in CreateClient(handler).Cards.StreamAsync(new CardQuery().Page(1, 3), CancellationToken.None))
         {
             cards.Add(card);
         }
@@ -55,7 +55,7 @@ public sealed class PaginationAndImageTests
             .RespondWith(HttpStatusCode.OK, Page(2, 0))
             .RespondWith(HttpStatusCode.OK, Page(0));
 
-        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 2, CancellationToken.None))
+        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery().Page(1, 2), CancellationToken.None))
         {
         }
 
@@ -75,7 +75,7 @@ public sealed class PaginationAndImageTests
 
         int count = 0;
 
-        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 2, CancellationToken.None))
+        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery().Page(1, 2), CancellationToken.None))
         {
             count++;
         }
@@ -85,21 +85,19 @@ public sealed class PaginationAndImageTests
     }
 
     [Test]
-    public async Task StreamAsync_WithAPageSizeBelowOne_NamesPageSizeAndSendsNothing()
+    public async Task StreamAsync_WithNoPageSizeOnTheQuery_Fetches100ToAPage()
     {
-        // Without the guard the zero reaches CardQuery.Page, which also throws but
-        // names itemsPerPage, a parameter the caller of StreamAsync never passed.
-        RecordingHandler handler = new();
+        // The page size lives on the query (DECISIONS #36); a query that never
+        // set one gets the stream's default.
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
 
-        ArgumentOutOfRangeException exception = await Should.ThrowAsync<ArgumentOutOfRangeException>(async () =>
+        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), CancellationToken.None))
         {
-            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 0, CancellationToken.None))
-            {
-            }
-        });
+        }
 
-        exception.ParamName.ShouldBe("pageSize");
-        handler.Requests.ShouldBeEmpty();
+        string uri = handler.SingleRequestUri;
+        uri.ShouldContain("pagination:page=1");
+        uri.ShouldContain("pagination:itemsPerPage=100");
     }
 
     [Test]
@@ -111,7 +109,7 @@ public sealed class PaginationAndImageTests
 
         await Should.ThrowAsync<OperationCanceledException>(async () =>
         {
-            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 2, cancelled.Token))
+            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery().Page(1, 2), cancelled.Token))
             {
             }
         });
@@ -137,7 +135,7 @@ public sealed class PaginationAndImageTests
 
         int count = 0;
 
-        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 10, CancellationToken.None))
+        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery().Page(1, 10), CancellationToken.None))
         {
             count++;
         }
@@ -155,7 +153,7 @@ public sealed class PaginationAndImageTests
 
         List<CardBrief> taken = new();
 
-        await foreach (CardBrief card in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 50, CancellationToken.None))
+        await foreach (CardBrief card in CreateClient(handler).Cards.StreamAsync(new CardQuery().Page(1, 50), CancellationToken.None))
         {
             taken.Add(card);
 
@@ -174,9 +172,9 @@ public sealed class PaginationAndImageTests
     {
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
 
-        CardQuery query = new CardQuery().Where(c => c.Name == "Furret").OrderBy(c => c.Name);
+        CardQuery query = new CardQuery().Where(c => c.Name == "Furret").OrderBy(c => c.Name).Page(1, 10);
 
-        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(query, 10, CancellationToken.None))
+        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(query, CancellationToken.None))
         {
         }
 
@@ -186,15 +184,15 @@ public sealed class PaginationAndImageTests
     }
 
     [Test]
-    public async Task StreamAsync_OverridesAnyPageAlreadyOnTheQuery()
+    public async Task StreamAsync_StartsAtPageOne_AndTakesOnlyThePageSizeFromTheQuery()
     {
-        // The stream owns paging; a page left on the query would silently skip
-        // results or repeat them.
+        // The stream owns the page number; one left on the query would silently
+        // skip results. The size is the one thing it reads from the query.
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, "[]");
 
-        CardQuery query = new CardQuery().Page(7, 3);
+        CardQuery query = new CardQuery().Page(7, 25);
 
-        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(query, 25, CancellationToken.None))
+        await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(query, CancellationToken.None))
         {
         }
 
@@ -210,21 +208,7 @@ public sealed class PaginationAndImageTests
 
         await Should.ThrowAsync<ArgumentNullException>(async () =>
         {
-            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(null!, 10, CancellationToken.None))
-            {
-            }
-        });
-    }
-
-    [TestCase(0)]
-    [TestCase(-1)]
-    public async Task StreamAsync_WithInvalidPageSize_Throws(int pageSize)
-    {
-        RecordingHandler handler = new();
-
-        await Should.ThrowAsync<ArgumentOutOfRangeException>(async () =>
-        {
-            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), pageSize, CancellationToken.None))
+            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(null!, CancellationToken.None))
             {
             }
         });
@@ -240,7 +224,7 @@ public sealed class PaginationAndImageTests
 
         await Should.ThrowAsync<OperationCanceledException>(async () =>
         {
-            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery(), 5, cts.Token))
+            await foreach (CardBrief _ in CreateClient(handler).Cards.StreamAsync(new CardQuery().Page(1, 5), cts.Token))
             {
             }
         });

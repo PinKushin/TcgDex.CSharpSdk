@@ -15,6 +15,38 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-25
+
+The last interface change before 1.0 (DECISIONS #36): public interfaces cannot gain parameters or members after
+1.0 without a major version, so paging and the catalog were reshaped now.
+
+### Changed
+
+- **Breaking, source level:** paging moved off the method signatures, ahead of 1.0. Public interfaces cannot gain
+  parameters after 1.0 without a breaking release, so growth now goes onto the types they take.
+  - `SearchDetailedAsync(filter, page, itemsPerPage, cancellationToken)` is `SearchDetailedAsync(filter, cancellationToken)`.
+    Set `Page` and `ItemsPerPage` on the `CardFilter` instead: `new CardFilter { Name = "Furret", Page = 2, ItemsPerPage = 25 }`.
+  - `StreamAsync(query, pageSize, cancellationToken)` is `StreamAsync(query, cancellationToken)`. The page size is the
+    `itemsPerPage` of `query.Page(1, n)`, and is 100 when the query sets none. The page number is still ignored.
+  - **`StreamAsync` now honours the query's page size.** Before, `query.Page(3, 10)` was ignored and the stream fetched
+    100 per request; now it fetches 10. A query that never set a page size still fetches 100. This changes the request
+    count with no compile error for anyone who set one.
+  - An out-of-range page size now throws from `CardQuery.Page` (naming `itemsPerPage`) when the query is built, not from
+    `StreamAsync` (which named `pageSize`). `SearchDetailedAsync` names the property, `Page` or `ItemsPerPage`, where it
+    used to name `page` and `itemsPerPage`.
+  - Apart from that, the requests sent are unchanged.
+
+### Added
+
+- `Catalog.GetValuesAsync(name)` and `Catalog.GetNumberValuesAsync(name)` read an enumeration endpoint by name, so one
+  the SDK has no named method for yet is reachable without waiting for a release. The name is escaped as a single path
+  segment.
+
+### Fixed
+
+- An id or endpoint name of `.` or `..` is rejected with `ArgumentException`. It used to be sent as is, and the URI layer
+  collapsed it, so `Cards.GetAsync("..")` requested `/v2/en/` rather than a card.
+
 ## [0.8.1] - 2026-10-18
 
 ### Fixed
@@ -543,7 +575,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.6.3...v0.7.0

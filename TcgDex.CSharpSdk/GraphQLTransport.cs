@@ -91,13 +91,8 @@ internal sealed class GraphQLTransport(
         int? itemsPerPage,
         CancellationToken cancellationToken)
     {
-        Guard.NotNull(filter);
-
-        // Validated as REST's CardQuery.Page does, rather than sent for the
-        // server to answer with something arbitrary.
-        Guard.NotLessThan(page, 1);
-        Guard.NotLessThan(itemsPerPage, 1);
-
+        // filter, page and itemsPerPage are validated by CardResource, the only
+        // caller, so the exceptions name the public arguments.
         string query = BuildQuery(filter, page, itemsPerPage);
         GraphQLCardsResponse response = await PostAsync(query, cancellationToken).ConfigureAwait(false);
 

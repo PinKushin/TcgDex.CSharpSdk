@@ -56,7 +56,7 @@ public sealed class BranchCoverageTests
         RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, """{"data":{"cards":[]}}""");
         TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
 
-        await client.Cards.SearchDetailedAsync(filter, page, itemsPerPage, CancellationToken.None);
+        await client.Cards.SearchDetailedAsync(filter with { Page = page, ItemsPerPage = itemsPerPage }, CancellationToken.None);
 
         using JsonDocument document = JsonDocument.Parse(handler.SingleRequestBody);
         return document.RootElement.GetProperty("query").GetString()!;
