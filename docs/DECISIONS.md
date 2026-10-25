@@ -991,8 +991,8 @@ version.**
 `PublicApi.approved.cs`), the interface rule, the target-framework rule above, and what is not promised.
 `SECURITY.md` now says only the latest release is supported and points there.
 
-**Proposed by me and not yet confirmed by the owner:** these four rules were not decided in conversation, I
-wrote them as the least surprising defaults and he should confirm or change them before 1.0:
+**Proposed by me, confirmed by the owner on 2026-10-25 (see "Resolved" below):** these four rules were not decided
+in conversation at first; I wrote them as the least surprising defaults:
 - ~~A minor release may add a member to the consumer-facing interfaces.~~ **Reversed, see the amendment below.**
 - `[Obsolete]` comes in a minor release and removal is no earlier than the next major, with no minimum number
   of minors between.
@@ -1038,14 +1038,29 @@ minor with a changelog entry); the page now says binary compatibility is firm an
 effort (a new overload can make a `null` argument ambiguous), that a dependency major bump is not a patch, that a
 serialized model is not a format promise, and how the contract is enforced.
 
-**Still open, not decided:** the assembly version strategy (pin `AssemblyVersion` to the major, or let it track the
-package version as now) matters for .NET Framework binding redirects through the `netstandard2.0` asset and is not
-stated; no `[Experimental]` or preview tier exists; no minimum C# or SDK version is stated. Each is a question for
-the owner before 1.0, none was touched here.
+**Resolved with the owner, 2026-10-25.** I explained the four open items in plain terms with a recommendation each;
+his reply: "that all seems good" and then, interrupting himself, "wait actually i probably wont pin though" (the
+assembly version, below). So "all seems good" covered every recommendation **except** pinning. That settles:
+- **The four proposed rules above are confirmed** (no interface gains a member within a major; `[Obsolete]` first
+  and removal no earlier than the next major; only the latest release of the current major gets fixes; wire
+  requests, log wording and exception messages are not API). This is after his earlier lean ("i think your
+  proposals are good") and after the amended text and both reviews.
+- **No preview tier.** Nothing is waiting for one and adding it later is additive. Revisit only if a feature needs it.
+- **A language minimum is stated:** C# 11 or later, because the public types have `required` members; raising it
+  is a major-version change. The page says so. It applies to constructing a model, not reading one, and holds on
+  the `netstandard2.0` asset too: `Compatibility/CompilerFeatureShims.cs` defines `RequiredMemberAttribute` and
+  `CompilerFeatureRequiredAttribute` there. Not tested with an older compiler.
 
-**Owner's view on the four proposed rules:** "i think your proposals are good". That is a lean, given while the
-reviews were still pending, not a sign-off on the amended text; the rules above stay marked as proposed until he
-reads the page as amended.
+**Assembly version: settled, not pinned. It tracks the package version.** I recommended pinning `AssemblyVersion`
+to the major (so a .NET Framework consumer on the `netstandard2.0` asset needs no new binding redirect for a minor
+or patch). The owner first said "wait actually i probably wont pin though, that seems objectively bad", which I
+treated as a lean and pushed back on (both choices are defensible; Newtonsoft.Json pins, Microsoft's own packages
+mostly do not). He then decided, with his reason: **"i dont care if it costs .netstandard a little bit, people
+running that should know enough to be able to work around, i want the right iinformatiion in traces"**, and chose
+to leave it unpinned. So the DLL's version identifies the exact release in a stack trace or a crash dump, at the
+price that a .NET Framework consumer may need a binding redirect on each upgrade, patches included. That cost is
+accepted knowingly and the versioning page states it. Pinning can be revisited only as a deliberate change; it
+would also be a visible change for those consumers.
 
 **Release timing (the owner, 2026-10-25):** "i actualy asked tcgdex if they wanted me to stay pre 1.0 until they
 took a look, no reply yet". So 1.0.0 is waiting on TCGdex's answer as well as the soak (#30); nothing here sets a

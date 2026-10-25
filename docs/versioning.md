@@ -20,8 +20,8 @@ namespace that is not in that file, is not public API and can change in any rele
 | Release | May contain | Never contains |
 |---|---|---|
 | **Patch** (`1.0.1`) | Bug fixes, documentation, dependency updates that change no documented behaviour and take no new major version of a dependency | New public members, a change to documented behaviour |
-| **Minor** (`1.1.0`) | New public types, new members on classes (never on an interface, below), new overloads, new optional properties on `CardFilter`, `CardQuery`, `TcgDexOptions` and the models, new enum values, `[Obsolete]` markings | Removing or renaming a public member, **dropping a target framework**, changing a signature (**adding a parameter, even an optional one, is a signature change**: it breaks compiled callers, so it ships as a new overload), changing what a documented call returns for the same input |
-| **Major** (`2.0.0`) | Anything above, plus removals and signature changes, new members on an interface, and dropping a target framework | |
+| **Minor** (`1.1.0`) | New public types, new members on classes (never on an interface, below), new overloads, new optional properties on `CardFilter`, `CardQuery`, `TcgDexOptions` and the models, new enum values, `[Obsolete]` markings | Removing or renaming a public member, **dropping a target framework**, **raising the minimum C# version**, changing a signature (**adding a parameter, even an optional one, is a signature change**: it breaks compiled callers, so it ships as a new overload), changing what a documented call returns for the same input |
+| **Major** (`2.0.0`) | Anything above, plus removals and signature changes, new members on an interface, dropping a target framework, and raising the minimum C# version | |
 
 **What counts as a fix.** A change that makes a call do what its documentation says is a patch, even when a caller
 had come to depend on the departure; the changelog says so. A change to observable behaviour the documentation
@@ -31,9 +31,9 @@ rules out as a patch: `StreamAsync` began honouring the query's page size, which
 it shipped as a breaking change.
 
 **Binary compatibility is the firm promise; source compatibility is best effort.** One caveat: the assembly
-version currently tracks the package version rather than being pinned to the major, so a .NET Framework consumer
-(who gets the `netstandard2.0` asset) sees a new assembly version on every release, patches included. Whether to
-pin it is not decided. A new overload can make an
+version tracks the package version rather than being pinned to the major, so a .NET Framework consumer (who gets
+the `netstandard2.0` asset) sees a new assembly version on every release, patches included, and may need a binding
+redirect for it. This is a deliberate choice (DECISIONS #39), not pinned. A new overload can make an
 existing call that passes `null` ambiguous, a parameter rename breaks named arguments, and a nullability change can
 add a warning. These are avoided where possible and named in the changelog when they happen. They are not on their
 own a reason for a major version.
@@ -84,6 +84,14 @@ stops compiling: a consumer on the dropped framework falls back to the `netstand
 
 An upgrade within a major version should not cost anyone that, so `net8.0` ships for as long as `1.x` does,
 whatever its runtime's support status. The first major version after its end of life is where it can go.
+
+## Language version
+
+Constructing the models (object initializers in your code, tests and mocks) needs **C# 11 or later** (the compiler
+in the .NET 7 SDK and Visual Studio 2022 17.4 onward), because their public types have `required` members, which
+an older compiler refuses. Reading a model you received is unaffected. This holds for every asset, including
+`netstandard2.0`, which carries the attributes `required` needs. Raising that minimum is a major-version change,
+since it can stop a consumer's build.
 
 ## Deprecation
 
