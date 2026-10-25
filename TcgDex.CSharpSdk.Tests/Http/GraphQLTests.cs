@@ -249,7 +249,7 @@ public sealed class GraphQLTests
         Should.ThrowAsync<ArgumentOutOfRangeException>(async () =>
                 await CreateClient(handler).Cards.SearchDetailedAsync(
                     new CardFilter { Name = "Furret", Page = page, ItemsPerPage = itemsPerPage }, CancellationToken.None))
-            .Result.ParamName.ShouldBe(page is not null ? "page" : "itemsPerPage");
+            .Result.ParamName.ShouldBe(page is not null ? "Page" : "ItemsPerPage");
 
         handler.Requests.ShouldBeEmpty("validation happens before anything is sent");
     }

@@ -21,10 +21,36 @@ internal abstract class ResourceBase(TcgDexTransport transport)
     /// </remarks>
     /// <param name="id">The raw identifier.</param>
     /// <returns>The escaped identifier.</returns>
-    protected static string EscapeId(string id)
+    protected static string EscapeId(string id) => EscapeSegment(id, nameof(id));
+
+    /// <summary>
+    /// Percent-encodes a caller-supplied endpoint name for use in a path segment.
+    /// </summary>
+    /// <param name="name">The raw endpoint name.</param>
+    /// <returns>The escaped name.</returns>
+    protected static string EscapeName(string name) => EscapeSegment(name, nameof(name));
+
+    /// <summary>
+    /// The one rule for caller data in a path: present, escaped, and never a
+    /// dot segment.
+    /// </summary>
+    /// <remarks>
+    /// <c>Uri.EscapeDataString</c> leaves <c>.</c> and <c>..</c> alone, and the URI
+    /// layer collapses them when the path is resolved, so either would request
+    /// the parent endpoint instead of the one named. Neither is ever a real id or
+    /// endpoint name. <paramref name="paramName"/> is passed explicitly so the
+    /// exception names the argument the public caller wrote.
+    /// </remarks>
+    private static string EscapeSegment(string value, string paramName)
     {
-        Guard.NotNullOrWhiteSpace(id);
-        return Uri.EscapeDataString(id);
+        Guard.NotNullOrWhiteSpaceNamed(value, paramName);
+
+        if (value is "." or "..")
+        {
+            throw new ArgumentException("A path segment cannot be a dot segment.", paramName);
+        }
+
+        return Uri.EscapeDataString(value);
     }
 }
 
@@ -34,13 +60,15 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQLTransport g
 {
     private const int DefaultStreamPageSize = 100;
 
-    // The null check lives here so a null filter throws ArgumentNullException
-    // naming `filter`, before .Page is read off it.
+    // Validated here, not in the transport, so each exception names what the
+    // caller wrote: the filter, or the property they set on it.
     public Task<IReadOnlyList<Card>> SearchDetailedAsync(
         Querying.CardFilter filter,
         CancellationToken cancellationToken = default)
     {
         Guard.NotNull(filter);
+        Guard.NotLessThanNamed(filter.Page, 1, nameof(filter.Page));
+        Guard.NotLessThanNamed(filter.ItemsPerPage, 1, nameof(filter.ItemsPerPage));
 
         return graphQL.SearchAsync(filter, filter.Page, filter.ItemsPerPage, cancellationToken);
     }
@@ -186,10 +214,10 @@ internal sealed class CatalogResource(TcgDexTransport transport)
         => Numbers("dex-ids", cancellationToken);
 
     public Task<IReadOnlyList<string>> GetValuesAsync(string name, CancellationToken cancellationToken = default)
-        => Text(EscapeId(name), cancellationToken);
+        => Text(EscapeName(name), cancellationToken);
 
     public Task<IReadOnlyList<int>> GetNumberValuesAsync(string name, CancellationToken cancellationToken = default)
-        => Numbers(EscapeId(name), cancellationToken);
+        => Numbers(EscapeName(name), cancellationToken);
 
     private Task<IReadOnlyList<string>> Text(string path, CancellationToken cancellationToken)
         => Transport.GetRequiredAsync<IReadOnlyList<string>>(path, cancellationToken);

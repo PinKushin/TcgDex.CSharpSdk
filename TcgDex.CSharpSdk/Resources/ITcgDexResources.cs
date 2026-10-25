@@ -230,7 +230,7 @@ public interface ICatalogResource
     /// <param name="name">The endpoint, for example <c>"rarities"</c>; escaped as a single path segment.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every value in use.</returns>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is empty or whitespace.</exception>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is empty, whitespace, <c>"."</c> or <c>".."</c>.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
     /// <remarks>
     /// Upstream adds enumeration endpoints over time. A named method per endpoint
@@ -246,7 +246,7 @@ public interface ICatalogResource
     /// <param name="name">The endpoint, for example <c>"hp"</c>; escaped as a single path segment.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>Every value in use.</returns>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is empty or whitespace.</exception>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is empty, whitespace, <c>"."</c> or <c>".."</c>.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
     Task<IReadOnlyList<int>> GetNumberValuesAsync(string name, CancellationToken cancellationToken = default);
 }

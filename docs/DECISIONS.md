@@ -894,6 +894,18 @@ the ICatalogResource and paging changes in one PR, TDD, with PublicApi.approved.
 - `StreamAsync(CardQuery, CancellationToken)`: the page size is the query's `Page(_, itemsPerPage)`, 100
   when unset; its page number is still ignored.
 
+**Review of the change itself (2026-10-25):** three reviewers, run independently of each other and of me: a
+sonnet diff review, a sonnet test-validity review, and Fable. All were given the branch and the intent, no
+findings. They agreed on two defects, both fixed in the same PR: a null or blank catalog name threw naming
+`id` instead of `name` (it went through the id escaper), and `.` or `..` survived `Uri.EscapeDataString`
+and were collapsed by the URI layer, so the "single segment" claim was false. The second also affected ids,
+so the fix is in the shared segment escaper and ids are rejected too. Also fixed: the CHANGELOG said the
+wire requests were unchanged, which was false for a query that set a page size; the test gaps (each rule
+exercised through both catalog methods); and the page-size exceptions now name `Page` and `ItemsPerPage`.
+Fable asked whether `CardFilter.Page` (an `init` property) against `CardQuery.Page(page, size)` (a method)
+is intended. It is: each follows its own type's idiom, a settings record against an immutable fluent
+builder, and unifying them would be a bigger change than this PR.
+
 **Not done:** merging the two `ListAsync` overloads into `ListAsync(CardQuery? query = null, ...)`, which
 Fable listed. It would make `ListAsync(cancellationToken)` stop compiling for every caller, to head off a
 third overload that no interface has asked for. Recorded as a known trade-off, not a regret.

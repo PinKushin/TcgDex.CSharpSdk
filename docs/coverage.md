@@ -311,8 +311,8 @@ Line numbers are those of `8ffde05`.
 Mutation run 39189935172 (branch `fix/mutation-regressions`) left 51 survivors. Those in files that
 were not below their best had not been examined, so each was read. Sixteen now have a killing test,
 checked by hand: the two writer guards in `ReleaseDateConverter` and `TimestampConverter`, the null
-`variants_detailed` coalescing in `Card`, the `pageSize` guard and the cancellation check in
-`StreamAsync`, the `BoundedLru` bound, the tagless-entry slot in `DeserializedResponseCache`, the
+`variants_detailed` coalescing in `Card`, the `pageSize` guard (removed by DECISIONS #36; the size now
+comes from `CardQuery.Page`) and the cancellation check in `StreamAsync`, the `BoundedLru` bound, the tagless-entry slot in `DeserializedResponseCache`, the
 GraphQL error log, the `'9'` boundary in `Attack.BaseDamage`, and the five `ConfigureAwait` calls in
 `GraphQLTransport` and `StreamAsync`, the `"get_"` prefix of the indexer check in
 `ExpressionTranslator`, and the pricing-skip type check in `TcgDexJsonContracts`. The five below cannot be killed.
