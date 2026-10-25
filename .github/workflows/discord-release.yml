@@ -8,14 +8,29 @@ name: Announce release on Discord
 # fields are passed through `env:` and into jq with --arg, never interpolated into the script text, so a release title or
 # body cannot inject shell. `allowed_mentions` is empty, so a release note that contains @everyone pings nobody.
 #
-# `workflow_dispatch` posts a clearly marked test message, the control that proves the secret and the channel work
-# without publishing a release.
+# `workflow_dispatch` with no `tag` posts a clearly marked test message, the control that proves the secret and the
+# channel work without publishing a release. With a `tag` it announces that existing release for real.
+#
+# Why `workflow_call`: release.yml creates the GitHub Release with the built-in GITHUB_TOKEN, and GitHub does not start
+# workflows from events that token causes, so `release: published` never fires for a tag-driven release (v0.9.0 was
+# never announced; this workflow had not run once). release.yml now calls this workflow with the tag. The `release`
+# trigger stays for a release a person publishes by hand, which does fire it. The two cannot both fire for one release.
 
 on:
   release:
     types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: 'The release to announce, e.g. v0.9.0'
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
+      tag:
+        description: 'Announce this existing release for real (e.g. v0.9.0). Empty posts the test message'
+        type: string
+        default: ''
       dry_run:
         description: 'Print the payload instead of posting it (needs no secret)'
         type: boolean
@@ -45,13 +60,22 @@ jobs:
           SERVER: ${{ github.server_url }}
           DRY_RUN: ${{ inputs.dry_run }}
           TEST_BODY: ${{ inputs.body }}
+          INPUT_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$DRY_RUN" != "true" ] && [ -z "$WEBHOOK_URL" ]; then
             echo "::error::the repository secret DISCORD_WEBHOOK_URL is not set"
             exit 1
           fi
 
-          if [ "$EVENT" = "workflow_dispatch" ]; then
+          if [ -n "$INPUT_TAG" ]; then
+            # Read the release back rather than passing its text in, so there is one source for the fields and a
+            # tag that does not exist fails here, loudly, instead of posting an empty message.
+            release=$(gh release view "$INPUT_TAG" --repo "$REPO" --json tagName,name,url,body,isPrerelease)
+            TAG=$(jq -r '.tagName' <<<"$release"); NAME=$(jq -r '.name // ""' <<<"$release")
+            URL=$(jq -r '.url' <<<"$release"); BODY=$(jq -r '.body // ""' <<<"$release")
+            PRERELEASE=$(jq -r '.isPrerelease' <<<"$release")
+          elif [ "$EVENT" = "workflow_dispatch" ]; then
             TAG="test"; NAME="Test message from the release workflow"; URL="$SERVER/$REPO/releases"
             BODY="${TEST_BODY:-This is a test of the Discord announcement; no release was published.}"; PRERELEASE="false"
           fi

@@ -160,10 +160,9 @@ jobs:
       # Discord post in the job summary. Consumer-scoped by construction — the
       # changelog already excludes internal, CI and test-only work. Runs only on
       # a successful publish (the implicit success() guard), so nothing is
-      # announced that did not actually ship. The post still has to be pasted by
-      # a human: the project channel lives in a Discord we do not administer, so
-      # a webhook is not ours to create — this automates the writing, not the
-      # sending.
+      # announced that did not actually ship. The `announce` job below posts it
+      # through the repository's webhook; this summary stays as the fallback and
+      # the preview, for when that secret is unset or the post is refused.
       - name: Build release announcement
         shell: pwsh
         run: |
@@ -203,3 +202,17 @@ jobs:
           # carries the real package and not only GitHub's source zips. --clobber
           # keeps a re-run idempotent, like the edit above.
           gh release upload "v$VERSION" ./artifacts/* --clobber
+
+  # A separate job, after the publish: nothing is announced that did not ship, and a Discord failure cannot
+  # fail or re-run the publish. It has to be called from here: the release above is created with GITHUB_TOKEN,
+  # and GitHub does not start the `release: published` workflow for events that token causes.
+  announce:
+    name: Announce on Discord
+    needs: publish
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/discord-release.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit
