@@ -79,6 +79,23 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
+  <!--
+    Package validation (DECISIONS #41). `dotnet pack` compares this build with the last release and fails on a
+    binary-incompatible change, on every target framework. PublicApi.approved.cs pins the source-level surface
+    on net10.0 only; this is the check that a 1.0.x cannot quietly break an assembly someone already compiled
+    against, and that the three target frameworks keep exposing the same API.
+
+    PackageValidationBaselineVersion is the version to compare against, and it MOVES: set it to the release
+    just published, in the PR that prepares the next one. It is 0.9.0 until 1.0.0 ships; a deliberate break
+    ahead of 1.0.0 is recorded in CompatibilitySuppressions.xml next to this file (generated with
+    `dotnet pack -p:ApiCompatGenerateSuppressionFile=true`), not by lowering the check.
+  -->
+  <PropertyGroup>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.9.0</PackageValidationBaselineVersion>
+    <EnableStrictModeForCompatibleTfms>true</EnableStrictModeForCompatibleTfms>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" Visible="false" />
     <None Include="..\LICENSE.txt" Pack="true" PackagePath="\" Visible="false" />

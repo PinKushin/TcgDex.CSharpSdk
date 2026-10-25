@@ -968,3 +968,25 @@ publishing policy names `release.yml`).
 Verified with a dry run from the branch before merging (no secret needed); the first real post is the late
 0.9.0 announcement, which is the owner's call because it is outward-facing.
 
+## 41. `dotnet pack` validates the package against the last release
+
+Blocker 4 of #37: nothing stopped a release from breaking an assembly someone had already compiled against.
+`PublicApi.approved.cs` pins the source-level surface, but on net10.0 only, and it does not look at binary
+compatibility or at whether the three target frameworks still expose the same API. The owner asked for it ("Fix
+the four confirmed blockers ... package validation"); he gave no view on the settings.
+
+`EnablePackageValidation` with `PackageValidationBaselineVersion` 0.9.0 and `EnableStrictModeForCompatibleTfms`
+in the library csproj. Measured before and after, on one change: renaming the public
+`MemoryTcgDexResponseCache.Clear()` packed without a word before, and fails the pack after with `CP0002: Member
+'void ...Clear()' exists on` the baseline, once for each of `net10.0`, `net8.0` and `netstandard2.0`. The
+unmodified code packs clean, with no warnings, including in strict mode.
+
+**The baseline has to move.** It is the release just published, so it is bumped in the PR that prepares the next
+one, and it is 0.9.0 until 1.0.0 ships. An intended break before 1.0.0 goes in `CompatibilitySuppressions.xml`
+(generated with `-p:ApiCompatGenerateSuppressionFile=true`), recorded here, not by lowering the check. Forgetting
+to move it is not dangerous (every break against an older release is still caught); it only makes the check
+looser about what the newer release added.
+
+**Cost:** `pack` now restores the baseline package from nuget.org, so a flaky restore can fail it, as the package
+smoke test already can (#34).
+
