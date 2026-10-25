@@ -1039,25 +1039,28 @@ effort (a new overload can make a `null` argument ambiguous), that a dependency 
 serialized model is not a format promise, and how the contract is enforced.
 
 **Resolved with the owner, 2026-10-25.** I explained the four open items in plain terms with a recommendation each;
-his reply: "that all seems good". That settles:
+his reply: "that all seems good" and then, interrupting himself, "wait actually i probably wont pin though" (the
+assembly version, below). So "all seems good" covered every recommendation **except** pinning. That settles:
 - **The four proposed rules above are confirmed** (no interface gains a member within a major; `[Obsolete]` first
   and removal no earlier than the next major; only the latest release of the current major gets fixes; wire
   requests, log wording and exception messages are not API). This is after his earlier lean ("i think your
   proposals are good") and after the amended text and both reviews.
 - **No preview tier.** Nothing is waiting for one and adding it later is additive. Revisit only if a feature needs it.
-- **A language minimum is stated:** C# 11 or later, because the public types have `required` members (20 in
-  `PublicApi.approved.cs`); raising it is a major-version change. The page says so. Not tested with an older
-  compiler; it follows from `required` being a C# 11 feature.
+- **A language minimum is stated:** C# 11 or later, because the public types have `required` members; raising it
+  is a major-version change. The page says so. It applies to constructing a model, not reading one, and holds on
+  the `netstandard2.0` asset too: `Compatibility/CompilerFeatureShims.cs` defines `RequiredMemberAttribute` and
+  `CompilerFeatureRequiredAttribute` there. Not tested with an older compiler.
 
-**Assembly version: not decided, and the status quo stands.** I recommended pinning `AssemblyVersion` to the major
-(so a .NET Framework consumer on the `netstandard2.0` asset needs no new binding redirect for a minor or patch). The
-owner, same day: "wait actually i probably wont pin though, that seems objectively bad". "Probably" and the
-reasoning are his; I did not agree it is objectively bad and said so, so this is a lean, not a settled decision.
-The case against pinning: the DLL's own version then no longer identifies the release, which makes diagnostics and
-stack traces less direct, and many libraries (Microsoft's own packages among them) do not pin. The case for it
-(Newtonsoft.Json does): upgrades within a major never touch binding. Neither is wrong, and the cost of not pinning
-is real but narrow (.NET Framework consumers). **Until he says otherwise the assembly version tracks the package
-version, and the versioning page says exactly that.**
+**Assembly version: settled, not pinned. It tracks the package version.** I recommended pinning `AssemblyVersion`
+to the major (so a .NET Framework consumer on the `netstandard2.0` asset needs no new binding redirect for a minor
+or patch). The owner first said "wait actually i probably wont pin though, that seems objectively bad", which I
+treated as a lean and pushed back on (both choices are defensible; Newtonsoft.Json pins, Microsoft's own packages
+mostly do not). He then decided, with his reason: **"i dont care if it costs .netstandard a little bit, people
+running that should know enough to be able to work around, i want the right iinformatiion in traces"**, and chose
+to leave it unpinned. So the DLL's version identifies the exact release in a stack trace or a crash dump, at the
+price that a .NET Framework consumer may need a binding redirect on each upgrade, patches included. That cost is
+accepted knowingly and the versioning page states it. Pinning can be revisited only as a deliberate change; it
+would also be a visible change for those consumers.
 
 **Release timing (the owner, 2026-10-25):** "i actualy asked tcgdex if they wanted me to stay pre 1.0 until they
 took a look, no reply yet". So 1.0.0 is waiting on TCGdex's answer as well as the soak (#30); nothing here sets a
