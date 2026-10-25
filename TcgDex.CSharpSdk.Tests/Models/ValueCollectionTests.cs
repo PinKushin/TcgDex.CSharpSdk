@@ -149,6 +149,67 @@ public sealed class ValueCollectionTests
     }
 
     [Test]
+    public void ADictionary_ComparesKeysOrdinally_WhateverComparerTheCallerBuiltItWith()
+    {
+        // A key comparer is not part of the entries, so honouring each side's own would make Equals asymmetric
+        // (one dictionary finds "Normal" under "normal", the other does not) and give equal dictionaries different
+        // hashes. The wrapper copies into the default comparer instead.
+        IReadOnlyDictionary<string, int> insensitive = ValueDictionary<string, int>.From(
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Normal"] = 1 });
+        IReadOnlyDictionary<string, int> ordinalLower = Dictionary(("normal", 1));
+
+        insensitive.Equals(ordinalLower).ShouldBeFalse();
+        ordinalLower.Equals(insensitive).ShouldBeFalse();
+        insensitive.ContainsKey("NORMAL").ShouldBeFalse();
+
+        IReadOnlyDictionary<string, int> insensitiveLower = ValueDictionary<string, int>.From(
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["normal"] = 1 });
+
+        insensitiveLower.Equals(ordinalLower).ShouldBeTrue();
+        ordinalLower.Equals(insensitiveLower).ShouldBeTrue();
+        insensitiveLower.GetHashCode().ShouldBe(ordinalLower.GetHashCode());
+    }
+
+    /// <summary>Treats two strings as the same key only when they are the same object, which is finer than ordinal.</summary>
+    private sealed class IdentityComparer : IEqualityComparer<string>
+    {
+        public bool Equals(string? x, string? y) => ReferenceEquals(x, y);
+
+        public int GetHashCode(string obj) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
+    }
+
+    [Test]
+    public void ADictionary_FromAFinerKeyComparer_KeepsTheLastOfTwoKeysTheDefaultTreatsAsOne()
+    {
+        // Two equal-by-value strings that are different objects are two keys under the identity comparer and one
+        // under the default. Copying with Add would throw; the indexer lets the last win.
+        Dictionary<string, int> source = new(new IdentityComparer())
+        {
+            [new string(['k'])] = 1,
+            [new string(['k'])] = 2,
+        };
+        source.Count.ShouldBe(2);
+
+        IReadOnlyDictionary<string, int> wrapped = ValueDictionary<string, int>.From(source);
+
+        wrapped.Count.ShouldBe(1);
+        wrapped["k"].ShouldBe(2);
+    }
+
+    [Test]
+    public void ADictionary_IsNotChanged_ByLaterEditsToTheDictionaryItWasBuiltFrom()
+    {
+        Dictionary<string, int> source = new() { ["a"] = 1 };
+        IReadOnlyDictionary<string, int> wrapped = ValueDictionary<string, int>.From(source);
+        int hashBefore = wrapped.GetHashCode();
+
+        source["b"] = 2;
+
+        wrapped.Count.ShouldBe(1);
+        wrapped.GetHashCode().ShouldBe(hashBefore);
+    }
+
+    [Test]
     public void ADictionary_HoldingANullValue_StillHashesAndComparesAndPrints()
     {
         IReadOnlyDictionary<string, string?> first = ValueDictionary<string, string?>.From(new Dictionary<string, string?> { ["a"] = null });

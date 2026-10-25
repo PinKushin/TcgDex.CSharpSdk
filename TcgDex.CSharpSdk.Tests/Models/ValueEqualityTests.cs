@@ -63,6 +63,38 @@ public sealed class ValueEqualityTests
         change(original).ShouldNotBe(original);
     }
 
+    /// <summary>
+    /// The mirror image: one collection per property rebuilt as a different list with the same items. This is the
+    /// case that fails if a property's setter forgets the wrapper, which the "one item changed" cases above cannot
+    /// see (a list compared by reference is also unequal after a change).
+    /// </summary>
+    private static IEnumerable<TestCaseData> ACardWithOneCollectionRebuilt()
+    {
+        yield return Case("Types", c => c with { Types = c.Types.ToList() });
+        yield return Case("DexIds", c => c with { DexIds = c.DexIds.ToList() });
+        yield return Case("Attacks", c => c with { Attacks = c.Attacks.ToList() });
+        yield return Case("Abilities", c => c with { Abilities = c.Abilities.ToList() });
+        yield return Case("Weaknesses", c => c with { Weaknesses = c.Weaknesses.ToList() });
+        yield return Case("Resistances", c => c with { Resistances = c.Resistances.ToList() });
+        yield return Case("Boosters", c => c with { Boosters = c.Boosters.ToList() });
+        yield return Case("DetailedVariants", c => c with { DetailedVariants = c.DetailedVariants.ToList() });
+
+        static TestCaseData Case(string name, Func<Card, Card> rebuild) => new TestCaseData(rebuild).SetName($"A_Rebuilt_{name}_KeepsTheCardsEqual");
+    }
+
+    [TestCaseSource(nameof(ACardWithOneCollectionRebuilt))]
+    public void ACardWithOneCollectionRebuilt_IsStillEqual(Func<Card, Card> rebuild)
+    {
+        Card original = ParseCard();
+        Card rebuilt = rebuild(original);
+
+        // `with` builds a new Card, and each case supplies a freshly built list for one property, so equality here
+        // has to come from comparing contents.
+        rebuilt.ShouldNotBeSameAs(original);
+        rebuilt.Equals(original).ShouldBeTrue();
+        rebuilt.GetHashCode().ShouldBe(original.GetHashCode());
+    }
+
     [Test]
     public void ACollectionSuppliedAsADifferentListInstance_WithTheSameItems_IsEqual()
     {

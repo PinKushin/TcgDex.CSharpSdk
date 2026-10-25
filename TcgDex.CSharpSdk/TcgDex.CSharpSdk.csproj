@@ -80,21 +80,32 @@
   </PropertyGroup>
 
   <!--
-    Package validation (DECISIONS #41). `dotnet pack` compares this build with the last release and fails on a
-    removed or changed public API (binary or source), on every target framework, and under strict mode on an API
-    that one framework has and another lacks. The baseline package itself is downloaded at restore, not at pack. PublicApi.approved.cs pins the source-level surface
-    on net10.0 only; this is the check that a 1.0.x cannot quietly break an assembly someone already compiled
-    against, and that the three target frameworks keep exposing the same API.
+    Package validation (DECISIONS #41). `dotnet pack` fails on two things. First, a public API removed or changed
+    since the last release, on every target framework. Second, with the two strict modes below, an API that one
+    target framework has and another lacks. PublicApi.approved.cs pins the source-level surface on net10.0 only,
+    so this is what stops a 1.0.x from quietly breaking an assembly someone already compiled against, and what
+    keeps the three frameworks exposing the same API. The baseline package is downloaded at restore, not at pack.
 
     PackageValidationBaselineVersion is the version to compare against, and it MOVES: set it to the release
-    just published, in the PR that prepares the next one. It is 0.9.0 until 1.0.0 ships; a deliberate break
-    ahead of 1.0.0 is recorded in CompatibilitySuppressions.xml next to this file (generated with
-    `dotnet pack -p:ApiCompatGenerateSuppressionFile=true`), not by lowering the check.
+    just published, in the PR that prepares the next one. It is 0.9.0 until 1.0.0 ships.
+
+    EnableStrictModeForCompatibleTfms (runtime compatibility, already the default) and
+    EnableStrictModeForCompatibleFrameworksInPackage (API parity across the shipped frameworks, off by default)
+    are both set. The second is the one that catches a member added only under `#if NET10_0`.
+
+    CompatibilitySuppressions.xml next to this file holds what is accepted. Today that is three entries, all the
+    same thing the runtime does and the library cannot: enums implement ISpanFormattable on net8.0 and later but
+    not on netstandard2.0 (CP0008). Each is scoped to the enum type, not to that one interface, so it would also
+    hide any other interface those three enums lack on netstandard2.0; enums cannot gain interfaces from library
+    code, so that is accepted. Add an entry only for a difference like that or a deliberate break ahead of
+    1.0.0 (generate it with `dotnet pack -p:ApiCompatGenerateSuppressionFile=true` and READ the diff: a wrong
+    entry silently hides a break), never by lowering the check.
   -->
   <PropertyGroup>
     <EnablePackageValidation>true</EnablePackageValidation>
     <PackageValidationBaselineVersion>0.9.0</PackageValidationBaselineVersion>
     <EnableStrictModeForCompatibleTfms>true</EnableStrictModeForCompatibleTfms>
+    <EnableStrictModeForCompatibleFrameworksInPackage>true</EnableStrictModeForCompatibleFrameworksInPackage>
   </PropertyGroup>
 
   <ItemGroup>

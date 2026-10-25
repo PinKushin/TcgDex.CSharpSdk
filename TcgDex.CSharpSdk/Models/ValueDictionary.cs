@@ -8,8 +8,9 @@ using System.Collections;
 /// <typeparam name="TKey">The key type.</typeparam>
 /// <typeparam name="TValue">The value type.</typeparam>
 /// <remarks>
-/// The reason, and why it wraps rather than copies, are the same as for <see cref="ValueList{T}"/>. Two
-/// dictionaries are equal when they hold the same keys with equal values, in any order.
+/// The reason it exists is the same as for <see cref="ValueList{T}"/>. Unlike that one it copies what it is given,
+/// into the default key comparer; see <see cref="From"/>. Two dictionaries are equal when they hold the same keys
+/// with equal values, in any order.
 /// </remarks>
 internal sealed class ValueDictionary<TKey, TValue> : IReadOnlyDictionary<TKey, TValue>, IEquatable<ValueDictionary<TKey, TValue>>
     where TKey : notnull
@@ -37,17 +38,39 @@ internal sealed class ValueDictionary<TKey, TValue> : IReadOnlyDictionary<TKey, 
     public TValue this[TKey key] => _items[key];
 
     /// <summary>
-    /// Wraps a dictionary, or returns the shared empty one for null.
+    /// Copies a dictionary into one that compares by its entries, or returns the shared empty one for null.
     /// </summary>
     /// <param name="items">The entries, or <see langword="null"/>.</param>
     /// <returns>A dictionary that compares by its entries.</returns>
+    /// <remarks>
+    /// Unlike <see cref="ValueList{T}"/> this copies, into a dictionary with the default key comparer. A key comparer
+    /// is not part of the entries, so honouring each side's own would make <see cref="Equals(ValueDictionary{TKey, TValue}?)"/>
+    /// asymmetric (one side finds <c>"Normal"</c> under <c>"normal"</c>, the other does not) and give equal dictionaries
+    /// different hashes. Keys therefore compare by the default comparer, which is ordinal for strings. The copy is
+    /// small (a card has a few printings) and also keeps the hash stable if the caller edits their dictionary later.
+    /// </remarks>
     internal static IReadOnlyDictionary<TKey, TValue> From(IReadOnlyDictionary<TKey, TValue>? items)
         => items switch
         {
             null => Empty,
             ValueDictionary<TKey, TValue> already => already,
-            _ => new ValueDictionary<TKey, TValue>(items),
+            _ => new ValueDictionary<TKey, TValue>(Copy(items)),
         };
+
+    private static Dictionary<TKey, TValue> Copy(IReadOnlyDictionary<TKey, TValue> items)
+    {
+        Dictionary<TKey, TValue> copy = new(items.Count);
+
+        foreach (KeyValuePair<TKey, TValue> entry in items)
+        {
+            // The indexer, not Add: a source whose comparer is finer than the default can hold two keys the default
+            // treats as one, and Add would throw. The last one wins, which a hand-built dictionary can do and
+            // deserialized input never does.
+            copy[entry.Key] = entry.Value;
+        }
+
+        return copy;
+    }
 
     /// <inheritdoc />
     public bool ContainsKey(TKey key) => _items.ContainsKey(key);

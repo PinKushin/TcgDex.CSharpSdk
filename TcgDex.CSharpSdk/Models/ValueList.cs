@@ -17,7 +17,15 @@ using System.Collections;
 /// </para>
 /// <para>
 /// It wraps the list it is given rather than copying it, so it adds one small object per collection and
-/// behaves exactly as the underlying list does.
+/// behaves exactly as the underlying list does. That includes aliasing: a model never copied the list it was
+/// handed, and still does not, so editing a <c>List&lt;T&gt;</c> after giving it to a model changes the model, and
+/// now changes its equality and hash too. Treat a list as given away. A copy would remove the hazard at the price
+/// of a second array per collection on every deserialization, and was not taken (DECISIONS #40).
+/// </para>
+/// <para>
+/// <c>Equals</c>, <c>GetHashCode</c> and <c>ToString</c> walk every item, and every nested model's own comparison in
+/// turn, so they cost time proportional to the card's contents. Keying a cache on a whole <c>Card</c> pays that on
+/// each lookup; key on <c>Card.Id</c> instead.
 /// </para>
 /// </remarks>
 internal sealed class ValueList<T> : IReadOnlyList<T>, IEquatable<ValueList<T>>
