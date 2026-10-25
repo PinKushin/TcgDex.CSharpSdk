@@ -16,6 +16,9 @@
 - name: Unity
   href: unity.md
 
+- name: Versioning and compatibility
+  href: versioning.md
+
 - name: API reference
   href: api/
   homepage: api/index.md

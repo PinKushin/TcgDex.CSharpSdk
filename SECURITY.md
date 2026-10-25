@@ -29,11 +29,14 @@ as a normal issue and you will be told that plainly.
 
 | Version | Supported |
 |---|---|
-| Unreleased (`main`) | Yes |
+| Latest release on NuGet (currently `0.9.x`) | Yes |
+| Anything older | No — upgrade to the latest |
 
-**Nothing has been published to NuGet yet.** Once `1.0.0` ships this table will
-list the supported line; until then `main` is the only thing that exists, and
-fixes land there.
+Only the latest release is fixed, and a fix ships as a new patch release of it.
+That stays true after `1.0.0`: the latest release of the current major version
+is the supported one. The full policy, including what a version number promises
+and how long a deprecated member lives, is in
+[Versioning and compatibility](https://pinkushin.github.io/TcgDex.CSharpSdk/versioning.html).
 
 ## What this library actually exposes
 
