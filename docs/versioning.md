@@ -30,7 +30,10 @@ release with a changelog entry. Before `1.0.0` this is not yet in force, and `0.
 rules out as a patch: `StreamAsync` began honouring the query's page size, which changes the request count, and
 it shipped as a breaking change.
 
-**Binary compatibility is the firm promise; source compatibility is best effort.** A new overload can make an
+**Binary compatibility is the firm promise; source compatibility is best effort.** One caveat: the assembly
+version currently tracks the package version rather than being pinned to the major, so a .NET Framework consumer
+(who gets the `netstandard2.0` asset) sees a new assembly version on every release, patches included. Whether to
+pin it is not decided. A new overload can make an
 existing call that passes `null` ambiguous, a parameter rename breaks named arguments, and a nullability change can
 add a warning. These are avoided where possible and named in the changelog when they happen. They are not on their
 own a reason for a major version.
@@ -57,9 +60,9 @@ method for yet. If neither can carry a change, it waits for the next major versi
 `ITcgDexResponseCache` is the other kind: a deliberate extension point (Redis, disk) that you are expected to
 implement, and it likewise will not gain members within a major version. The types it passes around are the same
 kind of extension point: `CachedResponse` may gain optional properties but never a `required` one, and
-`TcgDexCacheOptions`, which you may subclass to override `GetTimeToLive`, may gain members but will not change
-that method's behaviour for a subclass that already overrides it. A new member on a class you can subclass may
-share a name with one you declared (compiler warning CS0108); that is not treated as a break.
+`TcgDexCacheOptions`, which you may subclass to override `GetTimeToLive`, may gain members. A new member on a
+class you can subclass may share a name with one you declared (compiler warning CS0108); that is not treated as
+a break.
 
 ## Target frameworks
 

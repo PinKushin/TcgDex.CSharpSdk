@@ -64,8 +64,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$DRY_RUN" != "true" ] && [ -z "$WEBHOOK_URL" ]; then
-            echo "::error::the repository secret DISCORD_WEBHOOK_URL is not set"
-            exit 1
+            # Called from release.yml with no secret set: warn and succeed, so an unset webhook does not turn every
+            # release red (the job summary in release.yml carries the post to paste by hand). A person who ran this
+            # by hand is asking for a post, so for them it is an error.
+            if [ "$EVENT" = "workflow_dispatch" ]; then
+              echo "::error::the repository secret DISCORD_WEBHOOK_URL is not set"
+              exit 1
+            fi
+            echo "::warning::the repository secret DISCORD_WEBHOOK_URL is not set, so nothing was posted to Discord"
+            exit 0
           fi
 
           if [ -n "$INPUT_TAG" ]; then

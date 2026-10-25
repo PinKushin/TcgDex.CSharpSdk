@@ -95,7 +95,9 @@
 
     CompatibilitySuppressions.xml next to this file holds what is accepted. Today that is three entries, all the
     same thing the runtime does and the library cannot: enums implement ISpanFormattable on net8.0 and later but
-    not on netstandard2.0 (CP0008). Add an entry only for a difference like that or a deliberate break ahead of
+    not on netstandard2.0 (CP0008). Each is scoped to the enum type, not to that one interface, so it would also
+    hide any other interface those three enums lack on netstandard2.0; enums cannot gain interfaces from library
+    code, so that is accepted. Add an entry only for a difference like that or a deliberate break ahead of
     1.0.0 (generate it with `dotnet pack -p:ApiCompatGenerateSuppressionFile=true` and READ the diff: a wrong
     entry silently hides a break), never by lowering the check.
   -->

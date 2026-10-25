@@ -8,8 +8,9 @@ using System.Collections;
 /// <typeparam name="TKey">The key type.</typeparam>
 /// <typeparam name="TValue">The value type.</typeparam>
 /// <remarks>
-/// The reason, and why it wraps rather than copies, are the same as for <see cref="ValueList{T}"/>. Two
-/// dictionaries are equal when they hold the same keys with equal values, in any order.
+/// The reason it exists is the same as for <see cref="ValueList{T}"/>. Unlike that one it copies what it is given,
+/// into the default key comparer; see <see cref="From"/>. Two dictionaries are equal when they hold the same keys
+/// with equal values, in any order.
 /// </remarks>
 internal sealed class ValueDictionary<TKey, TValue> : IReadOnlyDictionary<TKey, TValue>, IEquatable<ValueDictionary<TKey, TValue>>
     where TKey : notnull

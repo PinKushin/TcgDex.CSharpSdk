@@ -208,8 +208,8 @@ jobs:
   # does not start a `release: published` workflow for events that token causes.
   #
   # A Discord failure does redden the run, and "Re-run all jobs" re-runs `publish` too. That is harmless here
-  # (--skip-duplicate on the push, `release edit`, --clobber), but if this job is the red one, look at the webhook,
-  # not the publish. Re-run only this job to retry the post.
+  # (--skip-duplicate on the push, `release edit`, --clobber), though `announce` then posts to Discord a second time.
+  # If this job is the red one, look at the webhook, not the publish, and re-run only this job to retry the post.
   #
   # Only the one secret it needs is passed, by name, so the called workflow sees no other repository secret.
   announce:
