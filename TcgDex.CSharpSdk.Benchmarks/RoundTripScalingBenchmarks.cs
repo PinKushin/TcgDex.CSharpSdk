@@ -145,10 +145,8 @@ public class RoundTripScalingBenchmarks : IDisposable
     public async Task<int> GraphQL_SingleRequest()
     {
         IReadOnlyList<Card> cards = await _client.Cards.SearchDetailedAsync(
-            new CardFilter { Name = Name },
-            page: 1,
-            itemsPerPage: Cards,
-            cancellationToken: CancellationToken.None).ConfigureAwait(false);
+            new CardFilter { Name = Name, Page = 1, ItemsPerPage = Cards },
+            CancellationToken.None).ConfigureAwait(false);
 
         int hp = 0;
         foreach (Card card in cards)

@@ -449,8 +449,10 @@ namespace TcgDex.Querying
         public int? HitPoints { get; init; }
         public string? Id { get; init; }
         public string? Illustrator { get; init; }
+        public int? ItemsPerPage { get; init; }
         public string? LocalId { get; init; }
         public string? Name { get; init; }
+        public int? Page { get; init; }
         public string? Rarity { get; init; }
         public string? RegulationMark { get; init; }
         public int? RetreatCost { get; init; }
@@ -475,8 +477,8 @@ namespace TcgDex.Resources
         System.Threading.Tasks.Task<TcgDex.Models.Card?> GetAsync(string id, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardBrief>> ListAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.CardBrief>> ListAsync(TcgDex.Querying.CardQuery query, System.Threading.CancellationToken cancellationToken = default);
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.Card>> SearchDetailedAsync(TcgDex.Querying.CardFilter filter, int? page = default, int? itemsPerPage = default, System.Threading.CancellationToken cancellationToken = default);
-        System.Collections.Generic.IAsyncEnumerable<TcgDex.Models.CardBrief> StreamAsync(TcgDex.Querying.CardQuery query, int pageSize = 100, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TcgDex.Models.Card>> SearchDetailedAsync(TcgDex.Querying.CardFilter filter, System.Threading.CancellationToken cancellationToken = default);
+        System.Collections.Generic.IAsyncEnumerable<TcgDex.Models.CardBrief> StreamAsync(TcgDex.Querying.CardQuery query, System.Threading.CancellationToken cancellationToken = default);
     }
     public interface ICardSetResource
     {
@@ -490,6 +492,7 @@ namespace TcgDex.Resources
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetEnergyTypesAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<int>> GetHitPointsAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetIllustratorsAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<int>> GetNumberValuesAsync(string name, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetRaritiesAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetRegulationMarksAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<int>> GetRetreatCostsAsync(System.Threading.CancellationToken cancellationToken = default);
@@ -497,6 +500,7 @@ namespace TcgDex.Resources
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetSuffixesAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetTrainerTypesAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetTypesAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetValuesAsync(string name, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string>> GetVariantsAsync(System.Threading.CancellationToken cancellationToken = default);
     }
     public interface IRandomResource

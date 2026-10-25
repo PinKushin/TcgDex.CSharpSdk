@@ -15,7 +15,7 @@ public sealed class StreamingTests : LiveApiFixture
         List<CardBrief> streamed = new();
 
         await foreach (CardBrief card in Client.Cards.StreamAsync(
-            new CardQuery().Where(c => c.Name == "Furret"), pageSize: 3, Timeout))
+            new CardQuery().Where(c => c.Name == "Furret").Page(1, 3), Timeout))
         {
             streamed.Add(card);
         }
@@ -38,7 +38,7 @@ public sealed class StreamingTests : LiveApiFixture
         // Against a set of 20,000+ cards, taking five must not enumerate them all.
         List<CardBrief> taken = new();
 
-        await foreach (CardBrief card in Client.Cards.StreamAsync(new CardQuery(), pageSize: 5, Timeout))
+        await foreach (CardBrief card in Client.Cards.StreamAsync(new CardQuery().Page(1, 5), Timeout))
         {
             taken.Add(card);
 
@@ -57,7 +57,7 @@ public sealed class StreamingTests : LiveApiFixture
         int count = 0;
 
         await foreach (CardBrief _ in Client.Cards.StreamAsync(
-            new CardQuery().Where(c => c.Name == "NotARealPokemonName"), pageSize: 10, Timeout))
+            new CardQuery().Where(c => c.Name == "NotARealPokemonName").Page(1, 10), Timeout))
         {
             count++;
         }

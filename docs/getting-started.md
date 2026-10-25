@@ -311,7 +311,7 @@ absent — some cards genuinely have no artwork.
 
 ```csharp
 await foreach (CardBrief card in tcgdex.Cards.StreamAsync(
-    new CardQuery().Where(c => c.Category == "Pokemon"), pageSize: 100, ct))
+    new CardQuery().Where(c => c.Category == "Pokemon").Page(1, 100), ct))
 {
     // Pages are fetched as you consume them; breaking out stops the requests.
 }
@@ -319,6 +319,8 @@ await foreach (CardBrief card in tcgdex.Cards.StreamAsync(
 
 The API reports no total count, so the end of the results can only be detected
 by receiving a short page. `StreamAsync` handles that once so you do not have to.
+The page size is the second argument of `Page(1, 100)` (100 when you do not set one);
+the page number is ignored, because the stream always starts at the first page.
 
 ## Reading the models
 

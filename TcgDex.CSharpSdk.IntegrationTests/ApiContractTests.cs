@@ -205,9 +205,7 @@ public sealed class ApiContractTests : LiveApiFixture
     public async Task SearchDetailed_WithPagination_LimitsResults()
     {
         IReadOnlyList<Card> cards = await Client.Cards.SearchDetailedAsync(
-            new CardFilter { Category = CardCategories.Pokemon },
-            page: 1,
-            itemsPerPage: 5,
+            new CardFilter { Category = CardCategories.Pokemon, Page = 1, ItemsPerPage = 5 },
             cancellationToken: Timeout);
 
         cards.Count.ShouldBeLessThanOrEqualTo(5);

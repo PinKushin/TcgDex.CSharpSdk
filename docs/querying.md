@@ -91,13 +91,15 @@ shorter than you asked for:
 
 ```csharp
 await foreach (CardBrief card in tcgdex.Cards.StreamAsync(
-    new CardQuery().Where(c => c.Category == "Pokemon"),
-    pageSize: 100,
+    new CardQuery().Where(c => c.Category == "Pokemon").Page(1, 100),
     cancellationToken))
 {
     // ...
 }
 ```
+
+The page size is the `itemsPerPage` you give `Page` (100 when you do not call it).
+The page number is ignored: the stream always starts at the first page.
 
 Breaking out stops the requests — nothing is buffered beyond the current page,
 so taking the first five results costs one request rather than downloading
@@ -145,6 +147,9 @@ IReadOnlyList<Card> cards = await tcgdex.Cards.SearchDetailedAsync(
 
 // 12 fully populated cards in one request. Over REST that is 13 round trips.
 ```
+
+To page the results, set `Page` and `ItemsPerPage` on the filter itself:
+`new CardFilter { Category = "Pokemon", Page = 2, ItemsPerPage = 25 }`.
 
 Three limits come with it, all imposed by the GraphQL endpoint rather than by
 this SDK:

@@ -359,7 +359,7 @@ public sealed class ContextCaptureTests
         Task work = await AssertNoPostsAsync(
             async () =>
             {
-                await foreach (CardBrief _ in client.Cards.StreamAsync(new CardQuery(), 2, CancellationToken.None).ConfigureAwait(false))
+                await foreach (CardBrief _ in client.Cards.StreamAsync(new CardQuery().Page(1, 2), CancellationToken.None).ConfigureAwait(false))
                 {
                 }
             },
