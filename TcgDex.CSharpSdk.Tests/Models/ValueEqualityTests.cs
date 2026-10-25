@@ -88,7 +88,9 @@ public sealed class ValueEqualityTests
         Card original = ParseCard();
         Card rebuilt = rebuild(original);
 
-        // Guard the test itself: the rebuilt collection really is a different instance.
+        // `with` builds a new Card, and each case supplies a freshly built list for one property, so equality here
+        // has to come from comparing contents.
+        rebuilt.ShouldNotBeSameAs(original);
         rebuilt.Equals(original).ShouldBeTrue();
         rebuilt.GetHashCode().ShouldBe(original.GetHashCode());
     }

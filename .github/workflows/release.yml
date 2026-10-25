@@ -203,9 +203,15 @@ jobs:
           # keeps a re-run idempotent, like the edit above.
           gh release upload "v$VERSION" ./artifacts/* --clobber
 
-  # A separate job, after the publish: nothing is announced that did not ship, and a Discord failure cannot
-  # fail or re-run the publish. It has to be called from here: the release above is created with GITHUB_TOKEN,
-  # and GitHub does not start the `release: published` workflow for events that token causes.
+  # A separate job, after the publish: nothing is announced that did not ship, and a Discord failure cannot fail
+  # the NuGet publish. It has to be called from here: the release above is created with GITHUB_TOKEN, and GitHub
+  # does not start a `release: published` workflow for events that token causes.
+  #
+  # A Discord failure does redden the run, and "Re-run all jobs" re-runs `publish` too. That is harmless here
+  # (--skip-duplicate on the push, `release edit`, --clobber), but if this job is the red one, look at the webhook,
+  # not the publish. Re-run only this job to retry the post.
+  #
+  # Only the one secret it needs is passed, by name, so the called workflow sees no other repository secret.
   announce:
     name: Announce on Discord
     needs: publish
@@ -215,4 +221,5 @@ jobs:
     uses: ./.github/workflows/discord-release.yml
     with:
       tag: ${{ github.ref_name }}
-    secrets: inherit
+    secrets:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

@@ -19,13 +19,21 @@ namespace that is not in that file, is not public API and can change in any rele
 
 | Release | May contain | Never contains |
 |---|---|---|
-| **Patch** (`1.0.1`) | Bug fixes, documentation, dependency updates that change no documented behaviour | New public members, a change to documented behaviour |
+| **Patch** (`1.0.1`) | Bug fixes, documentation, dependency updates that change no documented behaviour and take no new major version of a dependency | New public members, a change to documented behaviour |
 | **Minor** (`1.1.0`) | New public types, new members on classes (never on an interface, below), new overloads, new optional properties on `CardFilter`, `CardQuery`, `TcgDexOptions` and the models, new enum values, `[Obsolete]` markings | Removing or renaming a public member, **dropping a target framework**, changing a signature (**adding a parameter, even an optional one, is a signature change**: it breaks compiled callers, so it ships as a new overload), changing what a documented call returns for the same input |
 | **Major** (`2.0.0`) | Anything above, plus removals and signature changes, new members on an interface, and dropping a target framework | |
 
-**A fix is not a break.** Making a call do what its documentation always said, or what it plainly should have,
-is a patch even when a caller had come to depend on the defect; the changelog says so. `0.9.0`'s `StreamAsync`
-honouring the query's page size is the kind of change meant.
+**What counts as a fix.** A change that makes a call do what its documentation says is a patch, even when a caller
+had come to depend on the departure; the changelog says so. A change to observable behaviour the documentation
+never promised (how many requests a call makes, an ordering, a default) is *not* a defect fix: it ships in a minor
+release with a changelog entry. Before `1.0.0` this is not yet in force, and `0.9.0` is the example of what it
+rules out as a patch: `StreamAsync` began honouring the query's page size, which changes the request count, and
+it shipped as a breaking change.
+
+**Binary compatibility is the firm promise; source compatibility is best effort.** A new overload can make an
+existing call that passes `null` ambiguous, a parameter rename breaks named arguments, and a nullability change can
+add a warning. These are avoided where possible and named in the changelog when they happen. They are not on their
+own a reason for a major version.
 
 **New members on a model or options type must be optional**: a settable property with a default that keeps
 today's behaviour, never `required`, which would break every caller that constructs one. A model gaining a
@@ -50,7 +58,8 @@ method for yet. If neither can carry a change, it waits for the next major versi
 implement, and it likewise will not gain members within a major version. The types it passes around are the same
 kind of extension point: `CachedResponse` may gain optional properties but never a `required` one, and
 `TcgDexCacheOptions`, which you may subclass to override `GetTimeToLive`, may gain members but will not change
-that method's behaviour for a subclass that already overrides it.
+that method's behaviour for a subclass that already overrides it. A new member on a class you can subclass may
+share a name with one you declared (compiler warning CS0108); that is not treated as a break.
 
 ## Target frameworks
 
@@ -92,7 +101,16 @@ the fix ships as a patch release of the latest version.
 - **The TCGdex service itself.** This SDK reads a third-party API. It can change a field or add a
   rate limit without notice, and the SDK follows it; see [api-info](api-info.md) for what has been
   observed.
-- **The wire requests** are not API: a release may send a different, equivalent request, for example a
+- **The wire requests** are not API: a minor release may send a different, equivalent request, for example a
   different page size. The changelog records a change a caller can observe.
 - **Exact log text and exception messages.** Log categories, `TcgDexApiException.Kind` and the exception
   types are API; the wording is not.
+- **A serialized model.** The property names on the models are the JSON names the SDK reads, not a format it
+  promises to write. If you serialize a model yourself, a minor release may add a property to the output.
+
+## How this is enforced
+
+The pinned API file fails a test on any change to the source-level surface. And every pack validates the package
+against the previous release, on every target framework: a removed or changed public member, or a member that
+exists on one framework only, fails the build. The one check that is still by hand is moving that baseline to the
+newest release when a new one is prepared.

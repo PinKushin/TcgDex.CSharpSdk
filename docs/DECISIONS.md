@@ -968,6 +968,16 @@ publishing policy names `release.yml`).
 Verified with a dry run from the branch before merging (no secret needed); the first real post is the late
 0.9.0 announcement, which is the owner's call because it is outward-facing.
 
+**Amended 2026-10-25, after a Fable review (it had not been run before the merge):**
+- **"The two cannot both fire for one release" was false.** A release created by hand in the GitHub UI with a new
+  tag fires `release: published` as a person, and the tag push then reaches `release.yml`, whose `announce` job
+  posts a second time. The first post would also land before NuGet has the package. The `release:` trigger is
+  removed; a release made another way is announced by dispatching with its tag.
+- **`secrets: inherit` gave the called workflow every repository secret.** It now passes `DISCORD_WEBHOOK_URL` by
+  name.
+- A dispatch `tag` must look like `v<digit>...` (a leading `-` would be read by `gh` as a flag; it failed rather
+  than injected, so this is tidiness). The job comment says that re-running all jobs re-runs `publish` harmlessly.
+
 ## 39. The versioning contract: `docs/versioning.md`
 
 Blockers 1 and 2 of #37 (`SECURITY.md` still said nothing was published; no written compatibility
@@ -1016,6 +1026,27 @@ the code reviews of #40). What changed and why:
 - Not changed: `FlexibleStringConverter` is internal on purpose (#28); the page's "not in that file is not public
   API" is right, and the attribute that names it only shows up in the generated file.
 
+**Checked against established practice (an Opus review, 2026-10-25), after the owner asked "i think your proposals
+are good, are they standard? have them reviewed too ... they seem pretty much best practises arent they?".**
+The reviewer fetched one source (Microsoft Learn's library breaking-changes guidance) and judged the rest from
+memory, which it said. Its verdicts: standard are no new interface members within a major, `[Obsolete]` then
+removal in a major, enums may gain values, new model members optional, messages not API. *Stricter than usual*
+is dropping a TFM only in a major. *Looser than usual* are latest-release-only fixes (normal for Polly, Serilog
+and Dapper; Microsoft.Extensions and Azure keep older lines) and the "fix is a patch" rule. Changes made because of
+it: the fix rule is narrowed to behaviour that contradicts the documentation (an undocumented behaviour change is a
+minor with a changelog entry); the page now says binary compatibility is firm and source compatibility is best
+effort (a new overload can make a `null` argument ambiguous), that a dependency major bump is not a patch, that a
+serialized model is not a format promise, and how the contract is enforced.
+
+**Still open, not decided:** the assembly version strategy (pin `AssemblyVersion` to the major, or let it track the
+package version as now) matters for .NET Framework binding redirects through the `netstandard2.0` asset and is not
+stated; no `[Experimental]` or preview tier exists; no minimum C# or SDK version is stated. Each is a question for
+the owner before 1.0, none was touched here.
+
+**Owner's view on the four proposed rules:** "i think your proposals are good". That is a lean, given while the
+reviews were still pending, not a sign-off on the amended text; the rules above stay marked as proposed until he
+reads the page as amended.
+
 **Release timing (the owner, 2026-10-25):** "i actualy asked tcgdex if they wanted me to stay pre 1.0 until they
 took a look, no reply yet". So 1.0.0 is waiting on TCGdex's answer as well as the soak (#30); nothing here sets a
 date.
@@ -1038,9 +1069,21 @@ right thing for every collection, including any property added later.
   added later and forgotten would silently drop out of the comparison.
 
 **Semantics:** lists compare in order, item by item with the item's own equality; dictionaries compare by entries
-in any order. Null, absent and `[]` are all the same empty list. The wrapper holds the list it is given rather than
-copying it, so it costs one small object per non-empty collection and nothing else changes. A model's text
+in any order. Null, absent and `[]` are all the same empty list. A list wrapper holds the list it is given rather
+than copying it, so it costs one small object per non-empty collection and nothing else changes. A model's text
 (`ToString`) now shows `[Fire, Water]` instead of the list's type name.
+
+**Amended 2026-10-25, after a Fable review (run after the merge):** two statements above were wrong or incomplete.
+- *Dictionaries copy.* A key comparer is not part of the entries, so wrapping a caller's dictionary and honouring
+  its comparer made `Equals` asymmetric (one side finds `"Normal"` under `"normal"`, the other does not) and gave
+  equal dictionaries different hashes. `ValueDictionary` now copies into the default comparer (ordinal for strings),
+  which also stops later edits to the caller's dictionary changing the hash. A source whose comparer is finer than
+  the default can hold two keys the default treats as one; the last wins, it does not throw. Tests failed first.
+- *Lists still alias.* A `List<T>` given to a model is held, not copied, exactly as before, so editing it afterwards
+  changes the model and now its equality and hash. A copy would remove that at the price of a second array per
+  collection on every deserialization; not taken, and documented in the CHANGELOG and on the wrapper.
+- Also recorded: `Equals`, `GetHashCode` and `ToString` cost time proportional to the card's contents (key a cache
+  on `Card.Id`), and `ToString` on a 300-card set prints all 300.
 
 **Found while testing:** Shouldly's `ShouldBe` compares two lists, and two dictionaries, entry by entry in
 enumeration order, and never calls `Equals`. An assertion written that way cannot test a wrapper's equality, and
@@ -1059,19 +1102,31 @@ Blocker 4 of #37: nothing stopped a release from breaking an assembly someone ha
 compatibility or at whether the three target frameworks still expose the same API. The owner asked for it ("Fix
 the four confirmed blockers ... package validation"); he gave no view on the settings.
 
-`EnablePackageValidation` with `PackageValidationBaselineVersion` 0.9.0 and `EnableStrictModeForCompatibleTfms`
-in the library csproj. Measured on 2026-10-25 with `dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj -c Release`
-on one change: renaming the public `MemoryTcgDexResponseCache.Clear()` packed without a word before, and fails
-the pack after with `CP0002: Member 'void ...Clear()' exists on` the baseline, once for each of `net10.0`,
-`net8.0` and `netstandard2.0`. The unmodified code packs clean, with no warnings, including in strict mode. (Not
-yet in `VERIFICATION.md`; it is a one-line measurement that the command above reproduces.)
+`EnablePackageValidation` with `PackageValidationBaselineVersion` 0.9.0 in the library csproj. Measured on
+2026-10-25 with `dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj -c Release` on one change: renaming the
+public `MemoryTcgDexResponseCache.Clear()` packed without a word before, and fails the pack after with
+`CP0002: Member 'void ...Clear()' exists on` the baseline, once for each of `net10.0`, `net8.0` and
+`netstandard2.0`. (Not yet in `VERIFICATION.md`; the command above reproduces it.) The baseline is the published
+0.9.0 from nuget.org and the build under test is compared with it whatever its `<Version>` says, so the check bites
+from the first commit.
+
+**Corrected after a Fable review: the first settings did not enforce "same API on all three".** I had set
+`EnableStrictModeForCompatibleTfms` and written that it makes an API one framework has and another lacks an
+error. It does not: that setting is runtime compatibility and is already the default. The across-frameworks check is
+`EnableStrictModeForCompatibleFrameworksInPackage`, off by default. Measured with a probe member under
+`#if NET10_0`: with the first settings the pack succeeded without a word; with the second setting it fails with
+`CP0002: Member ... exists on lib/net10.0 but not on lib/net8.0`. Both are now set.
+
+**What turning it on cost:** on unmodified code the second setting also fails the pack, with `CP0008` on three
+enums (`ImageFormat`, `ImageQuality`, `TcgDexErrorKind`): they implement `ISpanFormattable` on net8.0 and later and
+not on netstandard2.0, which is the runtime's doing, not the library's. They are recorded in
+`TcgDex.CSharpSdk/CompatibilitySuppressions.xml`, exactly three entries, generated with
+`-p:ApiCompatGenerateSuppressionFile=true`; unmodified code packs clean again and the probe is still caught. A
+suppression file can hide a break, so it is read, not trusted: add an entry only for a difference of that kind,
+or a deliberate break before 1.0.0, never to quiet a failure.
 
 **The baseline has to move.** It is the release just published, so it is bumped in the PR that prepares the next
-one, and it is 0.9.0 until 1.0.0 ships. While the version being packed equals the baseline (as at 0.9.0), the
-check compares the package with its own published copy and proves nothing; it starts to bite at the next
-version. An intended break before 1.0.0 goes in `CompatibilitySuppressions.xml` (generated with
-`-p:ApiCompatGenerateSuppressionFile=true`, one entry per member per target framework), recorded here, not by
-lowering the check. Forgetting to move it is not dangerous (every break against an older release is still
+one, and it is 0.9.0 until 1.0.0 ships. Forgetting to move it is not dangerous (every break against an older release is still
 caught); it only makes the check looser about what the newer release added, and after 1.0.0 an unmoved 0.9.0
 baseline would let 1.0.x break 1.0.0 unnoticed wherever 0.9.0 allows it. **Nothing gates this**: `release.yml`
 checks `<Version>` and the CHANGELOG against the tag but not the baseline. A release-time check that the
@@ -1087,7 +1142,6 @@ reading `obj/project.assets.json` after a plain `dotnet restore`.
 `release.yml` packs with `-p:Version=...`; that only changes the version being validated, not the baseline, so it
 is unaffected, and a prerelease tag compares fine.
 
-**Open:** whether `EnableStrictModeForCompatibleTfms` is already the default under `EnablePackageValidation`. It
-is set explicitly, which is harmless if so. A future API that exists on net10.0 but not on net8.0 or
-netstandard2.0 now fails the pack and needs a suppression, which is the "same API on all three" promise.
+A future API that exists on net10.0 but not on net8.0 or netstandard2.0 now fails the pack and needs either a
+suppression or a change, which is the "same API on all three" promise doing its job.
 

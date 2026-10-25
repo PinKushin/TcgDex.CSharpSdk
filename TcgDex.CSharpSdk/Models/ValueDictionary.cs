@@ -62,7 +62,10 @@ internal sealed class ValueDictionary<TKey, TValue> : IReadOnlyDictionary<TKey, 
 
         foreach (KeyValuePair<TKey, TValue> entry in items)
         {
-            copy.Add(entry.Key, entry.Value);
+            // The indexer, not Add: a source whose comparer is finer than the default can hold two keys the default
+            // treats as one, and Add would throw. The last one wins, which a hand-built dictionary can do and
+            // deserialized input never does.
+            copy[entry.Key] = entry.Value;
         }
 
         return copy;
