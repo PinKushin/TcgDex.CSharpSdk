@@ -3,8 +3,8 @@
 Two things in one page: how a release happens **now** (the next section), and the
 one-time setup and background it was built on, written for a first-time
 publisher. **0.1.0 was published on 2026-08-08** by a `workflow_dispatch` run of
-`release.yml`, using Trusted Publishing — no API key was ever created. Every
-release since has been a tag push. The current version is whatever nuget.org
+`release.yml`, using Trusted Publishing — no API key was ever created. The first
+releases were dispatches too; since 0.2.0 they have been tag pushes. The current version is whatever nuget.org
 lists for [TcgDex.CSharpSdk](https://www.nuget.org/packages/TcgDex.CSharpSdk);
 this page does not say, because a version written here goes stale at the next
 release.
@@ -59,9 +59,11 @@ this is the shape of it.
    bump `<Version>` in `TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj`, rename the
    `[Unreleased]` heading in `CHANGELOG.md` to `[x.y.z] - date` (and add the
    compare link at the bottom), and move
-   `PackageValidationBaselineVersion` in the same csproj to the release just
-   published. The workflow refuses to publish if `<Version>` or the changelog
-   heading does not match the tag.
+   `PackageValidationBaselineVersion` in the same csproj to the **previous**
+   release, the newest one already on nuget.org, never the one being prepared
+   (the baseline is downloaded from nuget.org at restore, so a version that is
+   not published yet fails every build). The workflow refuses to publish if
+   `<Version>` or the changelog heading does not match the tag.
 2. **Review it, then merge.** Reviews come before auto-merge. The merge commit is
    the thing that gets tagged.
 3. **Tag that merge commit and push the tag:** `git tag vX.Y.Z <merge-sha>` then
@@ -71,17 +73,26 @@ this is the shape of it.
 4. **The tag push runs `release.yml`:**
    - `ci-gate` waits for CI on that exact commit and fails the release unless it
      passed (`scripts/Assert-CiPassed.ps1`, DECISIONS #42). If CI was slow or
-     briefly unreachable, "Re-run all jobs" is the recovery.
+     briefly unreachable, "Re-run all jobs" on that run is the recovery.
+     **This job has not yet run in a real release:** 0.9.0 was tagged before it
+     existed, so the next tag is its first run.
    - `publish` resolves the version from the tag, builds with `-warnaserror`, runs
-     the unit tests, packs, installs and runs the packed package
-     (`scripts/Test-Package.ps1`), logs in to nuget.org with a one-hour OIDC key,
-     pushes, and creates the GitHub Release with the packages attached.
+     the unit tests (net8.0 and net10.0 on its Linux runner; net472 and the rest
+     of CI are what the gate vouches for), packs, installs and runs the packed
+     package on net8.0 and net10.0 (`scripts/Test-Package.ps1`), logs in to
+     nuget.org with a one-hour OIDC key, pushes, and creates the GitHub Release
+     with the packages attached.
    - `announce` posts the GitHub Release to Discord through the repository secret
-     `DISCORD_WEBHOOK_URL`. To announce a release by hand, dispatch
-     `discord-release.yml` with its tag.
+     `DISCORD_WEBHOOK_URL`. If that secret is unset, it warns and succeeds, so
+     nothing is posted and the run stays green; the job summary of `publish`
+     carries the text to paste by hand. To announce a release by hand, dispatch
+     `discord-release.yml` with its tag (it must look like `v1.2.3`, the secret
+     must be set, an empty tag posts a test message, and `dry_run` needs no secret).
 5. **Check afterwards:** NuGet lists the version (usually a few minutes; 0.9.0 took
-   over ten, so give it time before assuming a failure), the DLLs in the package carry the version and the commit, and the
-   workflow run has no annotations beyond the known notices.
+   over ten, so give it time before assuming a failure), the DLLs in the package
+   carry the version and the commit, and the workflow run has no annotations
+   beyond the known notices (the Ubuntu 26 migration notice on Ubuntu jobs,
+   DECISIONS #14, and the macOS queue-time notice).
 
 Versions mean what [Versioning and compatibility](versioning.md) says they mean.
 
@@ -144,13 +155,6 @@ constrained by the repository and workflow file. So when a second package
 appears, the repo and workflow are what tell two policies apart, and the package
 name would not.
 
-**`release.yml` exists and is committed.** Nothing else needs creating before you
-publish.
-
-If you register a policy before its workflow exists, that is harmless too — a
-policy is a rule about what *would* be trusted, and simply never matches until
-the file is there.
-
 The one thing that must match exactly is the filename. A policy for `release.yml`
 does not trust `publish.yml`, and the failure is a rejected push at the moment
 you are trying to ship rather than anything earlier.
@@ -185,7 +189,7 @@ blast radius is one package rather than your whole account.
 
 **Copy the key immediately — it is shown exactly once.**
 
-The 365-day option this document previously recommended is being withdrawn:
+The 365-day key option is being withdrawn:
 
 - **From 2026-08-17**, new keys are capped at **30 days**; 365 is gone.
 - **On 2026-11-01**, every key created before 2026-08-17 expires, whatever
@@ -273,18 +277,18 @@ only issues those tokens *inside a workflow run*. Your laptop cannot mint one, s
 there is genuinely nothing to exchange from a terminal — that part of the
 constraint is real.
 
-What does not follow is that the first release has to happen from a terminal.
-**Add `workflow_dispatch` to the release workflow and press the button.** That
-runs in Actions, so OIDC works, and you get the same "watch it happen, one step
-at a time" that a manual push offers, with a live log — and no long-lived
-credential is ever created, stored, or forgotten about.
+What does not follow is that a release has to happen from a terminal. A
+`workflow_dispatch` trigger on the release workflow (it has one) runs in Actions,
+so OIDC works, and you get the same "watch it happen, one step at a time" that a
+manual push offers, with a live log — and no long-lived credential is ever
+created, stored, or forgotten about. That is how the first release was done.
 
-So the honest ordering is:
+So the ordering is:
 
 | | Key needed | When it makes sense |
 |---|---|---|
-| **Tag push** | **none** | **The normal release now** ("How a release happens now"). Runs the CI gate, creates the GitHub Release and announces it. |
-| `workflow_dispatch` | none | The first release was done this way. It publishes but does not create a GitHub Release, so it is for watching a run or retrying one. |
+| **Tag push** | **none** | **The normal release** ("How a release happens now"). Runs the CI gate, creates the GitHub Release and announces it. |
+| `workflow_dispatch` | none | How 0.1.0 was published. It runs from the branch you choose, so `ci-gate` and the version checks look at that branch's head, not at a tag; it publishes but creates no GitHub Release and does not announce. To retry a tag's release, re-run that tag's own run, or dispatch with the tag selected as the ref. |
 | `dotnet nuget push` from a terminal | yes | Only if Trusted Publishing is not yet enabled on your account |
 
 A failed publish costs nothing and claims nothing — the package ID is only taken
@@ -311,8 +315,8 @@ then delete it on nuget.org immediately afterwards.
 **Pass the key by environment variable, not on the command line.** A key in
 `--api-key` lands in your shell history, and on Windows in
 `ConsoleHost_history.txt`, where it outlives the "delete it the same day" plan.
-`NUGET_API_KEY` is supported from NuGet 7.6 (.NET SDK 10.0.300), which this repo
-already builds on.
+`NUGET_API_KEY` is supported from NuGet 7.6 (.NET SDK 10.0.300). The repo's own
+SDK floor is lower (`global.json`, 10.0.100), so check `dotnet --version` first.
 
 ```bash
 # PowerShell
@@ -340,7 +344,7 @@ If you would rather never handle a key at all, skip the manual push and let the
 workflow do it. You lose the chance to watch the push happen; you gain having no
 long-lived credential ever exist.
 
-### The release workflow — this is the one to use
+### Notes on `release.yml`
 
 The workflow lives at
 [`.github/workflows/release.yml`](https://github.com/PinKushin/TcgDex.CSharpSdk/blob/main/.github/workflows/release.yml).
@@ -367,11 +371,12 @@ matter:
 On an API key instead, drop the `NuGet login` step and the `id-token` permission,
 and use `--api-key ${{ secrets.NUGET_API_KEY }}`.
 
-**How the first release was done — no key, no tag, nothing to undo if it fails:**
-
-GitHub → **Actions** → **Release** → **Run workflow** → enter the version → run.
-Watch the log. If the policy is not active or the login step fails, nothing has
-been published and nothing has been claimed; fix it and press it again.
+**History: how the first release was done (a dispatch, not a tag).** GitHub →
+**Actions** → **Release** → **Run workflow** → enter the version → run, and watch
+the log. If the policy is not active or the login step fails, nothing has been
+published and nothing has been claimed; fix it and press it again. Today a
+dispatch would also run `ci-gate` against the head of the branch you pick, and it
+creates no GitHub Release and no announcement (see the table above).
 
 Since then, releases are a tag on the merge commit ("How a release happens
 now"). `--skip-duplicate` stops a re-run from failing on an already-published
