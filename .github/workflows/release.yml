@@ -36,10 +36,16 @@ jobs:
   # coverage gate or the AOT smoke test. This waits for CI on the exact commit and fails the release unless it
   # passed (scripts/Assert-CiPassed.ps1, DECISIONS #42). Its own job so `publish` keeps the same job and file, which
   # the trusted-publishing policy names.
+  #
+  # If it fails because CI was slow (the wait is 15 minutes) or briefly unreachable, "Re-run all jobs" is the
+  # recovery: the gate runs again and, once green, `publish` follows. Everything after it is safe to repeat
+  # (--skip-duplicate on the push, `release edit`, --clobber). If CI is genuinely red, fix it and tag the fixed
+  # commit instead.
   ci-gate:
     name: CI passed on this commit
     runs-on: ubuntu-latest
-    # measured healthy: ~4 min (run 40245471625, 2026-10-25; CI itself takes ~3 min, the gate adds checkout and polling)
+    # measured healthy: ~3 min (CI run 40245471625, 2026-10-25; that is the wait when the tag lands while CI is still
+    # going, and the gate has not itself run yet, so its checkout and polling are on top)
     timeout-minutes: 20
     permissions:
       actions: read
@@ -119,7 +125,8 @@ jobs:
       # should not be the first one to skip the zero-warning rule.
       #
       # ContinuousIntegrationBuild makes the compiler normalise source paths (to /_/...), so the binary and its
-      # symbols do not carry this runner's checkout path and a rebuild elsewhere produces the same bytes. It is
+      # symbols do not carry this runner's checkout path. (It does not by itself make a rebuild byte-identical: that
+      # also needs the same SDK, and global.json is a floor, not a pin.) It is
       # passed here, to the build that ships, and not set repository-wide: it would also rewrite the paths coverage
       # tooling maps back to files in CI's test run.
       - name: Build

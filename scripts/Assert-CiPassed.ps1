@@ -8,12 +8,20 @@
     be going when the tag is pushed. This is the gate (DECISIONS #42).
 
     Looks at runs of the CI workflow for the commit. For each triggering event it takes only the newest run, so a
-    failed run that was re-run and passed counts as passed, and an old cancelled run does not. It then:
+    newer run of the same event supersedes an older one (a run re-run with "Re-run failed jobs" keeps its id and
+    reports its latest attempt, so it is already handled). A commit that was pushed and also opened as a pull request
+    has a run for each event, and both must be green. It then:
       - exits 0 when there is at least one such run and every one concluded `success`;
       - exits 1 as soon as any concluded as anything else (failure, cancelled, timed out);
       - waits (polling) while any is queued or in progress, up to -TimeoutMinutes, then exits 1;
       - exits 1 if no run exists after -NoRunGraceSeconds (CI starts within seconds of a push, so none means CI
-        did not run for this commit, for example a tag on a commit that was never pushed to a branch).
+        did not run for this commit, for example a tag on a commit that was never pushed to a branch);
+      - treats an error from `gh` (a 5xx, a rate limit) as "unknown" and tries again at the next poll, failing only
+        when the deadline passes, so one blip does not abort a release.
+
+    Failures print a single `::error::` line (a GitHub Actions annotation, plain text anywhere else) and `exit 1`.
+    `Write-Error` is not used: with `$ErrorActionPreference = 'Stop'` it throws, which would make the `exit` dead code
+    and print a stack trace.
 
     Needs `gh` authenticated, and the `actions: read` permission when run in a workflow.
 
@@ -63,31 +71,43 @@ if ([string]::IsNullOrWhiteSpace($Repository)) {
 }
 
 function Get-LatestRunPerEvent {
-    $json = gh run list --repo $Repository --workflow $Workflow --commit $Sha --limit 50 `
-        --json databaseId,event,status,conclusion,url
+    # Returns Ok = $false (and the reason) when the answer is unknown, so the caller can try again; Ok = $true with an
+    # empty list means GitHub answered and there is no run.
+    $output = gh run list --repo $Repository --workflow $Workflow --commit $Sha --limit 50 `
+        --json databaseId,event,status,conclusion,url 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "gh run list failed (exit $LASTEXITCODE) for $Repository $Workflow at $Sha"
+        return [pscustomobject]@{ Ok = $false; Runs = @(); Reason = "gh run list exited $LASTEXITCODE`: $output" }
     }
 
-    $runs = @($json | ConvertFrom-Json)
+    try {
+        $runs = @($output | ConvertFrom-Json)
+    }
+    catch [System.ArgumentException] {
+        return [pscustomobject]@{ Ok = $false; Runs = @(); Reason = "gh run list did not return JSON: $output" }
+    }
 
-    # Newest run per triggering event: a re-run supersedes the failure it retried.
-    return @($runs | Group-Object event | ForEach-Object {
+    # Newest run per triggering event: a newer run of the same event supersedes an older one.
+    $latest = @($runs | Group-Object event | ForEach-Object {
             $_.Group | Sort-Object databaseId -Descending | Select-Object -First 1
         })
+
+    return [pscustomobject]@{ Ok = $true; Runs = $latest; Reason = '' }
 }
 
 $started = Get-Date
 $deadline = $started.AddMinutes($TimeoutMinutes)
 
 while ($true) {
-    # @() because a function returning an empty array yields $null, and .Count on $null throws under strict mode.
-    $latest = @(Get-LatestRunPerEvent)
+    $answer = Get-LatestRunPerEvent
+    $latest = @($answer.Runs)
 
-    if ($latest.Count -eq 0) {
+    if (-not $answer.Ok) {
+        Write-Host "Could not read the CI runs for $Sha, will try again: $($answer.Reason)"
+    }
+    elseif ($latest.Count -eq 0) {
         $waited = [int]((Get-Date) - $started).TotalSeconds
         if ($waited -ge $NoRunGraceSeconds) {
-            Write-Error "No $Workflow run exists for $Sha after ${waited}s. CI did not run for this commit, so it is not releasable."
+            Write-Host "::error::No $Workflow run exists for $Sha after ${waited}s. CI did not run for this commit, so it is not releasable."
             exit 1
         }
 
@@ -100,7 +120,7 @@ while ($true) {
 
         $bad = @($latest | Where-Object { $_.status -eq 'completed' -and $_.conclusion -ne 'success' })
         if ($bad.Count -gt 0) {
-            Write-Error "$Workflow did not succeed on ${Sha}: $(($bad | ForEach-Object { "$($_.event)=$($_.conclusion)" }) -join ', ')"
+            Write-Host "::error::$Workflow did not succeed on ${Sha}: $(($bad | ForEach-Object { "$($_.event)=$($_.conclusion)" }) -join ', ')"
             exit 1
         }
 
@@ -114,7 +134,7 @@ while ($true) {
     }
 
     if ((Get-Date) -ge $deadline) {
-        Write-Error "Timed out after $TimeoutMinutes minute(s) waiting for $Workflow on $Sha."
+        Write-Host "::error::Timed out after $TimeoutMinutes minute(s) waiting for $Workflow on $Sha."
         exit 1
     }
 

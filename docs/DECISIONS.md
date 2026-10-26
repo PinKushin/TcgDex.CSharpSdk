@@ -1198,6 +1198,25 @@ standing rule is to stay current and fix forward (#14 keeps CI on `ubuntu-latest
 ("the SDK floats with the runner") would be met only by an exact pin that goes stale and has to be bumped by hand.
 That trade is mine, not the owner's; he can ask for an exact pin and `setup-dotnet`'s `global-json-file`.
 
+**Amended after the Fable review of this change (0 blockers, 6 risks):**
+- *The gate aborted on the first `gh` error.* Reproduced (a bad repository made it die in 1 second with a stack
+  trace), then fixed: an error from `gh` is "unknown" and is retried at the next poll until the deadline (13 retries
+  over 67 seconds when measured against a repository that does not exist). One 5xx can no longer kill a release.
+- *`Write-Error` followed by `exit` was dead code* under `$ErrorActionPreference = 'Stop'`, because `Write-Error`
+  throws. Failures now print one `::error::` line and `exit 1`; re-measured on the green, red and no-CI commits.
+- A commit that was both pushed and opened as a pull request has a run for each event, and **both must be green**;
+  that is intended and now documented. A newer run of the same event supersedes an older one (the script's comment
+  named the wrong mechanism before).
+- The "measured healthy" comment on `ci-gate` cited a plain CI run as if it were a gate run. It now says the ~3
+  minutes is CI's duration and that the gate itself has not run.
+- The recovery for a slow or unreachable CI is "Re-run all jobs", which is safe; documented on the job.
+- A byte-identical rebuild needs the same SDK, which the `global.json` floor does not guarantee; the comment on the
+  build step now claims only that the checkout path stays out of the binary and symbols.
+- `dependabot.yml` still said actions were pinned by major tag; reworded.
+- Left alone: the pin comments are mixed (`# v7` against `# v7.0.1`), cosmetic, and Dependabot rewrites each to the
+  exact tag on its next bump.
+- Open for the owner, as the reviewer asked: a `global.json` floor rather than an exact pin was my call (above).
+
 **Not verified:** `release.yml` has not been run end to end with these changes; that happens at the next tag, and a
 manual dispatch would attempt a real publish. The workflow files were checked for valid YAML and for job
 dependencies (`ci-gate` -> `publish` -> `announce`), and the release build and pack flags were run locally with a
