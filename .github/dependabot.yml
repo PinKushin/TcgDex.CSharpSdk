@@ -10,12 +10,14 @@ version: 2
 updates:
   # ----- GitHub Actions -----
   #
-  # The reason this entry matters more than it looks. Actions are pinned by
-  # major tag (`@v7`), so they float silently within a major and then stop
-  # dead when one is retired — the failure arrives on GitHub's schedule rather
-  # than ours. This repository's own policy is that deprecation notices get
-  # fixed when they appear, not when they break, and without Dependabot nothing
-  # surfaces them.
+  # The reason this entry matters more than it looks. Every action is pinned
+  # to a full commit SHA with a version comment (DECISIONS #42), so nothing
+  # moves unless a person moves it, and an action that is retired or has a
+  # security fix would otherwise sit unnoticed until it stopped working on
+  # GitHub's schedule rather than ours. This repository's own policy is that
+  # deprecation notices get fixed when they appear, not when they break, and
+  # without Dependabot nothing surfaces them. Dependabot bumps the SHA and the
+  # comment together.
   - package-ecosystem: github-actions
     directory: /
     schedule:

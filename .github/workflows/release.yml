@@ -31,8 +31,37 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 jobs:
+  # A tag can be pushed to any commit, and the merge's own CI run can still be going when it is. Nothing else ties a
+  # release to a green build, and the Test step below cannot stand in: it runs on Linux only, without net472, the
+  # coverage gate or the AOT smoke test. This waits for CI on the exact commit and fails the release unless it
+  # passed (scripts/Assert-CiPassed.ps1, DECISIONS #42). Its own job so `publish` keeps the same job and file, which
+  # the trusted-publishing policy names.
+  #
+  # If it fails because CI was slow (the wait is 15 minutes) or briefly unreachable, "Re-run all jobs" is the
+  # recovery: the gate runs again and, once green, `publish` follows. Everything after it is safe to repeat
+  # (--skip-duplicate on the push, `release edit`, --clobber). If CI is genuinely red, fix it and tag the fixed
+  # commit instead.
+  ci-gate:
+    name: CI passed on this commit
+    runs-on: ubuntu-latest
+    # measured healthy: ~3 min (CI run 40245471625, 2026-10-25; that is the wait when the tag lands while CI is still
+    # going, and the gate has not itself run yet, so its checkout and polling are on top)
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Require a green CI run on ${{ github.sha }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/Assert-CiPassed.ps1 -Sha "${{ github.sha }}" -TimeoutMinutes 15
+
   publish:
     name: Publish to NuGet
+    needs: ci-gate
     runs-on: ubuntu-latest
     permissions:
       # write, not read: the announcement step below creates a GitHub Release
@@ -44,9 +73,9 @@ jobs:
       # does not work first time.
       id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: |
             8.0.x
@@ -94,13 +123,21 @@ jobs:
 
       # -warnaserror here as well as in CI: a release is exactly the build that
       # should not be the first one to skip the zero-warning rule.
+      #
+      # ContinuousIntegrationBuild makes the compiler normalise source paths (to /_/...), so the binary and its
+      # symbols do not carry this runner's checkout path. (It does not by itself make a rebuild byte-identical: that
+      # also needs the same SDK, and global.json is a floor, not a pin.) It is
+      # passed here, to the build that ships, and not set repository-wide: it would also rewrite the paths coverage
+      # tooling maps back to files in CI's test run.
       - name: Build
         run: >
           dotnet build --configuration Release --no-restore -warnaserror
-          -p:Version="$VERSION"
+          -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
 
-      # Never publish something that is not green. Runs every target framework,
-      # so netstandard2.0 is executed through net472 rather than assumed.
+      # Never publish something that is not green. On this Linux runner that is net8.0 and net10.0: net472, which is
+      # what executes the netstandard2.0 asset, is Windows-only (TcgDex.CSharpSdk.Tests.csproj). It, the coverage
+      # gate and the AOT smoke test run in CI's own jobs, and the ci-gate job above requires them to have passed on
+      # this commit.
       - name: Test
         run: >
           dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj
@@ -113,7 +150,7 @@ jobs:
         run: >
           dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj
           --configuration Release --no-build
-          -o ./artifacts -p:Version="$VERSION"
+          -o ./artifacts -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
 
       # The package that is about to ship, installed into a fresh project and run on net8.0 and
       # net10.0. Linux cannot run net472, so the netstandard2.0 asset is covered by CI's Windows
@@ -133,7 +170,7 @@ jobs:
       # held in a secret because it is public: it appears as the package owner
       # on every package page and in the trusted publishing policy itself.
       - name: NuGet login
-        uses: NuGet/login@v1
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         id: login
         with:
           user: PinKushin
@@ -150,7 +187,7 @@ jobs:
 
       - name: Upload the published package
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: published-package
           path: ./artifacts/*
