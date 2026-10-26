@@ -1196,7 +1196,11 @@ the checkout directory; without it they embed the local path.
 build with an SDK older than the one `net10.0` needs, and documents it. It does not pin the exact SDK: the owner's
 standing rule is to stay current and fix forward (#14 keeps CI on `ubuntu-latest` unpinned), and Fable's complaint
 ("the SDK floats with the runner") would be met only by an exact pin that goes stale and has to be bumped by hand.
-That trade is mine, not the owner's; he can ask for an exact pin and `setup-dotnet`'s `global-json-file`.
+I chose the floor, and a Fable review then asked the owner to confirm it rather than leave it as my call. **Confirmed
+by the owner, 2026-10-25: "Yes, keep global.json as a floor (10.0.100, latestFeature)."** He gave no further
+reasoning; the reasons above are the ones I put in front of him. The alternative he declined was an exact SDK pin
+with `setup-dotnet`'s `global-json-file`, which would also be what makes a rebuild byte-identical. Revisit only as a
+deliberate change.
 
 **Amended after the Fable review of this change (0 blockers, 6 risks):**
 - *The gate aborted on the first `gh` error.* Reproduced (a bad repository made it die in 1 second with a stack
@@ -1215,7 +1219,7 @@ That trade is mine, not the owner's; he can ask for an exact pin and `setup-dotn
 - `dependabot.yml` still said actions were pinned by major tag; reworded.
 - Left alone: the pin comments are mixed (`# v7` against `# v7.0.1`), cosmetic, and Dependabot rewrites each to the
   exact tag on its next bump.
-- Open for the owner, as the reviewer asked: a `global.json` floor rather than an exact pin was my call (above).
+- The reviewer asked the owner to confirm the `global.json` floor rather than an exact pin; he did (above).
 
 **Not verified:** `release.yml` has not been run end to end with these changes; that happens at the next tag, and a
 manual dispatch would attempt a real publish. The workflow files were checked for valid YAML and for job
