@@ -929,9 +929,9 @@ some line numbers have drifted.
 | 2 | blocker | No written compatibility contract: SemVer scope, the interface-growth rule (#36), TFM lifecycle, `[Obsolete]` lead time, how long an old major gets fixes. .NET 8 reaches end of life 2026-11-10, so decide if `net8.0` stays | `CHANGELOG.md:5-6`, `SECURITY.md:28-36` | **confirmed** 2026-10-25: no SemVer, deprecation or support-window text in the README, SECURITY.md, CONTRIBUTING.md or `docs/*.md` (only the CHANGELOG header names SemVer). `docs/learnings.md:127` notes the net8.0 end-of-life date but nothing decides it. **Fixed** in #39 (`docs/versioning.md`) |
 | 3 | blocker | Models are `record`s holding `IReadOnlyList<T>`, so two cards from identical JSON may not compare equal; record to class later is breaking (#26 did it for `CachedResponse`) | `Models/Card.cs:21,27-34`, `PublicApi.approved.cs:177` | **confirmed by measurement** 2026-10-25: two `Card`s deserialized from the same JSON (one `types` entry) gave `Equals` false, `==` false and different hash codes. Cards whose collections are all empty compare equal, because `[]` is a shared empty array, so the bug shows only on real data. No model overrides `Equals`. **Fixed** in #40 |
 | 4 | blocker | No `EnablePackageValidation` with a baseline; the API baseline test is net10.0-only and does not check binary compatibility | `TcgDex.CSharpSdk.csproj:56-80` | **confirmed** 2026-10-25: no `EnablePackageValidation`, `PackageValidationBaselineVersion` or ApiCompat setting in any csproj, props, targets or workflow. **Fixed** in #41 |
-| 5 | should | `release.yml` does not require green CI on the tagged commit; unit tests on Ubuntu only, no net472, coverage gate or AOT smoke; a comment claims net472 runs | `release.yml:97-123` | **confirmed (read)**: the release job's `Test` step runs on `ubuntu-latest`, where the test project multi-targets only `net8.0;net10.0` (net472 is Windows-only, `TcgDex.CSharpSdk.Tests.csproj`), yet the comment above it says "netstandard2.0 is executed through net472"; no `needs:` or CI-status condition ties a tag push to green CI (the required checks gate the merge to `main`, and the tag goes on that merge commit); no coverage gate or AOT smoke in the job. The package smoke test (`Test-Package.ps1`) does run in it |
-| 6 | should | Publish job's actions pinned by tag, not SHA | `release.yml:47,49,136,153` | **confirmed (read)**: `release.yml` uses `checkout@v7`, `setup-dotnet@v6`, `NuGet/login@v1` (the step that receives the OIDC token) and `upload-artifact@v7` by tag. SHA pins are rare: only `ci.yml`'s `package-smoke-test` job (`checkout`, `setup-dotnet`, `download-artifact`) and `mutation.yml` (`checkout`, `setup-dotnet`, `upload-artifact`) use them, with a version comment. Every other job in `ci.yml`, and `release.yml`, `codeql.yml`, `docs.yml`, `fuzz.yml` and `live-api.yml`, use tags (`codeql-action`, `upload-pages-artifact`, `deploy-pages` and `cache` among them). `dependabot.yml` exists (corrected after review) |
-| 7 | should | No `ContinuousIntegrationBuild`, no `global.json` | `Directory.Build.props:45` | **confirmed (read)**: `Deterministic` is true (`Directory.Build.props:45`); `ContinuousIntegrationBuild` appears in no props, csproj or workflow; there is no `global.json`, so the SDK version floats with the runner |
+| 5 | should | `release.yml` does not require green CI on the tagged commit; unit tests on Ubuntu only, no net472, coverage gate or AOT smoke; a comment claims net472 runs | `release.yml:97-123` | **confirmed (read)**: the release job's `Test` step runs on `ubuntu-latest`, where the test project multi-targets only `net8.0;net10.0` (net472 is Windows-only, `TcgDex.CSharpSdk.Tests.csproj`), yet the comment above it says "netstandard2.0 is executed through net472"; no `needs:` or CI-status condition ties a tag push to green CI (the required checks gate the merge to `main`, and the tag goes on that merge commit); no coverage gate or AOT smoke in the job. The package smoke test (`Test-Package.ps1`) does run in it. **Fixed** in #42 |
+| 6 | should | Publish job's actions pinned by tag, not SHA | `release.yml:47,49,136,153` | **confirmed (read)**: `release.yml` uses `checkout@v7`, `setup-dotnet@v6`, `NuGet/login@v1` (the step that receives the OIDC token) and `upload-artifact@v7` by tag. SHA pins are rare: only `ci.yml`'s `package-smoke-test` job (`checkout`, `setup-dotnet`, `download-artifact`) and `mutation.yml` (`checkout`, `setup-dotnet`, `upload-artifact`) use them, with a version comment. Every other job in `ci.yml`, and `release.yml`, `codeql.yml`, `docs.yml`, `fuzz.yml` and `live-api.yml`, use tags (`codeql-action`, `upload-pages-artifact`, `deploy-pages` and `cache` among them). `dependabot.yml` exists (corrected after review). **Fixed** in #42 |
+| 7 | should | No `ContinuousIntegrationBuild`, no `global.json` | `Directory.Build.props:45` | **confirmed (read)**: `Deterministic` is true (`Directory.Build.props:45`); `ContinuousIntegrationBuild` appears in no props, csproj or workflow; there is no `global.json`, so the SDK version floats with the runner. **Fixed** in #42, except that the SDK still floats forward on purpose |
 | 8 | should | No 429 handling; `TcgDexApiException` exposes no `Retry-After`. Additive later, but 1.0 docs should say what a rate-limited caller sees | `TcgDexApiException.cs:46-73` | **confirmed (read)**: no `429`, `Retry-After` or `TooManyRequests` anywhere in the library source; `TcgDexApiException` carries `StatusCode`, `Problem` and `RequestUri` but no response headers, so a 429 would surface as `Kind = HttpStatus` with `StatusCode` 429 and the wait time is lost (inferred from the generic status handling; not run against a 429). `docs/getting-started.md:268-282` says the SDK ships no retry policy on purpose and shows `AddStandardResilienceHandler`, but does not say what a rate-limited caller sees |
 | 9 | should | `StreamAsync` ignores the query's page number. Decided in #36; Fable still flags it | `Resources/Resources.cs` | decided, re-open only if the owner wants |
 | 10 | should | `ITcgDexClient` has no escape hatch for a new resource group | `TcgDexClient.cs:17-33` | **confirmed (read), and the consequence is decided**: it has exactly five get-only properties and no generic accessor. #36 and `docs/versioning.md` say no interface gains a member within a major, so a new resource group waits for the next major. An escape hatch (as `ICatalogResource` got) was not added for the client |
@@ -1161,4 +1161,45 @@ is unaffected, and a prerelease tag compares fine.
 
 A future API that exists on net10.0 but not on net8.0 or netstandard2.0 now fails the pack and needs either a
 suppression or a change, which is the "same API on all three" promise doing its job.
+
+## 42. The release pipeline: a CI gate, pinned actions, a CI-build flag, a `global.json` floor
+
+Rows 5, 6 and 7 of #37. The owner: "Fix the release pipeline rows: rows 5, 6 and 7 (CI gate and net472 comment in
+release.yml, SHA-pin the actions, ContinuousIntegrationBuild and global.json). Branch, TDD where it applies, Fable
+review before auto-merge." He gave no view on the design; the choices below are mine.
+
+**CI gate (row 5).** A tag can be pushed to any commit, and the merge's own CI run can still be going when it is.
+New first job `ci-gate` in `release.yml` runs `scripts/Assert-CiPassed.ps1` on `github.sha` and `publish` now
+`needs` it. The script takes the newest `ci.yml` run per triggering event for the commit (so a re-run that passed
+supersedes the failure it retried), exits 0 only if all concluded `success`, exits 1 on any other conclusion, waits
+while one is running (the job gives it 15 minutes; CI takes about 3), and exits 1 if no run exists after two
+minutes. It is a separate job so `publish` keeps its name and file, which the trusted-publishing policy names.
+The false comment on the Test step (it claimed net472 ran there) now says what runs on that Linux runner and that
+the gate is what guarantees net472, coverage and AOT passed.
+*Tested, against real commits:* a green main commit exits 0; a commit whose CI failed (a PR branch) exits 1 naming
+both runs; a commit with no CI run exits 1 after the grace period. The third case first exited 1 for the **wrong
+reason**: `Count` on an empty result crashed under strict mode. Fixed with `@(...)` and re-measured, so the failure
+message is now the intended one.
+
+**Pinned actions (row 6).** Every `uses:` in every workflow is a full commit SHA with a version comment: 31 lines
+by the `pin-actions-to-sha` script plus the two `codeql-action` subpath actions by hand (`v4.39.1`; the script cannot
+resolve subpath actions). The one that matters most is `NuGet/login`, which receives the OIDC token. Dependabot's
+`github-actions` entry should keep them current, since it is meant to update a SHA pin together with its comment;
+the first Dependabot action PR after this is the check that it does.
+
+**CI-build flag (row 7).** `-p:ContinuousIntegrationBuild=true` is passed to the `Build` and `Pack` steps of
+`release.yml`, not set repository-wide: set globally it would also rewrite the source paths CI's coverage tooling
+maps back to files. *Measured:* the symbols of a pack with the flag carry the normalised `/_/` path and no trace of
+the checkout directory; without it they embed the local path.
+
+**`global.json` (row 7): a floor, not a pin.** `{ "version": "10.0.100", "rollForward": "latestFeature" }`. It stops a
+build with an SDK older than the one `net10.0` needs, and documents it. It does not pin the exact SDK: the owner's
+standing rule is to stay current and fix forward (#14 keeps CI on `ubuntu-latest` unpinned), and Fable's complaint
+("the SDK floats with the runner") would be met only by an exact pin that goes stale and has to be bumped by hand.
+That trade is mine, not the owner's; he can ask for an exact pin and `setup-dotnet`'s `global-json-file`.
+
+**Not verified:** `release.yml` has not been run end to end with these changes; that happens at the next tag, and a
+manual dispatch would attempt a real publish. The workflow files were checked for valid YAML and for job
+dependencies (`ci-gate` -> `publish` -> `announce`), and the release build and pack flags were run locally with a
+new version number; nothing was published.
 

@@ -37,9 +37,9 @@ jobs:
     name: Fuzz the response path
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: |
             8.0.x
@@ -83,7 +83,7 @@ jobs:
       # is not a failure: the seeds below still make the run useful, it just
       # starts further back.
       - name: Restore the corpus
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: corpus
           key: fuzz-corpus-${{ github.run_id }}
@@ -286,7 +286,7 @@ jobs:
       # well as success, since failure is when there is something to collect.
       - name: Upload findings
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: fuzz-findings
           path: |
