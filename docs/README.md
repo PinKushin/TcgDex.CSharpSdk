@@ -15,7 +15,7 @@ published site at
 | [`architecture.md`](architecture.md) | How the SDK is put together and why. Start here to extend it. |
 | [`learnings.md`](learnings.md) | Non-obvious behaviour discovered while building it, each with its evidence. |
 | [`coverage.md`](coverage.md) | Coverage goal, how to measure it correctly, and where it stands. |
-| [`publishing.md`](publishing.md) | First-time walkthrough for publishing to NuGet. |
+| [`publishing.md`](publishing.md) | How a release happens, and the NuGet setup behind it. |
 | [`roadmap.md`](roadmap.md) | What is left before 1.0, and what is out of scope. |
 
 `api/` holds the generated API reference. Only `api/index.md` is committed —
