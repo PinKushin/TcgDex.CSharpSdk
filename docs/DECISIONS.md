@@ -1365,3 +1365,14 @@ the root, so `dotnet-stryker` sat two months behind 5.0.0 (#44), and `docfx` sat
 never reach a consumer. Whether Dependabot now raises
 the tools is unverified until its first Monday run after the merge.
 
+**The package smoke test pinned a copy of the SDK's version line.** `TcgDex.CSharpSdk.PackageSmokeTest`
+has central package management off (#34), and it referenced `Microsoft.Extensions.DependencyInjection`
+by hand: 10.0.13 on `net10.0`, 8.0.1 elsewhere. The 10.0.14 bump failed both required smoke jobs with
+`NU1605: Detected package downgrade: Microsoft.Extensions.DependencyInjection from 10.0.14 to
+10.0.13`. The project was added on 2026-10-19, after the 10.0.13 bump, so this was the first patch it
+had to follow, and every later patch would have failed it the same way. The reference was deleted, not
+bumped. The SDK already brings the concrete `ServiceCollection` (`Microsoft.Extensions.Http` ->
+`Logging` -> `DependencyInjection`) at whatever patch it requires. *Measured* with
+`Test-Package.ps1` on a locally packed 0.9.0: net472, net8.0 and net10.0 all ran against the
+packed package, including both `AddTcgDex` checks.
+
