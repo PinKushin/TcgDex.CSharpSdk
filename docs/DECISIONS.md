@@ -1379,3 +1379,32 @@ target. *Measured* with
 `Test-Package.ps1` on a locally packed 0.9.0: net472, net8.0 and net10.0 all ran against the
 packed package, including both `AddTcgDex` checks.
 
+## 46. 0.9.1 ships the value-equality fix and the 10.0.14 dependency floor
+
+Asked whether anything needed a release, I found two consumer-visible changes since 0.9.0: model value
+equality (DECISIONS #40, PR #100) and the net10.0 dependency floor moving to 10.0.14 (DECISIONS #45,
+PR #113). The second had no CHANGELOG entry, because PR #113 missed it. I recommended releasing now as **0.9.1**, so that 1.0.0 stays a pure
+version change. The owner said "yep get everything fixed/done and do the release".
+
+**Why a patch.** Before 1.0.0 the rules in `docs/versioning.md` are not yet in force, so this is a
+judgement, not a requirement. Measured against them anyway: there is no new public member, no signature
+change and no dropped target, and the models are C# records, whose value equality the language promises
+and which they did not deliver while their collections compared by reference. That makes it a fix.
+`docs/versioning.md` itself does not state an equality promise. The `ToString` change is the one part
+that could be argued up to a minor. I said so when recommending; the owner did not ask for 0.10.0. Urgency was low: .NET
+10.0.14 is a security release (four CVEs), but GitHub lists no advisory against
+`Microsoft.Extensions.Http`, `Logging.Abstractions` or `Options`, and `NuGetAudit` (mode `all`) passed on
+the 10.0.13 graph.
+
+**The mutation check before a release (#32).** Each file's score in the latest run (42499809793) was
+compared with its best in all 32 successful runs, counting unit-test kills only. Two files were below:
+- `MemoryTcgDexResponseCache.cs`, 90.32% against 91.30%: its three survivors are the written-off
+  equivalents in `docs/coverage.md` (L39, L101, L107), as #32 already found.
+- `Resources.cs`, 97.56% against 100%: one survivor, in code newer than the best run. The dot-segment
+  guard (added 2026-10-25) could have its message blanked, because both tests checked only `ParamName`.
+  Both now assert the message too. *Verified by manipulation*: with the message set to `""`, all 6 cases
+  fail; restored by the exact inverse edit, they pass on net472, net8.0 and net10.0.
+
+The package validation baseline stays 0.9.0, the newest release on nuget.org (`docs/publishing.md`,
+step 1). It moves to 0.9.1 in the PR that prepares the next release.
+

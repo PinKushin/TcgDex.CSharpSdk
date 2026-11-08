@@ -15,6 +15,15 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-08
+
+### Changed
+
+- **net10.0:** `Microsoft.Extensions.Http`, `Microsoft.Extensions.Logging.Abstractions` and
+  `Microsoft.Extensions.Options` now require 10.0.14, up from 10.0.13. Each target tracks the
+  latest patch of its own line, for the security, bug and performance fixes. The net8.0 and
+  netstandard2.0 builds are unchanged and still depend on the 8.0.x line, which is at its newest patch.
+
 ### Fixed
 
 - Models now compare by value, collections included. Two `Card`s deserialized from the same JSON were never equal
@@ -589,7 +598,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.7.0...v0.8.0

@@ -83,6 +83,7 @@ public sealed class CatalogEscapeHatchTests
             () => CallAsync(CreateClient(handler), numeric, name));
 
         exception.ParamName.ShouldBe("name");
+        exception.Message.ShouldContain("dot segment");
         handler.Requests.ShouldBeEmpty();
     }
 
@@ -127,6 +128,7 @@ public sealed class CatalogEscapeHatchTests
             () => CreateClient(handler).Cards.GetAsync(id, CancellationToken.None));
 
         exception.ParamName.ShouldBe("id");
+        exception.Message.ShouldContain("dot segment");
         handler.Requests.ShouldBeEmpty();
     }
 }
