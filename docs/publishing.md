@@ -58,12 +58,14 @@ this is the shape of it.
 1. **Prepare the release in the pull request that needs it**, not in a follow-up:
    bump `<Version>` in `TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj`, rename the
    `[Unreleased]` heading in `CHANGELOG.md` to `[x.y.z] - date` (and add the
-   compare link at the bottom), and move
-   `PackageValidationBaselineVersion` in the same csproj to the **previous**
-   release, the newest one already on nuget.org, never the one being prepared
-   (the baseline is downloaded from nuget.org at restore, so a version that is
-   not published yet fails every build). The workflow refuses to publish if
-   `<Version>` or the changelog heading does not match the tag.
+   compare link at the bottom). Check that `PackageValidationBaselineVersion`
+   in the same csproj is the **previous** release, the newest one already on
+   nuget.org, never the one being prepared (the baseline is downloaded from
+   nuget.org at restore, so a version that is not published yet fails every
+   build). It is normally moved in a small PR once a release is published, so
+   the check stays tight between releases (DECISIONS #47). The workflow refuses
+   to publish if `<Version>` or the changelog heading does not match the tag,
+   or if the baseline is not the newest release on nuget.org.
 2. **Review it, then merge.** Reviews come before auto-merge. The merge commit is
    the thing that gets tagged.
 3. **Tag that merge commit and push the tag:** `git tag vX.Y.Z <merge-sha>` then

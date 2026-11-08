@@ -1145,12 +1145,10 @@ not on netstandard2.0, which is the runtime's doing, not the library's. They are
 suppression file can hide a break, so it is read, not trusted: add an entry only for a difference of that kind,
 or a deliberate break before 1.0.0, never to quiet a failure.
 
-**The baseline has to move.** It is the release just published, so it is bumped in the PR that prepares the next
-one, and it is 0.9.0 until 1.0.0 ships. Forgetting to move it is not dangerous (every break against an older release is still
-caught); it only makes the check looser about what the newer release added, and after 1.0.0 an unmoved 0.9.0
-baseline would let 1.0.x break 1.0.0 unnoticed wherever 0.9.0 allows it. **Nothing gates this**: `release.yml`
-checks `<Version>` and the CHANGELOG against the tag but not the baseline. A release-time check that the
-baseline is the previous published tag is the obvious addition, and was not built.
+**The baseline has to move.** It is the newest release on nuget.org. Forgetting to move it is not dangerous (every
+break against an older release is still caught); it only makes the check looser about what the newer release added,
+and after 1.0.0 an unmoved 0.9.x baseline would let 1.0.x break 1.0.0 unnoticed wherever 0.9.x allows it. When to
+move it, and the `release.yml` check that refuses to publish with a stale one, are in #47.
 
 **Cost, corrected after review.** I first wrote that `pack` restores the baseline. It does not: the baseline is
 a `downloadDependencies` entry in `project.assets.json`, so it comes down at **restore**, in every job that
@@ -1407,8 +1405,8 @@ compared with its best in all 32 successful runs, counting unit-test kills only.
   Both now assert the message too. *Verified by manipulation*: with the message set to `""`, all 6 cases
   fail; restored by the exact inverse edit, they pass on net472, net8.0 and net10.0.
 
-The package validation baseline stays 0.9.0, the newest release on nuget.org (`docs/publishing.md`,
-step 1). It moves to 0.9.1 in the PR that prepares the next release.
+The package validation baseline stayed 0.9.0, the newest release on nuget.org at the time, and moved to 0.9.1
+once 0.9.1 was published (#47).
 
 **The first tag run failed, and nothing was published.** `v0.9.1` on `bbc0440` passed `ci-gate`, then failed
 the `publish` job's `Test` step (run 42516058274): `ThePublicSurface_MatchesTheApprovedBaseline` threw
@@ -1422,6 +1420,38 @@ nuget.org, no GitHub Release was created, and the Discord job was skipped.
   exception. With the new property the full suite passes (823, 817, 816). Reading the packed symbols with
   `System.Reflection.Metadata` shows `/_/TcgDex.CSharpSdk/...` document paths on all three targets, while the test
   PDB keeps real paths.
-- *The tag:* nothing was published from `bbc0440`, so `v0.9.1` moves to the merge commit of the fix (PR #116),
-  rather than a 0.9.2 being cut for a release that never happened.
+- *The tag:* nothing was published from `bbc0440`, so `v0.9.1` moved to `84ae915`, the merge commit of the fix
+  (PR #116), rather than a 0.9.2 being cut for a release that never happened. Run 42523342162 published it: 823
+  and 817 tests, and the DLLs carry `0.9.1+84ae915`.
+
+## 47. The package validation baseline moves after each release, and `release.yml` refuses a stale one
+
+Once 0.9.1 was on nuget.org, I pointed out that the package validation baseline (#41) still said 0.9.0 and that
+nothing checked it. I offered two things: move it to 0.9.1 now, in a small PR of its own, rather than in the PR that
+prepares the next release; and a release-workflow step that fails when the baseline is not the newest version on
+nuget.org. The owner said "ok yea fix it", then "it means both".
+
+**Moved now, not with the next release.** While 0.9.1 was live and the baseline said 0.9.0, every PR was compared
+with 0.9.0 and could not see a break to anything 0.9.1 added. Moving it once a release is published keeps the check
+tight between releases. The PR that prepares the next release is the latest point. It cannot be the release's own
+PR: the baseline is downloaded at restore, so a version that is not published yet fails every build
+(`docs/publishing.md`, step 1).
+
+**The check.** The `Resolve version` step of `release.yml` reads the published versions from nuget.org's
+flat-container index. It fails unless `PackageValidationBaselineVersion` is the newest stable version there, other
+than the one being published. It runs before anything is built, so with it a break against the newest release is
+caught before it ships even when the baseline was forgotten: the release fails, the baseline moves, and the pack then
+compares against the right version.
+- The version being published is left out, so a re-run after the push, which finds it on nuget.org, still passes.
+- Only stable versions count. There is no prerelease tier (#39), and `sort -V` puts `1.0.0-beta` after `1.0.0`.
+- *Verified by manipulation*, running the step's lines locally. With the baseline set back to 0.9.0 it fails with
+  `PackageValidationBaselineVersion is 0.9.0 but the newest release on nuget.org is 0.9.1`. With 0.9.1 it passes on
+  the live feed. Against stubbed feeds it passes for a first run and a re-run of 0.9.2, ignores a `1.0.0-beta.1`,
+  fails once a newer release than the baseline exists, and fails with its own message when nuget.org cannot be read.
+  It has not yet run in a real release; the next tag push is the first.
+- Not built: the same check on pull requests. It would fail every PR, Dependabot's included, from the moment a
+  release is published until the baseline PR merges.
+
+`dotnet pack -p:Version=0.9.2` with the 0.9.1 baseline packs with no compatibility error, and restore records the
+0.9.1 package as the download.
 

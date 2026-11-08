@@ -115,6 +115,22 @@ jobs:
             exit 1
           fi
 
+          # Package validation compares the build with PackageValidationBaselineVersion, which has to be the newest
+          # release already on nuget.org. Left on an older one, a break to anything released since packs without a
+          # word, so this refuses to publish instead (DECISIONS #47). The version being published is left out, so a
+          # re-run after the push still passes. Stable versions only: there is no prerelease tier (DECISIONS #39),
+          # and `sort -V` would put 1.0.0-beta after 1.0.0.
+          BASELINE=$(grep -oP '(?<=<PackageValidationBaselineVersion>)[^<]+' TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj)
+          if ! INDEX=$(curl -fsS https://api.nuget.org/v3-flatcontainer/tcgdex.csharpsdk/index.json); then
+            echo "::error::could not read the published versions from nuget.org"
+            exit 1
+          fi
+          NEWEST=$(printf '%s' "$INDEX" | grep -oP '"\K[0-9]+\.[0-9]+\.[0-9]+(?=")' | grep -vxF "$VERSION" | sort -V | tail -n 1)
+          if [ "$BASELINE" != "$NEWEST" ]; then
+            echo "::error::TcgDex.CSharpSdk.csproj PackageValidationBaselineVersion is $BASELINE but the newest release on nuget.org is $NEWEST"
+            exit 1
+          fi
+
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "publishing $VERSION"
 
