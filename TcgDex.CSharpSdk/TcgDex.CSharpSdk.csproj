@@ -86,8 +86,9 @@
     so this is what stops a 1.0.x from quietly breaking an assembly someone already compiled against, and what
     keeps the three frameworks exposing the same API. The baseline package is downloaded at restore, not at pack.
 
-    PackageValidationBaselineVersion is the version to compare against, and it MOVES: set it to the newest
-    release already on nuget.org, in the PR that prepares the next one (docs/publishing.md, step 1).
+    PackageValidationBaselineVersion is the version to compare against, and it MOVES: it is the newest release
+    already on nuget.org. Move it once a release is published, and at the latest in the PR that prepares the
+    next one; release.yml refuses to publish otherwise (docs/publishing.md, step 1; DECISIONS #47).
 
     EnableStrictModeForCompatibleTfms (runtime compatibility, already the default) and
     EnableStrictModeForCompatibleFrameworksInPackage (API parity across the shipped frameworks, off by default)
@@ -103,7 +104,7 @@
   -->
   <PropertyGroup>
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>0.9.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>0.9.1</PackageValidationBaselineVersion>
     <EnableStrictModeForCompatibleTfms>true</EnableStrictModeForCompatibleTfms>
     <EnableStrictModeForCompatibleFrameworksInPackage>true</EnableStrictModeForCompatibleFrameworksInPackage>
   </PropertyGroup>
