@@ -120,12 +120,19 @@ jobs:
           # word, so this refuses to publish instead (DECISIONS #47). The version being published is left out, so a
           # re-run after the push still passes. Stable versions only: there is no prerelease tier (DECISIONS #39),
           # and `sort -V` would put 1.0.0-beta after 1.0.0.
-          BASELINE=$(grep -oP '(?<=<PackageValidationBaselineVersion>)[^<]+' TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj)
+          if ! BASELINE=$(grep -oP '(?<=<PackageValidationBaselineVersion>)[^<]+' TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj); then
+            echo "::error::TcgDex.CSharpSdk.csproj has no PackageValidationBaselineVersion"
+            exit 1
+          fi
           if ! INDEX=$(curl -fsS https://api.nuget.org/v3-flatcontainer/tcgdex.csharpsdk/index.json); then
             echo "::error::could not read the published versions from nuget.org"
             exit 1
           fi
           NEWEST=$(printf '%s' "$INDEX" | grep -oP '"\K[0-9]+\.[0-9]+\.[0-9]+(?=")' | grep -vxF "$VERSION" | sort -V | tail -n 1)
+          if [ -z "$NEWEST" ]; then
+            echo "::error::found no stable release on nuget.org other than $VERSION"
+            exit 1
+          fi
           if [ "$BASELINE" != "$NEWEST" ]; then
             echo "::error::TcgDex.CSharpSdk.csproj PackageValidationBaselineVersion is $BASELINE but the newest release on nuget.org is $NEWEST"
             exit 1

@@ -65,7 +65,7 @@ this is the shape of it.
    build). It is normally moved in a small PR once a release is published, so
    the check stays tight between releases (DECISIONS #47). The workflow refuses
    to publish if `<Version>` or the changelog heading does not match the tag,
-   or if the baseline is not the newest release on nuget.org.
+   or if the baseline is not the newest stable release on nuget.org.
 2. **Review it, then merge.** Reviews come before auto-merge. The merge commit is
    the thing that gets tagged.
 3. **Tag that merge commit and push the tag:** `git tag vX.Y.Z <merge-sha>` then

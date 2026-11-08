@@ -1447,8 +1447,10 @@ compares against the right version.
 - *Verified by manipulation*, running the step's lines locally. With the baseline set back to 0.9.0 it fails with
   `PackageValidationBaselineVersion is 0.9.0 but the newest release on nuget.org is 0.9.1`. With 0.9.1 it passes on
   the live feed. Against stubbed feeds it passes for a first run and a re-run of 0.9.2, ignores a `1.0.0-beta.1`,
-  fails once a newer release than the baseline exists, and fails with its own message when nuget.org cannot be read.
-  It has not yet run in a real release; the next tag push is the first.
+  and fails once a release newer than the baseline exists. Each other failure prints its own `::error::`: nuget.org
+  unreachable, no other stable release on the feed, and no baseline element in the csproj (the step runs under
+  `bash -e`, so without that guard it would die with no message). It has not yet run in a real release; the next tag
+  push is the first.
 - Not built: the same check on pull requests. It would fail every PR, Dependabot's included, from the moment a
   release is published until the baseline PR merges.
 

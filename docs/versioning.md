@@ -123,5 +123,5 @@ the fix ships as a patch release of the latest version.
 
 The pinned API file fails a test on any change to the source-level surface. And every pack validates the package
 against the previous release, on every target framework: a removed or changed public member, or a member that
-exists on one framework only, fails the build. The one check that is still by hand is moving that baseline to the
-newest release when a new one is prepared.
+exists on one framework only, fails the build. That baseline is moved to each release once it is published, and
+the release workflow refuses to publish while it still points at an older one.
