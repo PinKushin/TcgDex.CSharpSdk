@@ -1353,12 +1353,15 @@ and that clock is gone. So `net8.0` now skips the properties, as `net472` alread
   at 1862/1866. Branch coverage moved from 690/707 to 691/707, all at `BoundedLru.cs` L170. That
   line is the retry after a concurrent write, so whether a run reaches it is timing.
 
-**Dependabot never read the tool manifest.** Its NuGet updater looks only for
-`./.config/dotnet-tools.json` (`MSBuildHelper.TryGetDotNetToolsJsonPath` in dependabot-core).
-Ours was at the root, so `dotnet-stryker` sat two months behind 5.0.0 (#44), and `docfx` sat at
+**Dependabot never read the tool manifest.** Its NuGet updater looks only for a
+`.config/dotnet-tools.json`, in the update directory or a parent
+(`MSBuildHelper.TryGetDotNetToolsJsonPath` in dependabot-core). Ours was `dotnet-tools.json` at
+the root, so `dotnet-stryker` sat two months behind 5.0.0 (#44), and `docfx` sat at
 2.78.5 behind 2.81.0. The manifest moved to `.config/`, which is also where
 `dotnet new tool-manifest` puts it. `dotnet tool list --local` finds it from
 `TcgDex.CSharpSdk.Tests/`, where Stryker runs. Both tools and CsCheck joined the
-`test-and-tooling` group. CsCheck had been falling into `runtime`. Whether Dependabot now raises
+`test-and-tooling` group, with the three analyzers. CsCheck and the analyzers had been falling into
+`runtime`, which is meant for shipped packages only; the analyzers are `PrivateAssets=all` and
+never reach a consumer. Whether Dependabot now raises
 the tools is unverified until its first Monday run after the merge.
 
