@@ -1254,37 +1254,58 @@ not JSON. The empty body is checked separately because `Test-Json` cannot bind a
 *Measured* with that guard expression against live responses: refused a 503, a 200 HTML page and
 an empty body, and accepted the `nope-999` 404 recording and `series/swsh`.
 
-## 44. The mutation workflow restores before Stryker runs
+## 44. Stryker runs in project mode, from `TcgDex.CSharpSdk.Tests/`
 
-The scheduled mutation run failed on 2026-11-04 and 2026-11-07. Both times Stryker crashed before
-any mutant ran: `Failed to build the mutated assembly due to unrecoverable error: error CS0518:
-Predefined type 'System.Attribute' is not defined or imported`. Both runs were on the same commit,
-with the same Stryker (4.16.0) and the same config, as eleven runs that passed with the same score
-(95.43%). So this is a flake, not a regression.
+**The failure.** Stryker sometimes crashed before any mutant ran: `Failed to build the mutated
+assembly due to unrecoverable error: error CS0518: Predefined type 'System.Attribute' is not
+defined or imported`. It happened on four runs: the scheduled runs of 2026-10-19 (`c3d8836`),
+2026-11-04 and 2026-11-07 (both `978413a`), and the dispatch run 39188453091 (`6602859`). That
+makes 3 of the 24 scheduled runs from 2026-10-16 to 2026-11-08. It is a flake, not a regression.
+Eight scheduled runs on `978413a` passed with 95.43%, and `6602859` passed when dispatched again
+straight after it failed.
 
-**What happens.** Each failing run, and no passing run, logs `Buildalyzer could not find source
-files ... We fall back to filesystem scan`. In solution mode Stryker analyses all six projects in
-the solution at once, four at a time, on a cold checkout. The other five all reference the library,
-and in the reproduced failure three of them were analysed alongside it. Sometimes the library's
-analysis reports success but returns no source files. Stryker's fallback
-rescans the folder for `.cs` files, but it still takes references from the empty analysis. The
-mutated assembly is then compiled with no references, which gives CS0518. The debug log of one
-reproduced failure shows this sequence. It does not show *why* the analysis came back empty. My
-hypothesis is that concurrent restores, which write the library's `obj/` while it is being
-analysed, race. That is not proven.
+**The mechanism.** Every failing run, and none of the passing runs checked, logs `Buildalyzer
+could not find source files ... We fall back to filesystem scan`. The cause was solution mode.
+Stryker 4.16.0 uses solution mode whenever the directory it runs from holds exactly one `.sln`, even
+if `solution` is not configured. In solution mode it analyses all six projects in the solution with
+`Parallel.ForEach`, at most `--concurrency` at a time (4 on a GitHub runner). The other five
+projects all reference the library. Each analysis is a Buildalyzer design-time build, and
+Buildalyzer's `Restore` option defaults to true. The likely race is concurrent restores writing the
+library's `obj/` while the library is being analysed. Sometimes the library's analysis reports
+success but returns no source files. Stryker's fallback rescans the folder for `.cs` files, but it
+does not recover the references. The mutated assembly is then compiled against nothing, which
+gives CS0518.
+- *From the log:* the analysis reported success, then the fallback warning, then CS0518.
+- *From the source, not the log:* that the references were missing. The run was not in diag mode,
+  so the log does not list them.
+- *Not shown by anything:* why the analysis came back empty.
 
-**The fix.** Run `dotnet restore` on the solution before `dotnet stryker`. The restores during
-analysis then have nothing to write.
+**The fix.** Run Stryker from `TcgDex.CSharpSdk.Tests/`, where there is no `.sln`, so it uses
+project mode. `stryker-config.json` moved there and lost its `test-projects` entry, because Stryker
+finds the test project in its working directory. In project mode the analysis queue starts with the
+test project. The library is queued from that project's references only after its analysis has
+finished. With one test project, the library is never analysed while another project's analysis is
+running. *Measured* locally with `--log-to-file`: `IsSolutionContext False`, the test project was
+analysed from 10:52:38 to 10:52:49, then the library from 10:52:49 to 10:52:55. Only 2 projects are
+analysed now instead of 6.
 
-*Measured* with a throwaway A/B workflow on GitHub Actions. Each job was a cold checkout running
-Stryker on one file. Without a restore, 2 of 70 jobs failed with the same signature. With a restore,
-0 of 70 failed. That **does not prove the fix**: at this failure rate the difference is not
-significant (p about 0.5). The failure rate in the experiment (about 3%) was also lower than on the
-schedule (2 of 13 days). The step costs a few seconds and Stryker builds the solution next anyway,
-so it is kept on the evidence there is. The schedule is the check. At the scheduled failure rate,
-20 green days in a row would happen by chance about 4% of the time. Any failure with this
-signature after this change means the hypothesis was wrong, and the next candidate is project mode
-(dropping `solution` from `stryker-config.json`), which analyses fewer projects.
+Running from the root falls back into solution mode. `CLAUDE.md`, the `tcgdex-verify` skill and
+`docs/measuring.md` now give the command from the test folder. `build/run-measurements.sh` is the
+retired mutation box's script and was left alone.
+
+**What changes in the run.** 823 tests are discovered instead of 834. The 11 offline `JsonShape`
+tests in `TcgDex.CSharpSdk.IntegrationTests` came in only through the solution, and they test the
+drift engine, not the library. `test-case-filter` now matches nothing, but it stays as the #31
+guard in case another test project is ever added.
+
+**First attempt, replaced.** The first version of this change ran `dotnet restore` before Stryker.
+A throwaway A/B workflow tested it: each job was a cold checkout running Stryker on one file. With
+no restore, 2 of 70 jobs failed with this signature. With a restore, 0 of 70 failed. That is not
+significant (two-sided Fisher p = 0.50). The experiment's failure rate (about 3%) was also well
+below the schedule's (3 of 24). The review of #111 pointed out that the restore does not remove
+the restores during analysis. It only turns them into no-ops, and only if NuGet's no-op check
+ignores the properties Buildalyzer sets, which is unverified. Project mode removes the concurrency
+itself, so it replaced the restore.
 
 Separately, Stryker 5.0.0 was released on 2026-09-11 and nothing raised it. Upgrading is a separate
 change, because it can move the mutation score.

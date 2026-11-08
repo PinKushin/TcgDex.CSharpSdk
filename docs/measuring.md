@@ -369,11 +369,14 @@ differently.
 ## Mutation testing
 
 ```bash
+cd TcgDex.CSharpSdk.Tests
 dotnet stryker                                        # full run, slow
 dotnet stryker --mutate "**/Querying/QueryFilter.cs"  # one file, fast
 ```
 
-Configuration is in `stryker-config.json`.
+Configuration is in `TcgDex.CSharpSdk.Tests/stryker-config.json`. Run Stryker from that folder,
+not the repository root. At the root it finds the `.sln` and switches to solution mode, which
+analyses every project in parallel and intermittently failed with CS0518 (DECISIONS #44).
 
 ### Why, when coverage is already gated
 

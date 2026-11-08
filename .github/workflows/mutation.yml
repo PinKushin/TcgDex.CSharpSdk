@@ -1,8 +1,9 @@
 name: Mutation
 
-# Scheduled, not a per-push gate: a run takes ~15 minutes, which is too slow to
-# block a merge on and too valuable to skip. Moved here from the Oracle
-# mutation box (DECISIONS #15). A score under stryker-config.json's `break`
+# Scheduled, not a per-push gate: a run takes about 6 minutes, which is too slow
+# to block a merge on and too valuable to skip. Moved here from the Oracle
+# mutation box (DECISIONS #15). A score under the `break` threshold in
+# TcgDex.CSharpSdk.Tests/stryker-config.json
 # threshold fails the run.
 on:
   schedule:
@@ -22,7 +23,7 @@ jobs:
   stryker:
     name: Stryker
     runs-on: ubuntu-latest
-    # measured healthy: ~15 min (mutation-box 3 cores, 2026-09-23); not yet measured on a GitHub runner
+    # measured healthy: ~6 min (runs 42477802953 and 42495890976, 2026-11-08)
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -35,19 +36,20 @@ jobs:
 
       - run: dotnet tool restore
 
-      # Restore before Stryker analyses the solution (DECISIONS #44). On a cold
-      # checkout its parallel analysis sometimes came back empty for the library,
-      # which then compiled with no references and failed with CS0518.
-      - run: dotnet restore TcgDex.CSharpSdk.sln
-
-      # Stryker defaults to half the logical processors.
+      # Run from the test project's folder, not the root. With a .sln in its
+      # working directory Stryker uses solution mode, which analyses every
+      # project in parallel and sometimes came back empty for the library
+      # (CS0518; DECISIONS #44). From here it analyses the test project first,
+      # then the library. Stryker defaults to half the logical processors.
       - name: Run Stryker
+        working-directory: TcgDex.CSharpSdk.Tests
         run: |
           set -o pipefail
           dotnet stryker --concurrency "$(nproc)" | tee stryker.log
 
       - name: Summarize
         if: always()
+        working-directory: TcgDex.CSharpSdk.Tests
         run: |
           if [ ! -s stryker.log ]; then
             echo "::warning::stryker.log missing or empty; no score to summarize"
@@ -61,5 +63,5 @@ jobs:
         if: always()
         with:
           name: mutation-report
-          path: StrykerOutput/*/reports/mutation-report.html
+          path: TcgDex.CSharpSdk.Tests/StrykerOutput/*/reports/mutation-report.html
           if-no-files-found: error
