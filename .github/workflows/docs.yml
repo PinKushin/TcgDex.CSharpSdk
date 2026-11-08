@@ -7,7 +7,7 @@ on:
       - "docs/**"
       - "docfx.json"
       - "docfx-filter.yml"
-      - "dotnet-tools.json"
+      - ".config/dotnet-tools.json"
       - "TcgDex.CSharpSdk/**"
       - ".github/workflows/docs.yml"
   pull_request:
@@ -36,13 +36,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
           dotnet-version: |
             8.0.x
             10.0.x
 
-      # Restores docfx at the version pinned in dotnet-tools.json, so the site
+      # Restores docfx at the version pinned in .config/dotnet-tools.json, so the site
       # cannot change because a new docfx shipped.
       - name: Restore tools
         run: dotnet tool restore

@@ -24,17 +24,12 @@
     <RootNamespace>TcgDex.PackageSmokeTest</RootNamespace>
   </PropertyGroup>
 
+  <!-- The SDK is the only reference. The concrete ServiceCollection arrives through
+       it (Microsoft.Extensions.Http -> Logging -> DependencyInjection), at the version
+       the SDK's dependency graph resolves on each target. A hand-pinned copy here fell one patch behind the SDK
+       and failed restore with NU1605 (DECISIONS #45). -->
   <ItemGroup>
     <PackageReference Include="TcgDex.CSharpSdk" Version="$(SmokeSdkVersion)" />
-  </ItemGroup>
-
-  <!-- The concrete service collection, which a consumer brings. Versions follow the
-       line the SDK itself resolves on each target. -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
-  </ItemGroup>
-  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
   </ItemGroup>
 
 </Project>

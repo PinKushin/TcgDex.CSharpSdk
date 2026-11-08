@@ -36,7 +36,11 @@ updates:
   # ----- NuGet -----
   #
   # Versions live in Directory.Packages.props under central package management,
-  # which Dependabot understands and edits in place.
+  # which Dependabot understands and edits in place. The same entry covers the
+  # local tools (docfx, dotnet-stryker), but only because the manifest is at
+  # .config/dotnet-tools.json: Dependabot looks for that name alone, in the
+  # update directory or a parent, so a root dotnet-tools.json was never read
+  # (DECISIONS #45).
   #
   # Runtime dependencies sit on one release line per target framework (10.x for
   # net10.0, 8.0.x for net8.0/netstandard2.0), and each line tracks its newest
@@ -67,6 +71,13 @@ updates:
           - "SharpFuzz"
           - "Newtonsoft.Json"
           - "TCGdex"
+          - "CsCheck"
+          - "docfx"
+          - "dotnet-stryker"
+          # Build-time only, PrivateAssets=all: never in a consumer's graph.
+          - "SonarAnalyzer.CSharp"
+          - "Roslynator.Analyzers"
+          - "Meziantou.Analyzer"
       # Everything shipped. Separate because these set the floor for consumers
       # and a major here is a decision rather than an update.
       runtime:
@@ -81,6 +92,12 @@ updates:
           - "SharpFuzz"
           - "Newtonsoft.Json"
           - "TCGdex"
+          - "CsCheck"
+          - "docfx"
+          - "dotnet-stryker"
+          - "SonarAnalyzer.CSharp"
+          - "Roslynator.Analyzers"
+          - "Meziantou.Analyzer"
     # Major bumps on the shipped dependencies are ignored, and this is the one
     # rule here that is not about noise.
     #

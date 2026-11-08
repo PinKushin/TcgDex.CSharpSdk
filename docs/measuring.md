@@ -358,11 +358,12 @@ Deliberately small. Each property runs CsCheck's default 100 cases and the whole
 set adds well under a second, so it stays in the normal test run rather than
 becoming a nightly job. Fuzzing is where the long budgets belong.
 
-CsCheck ships a **net8.0 asset only**, so the properties are excluded from the
-`net472` leg of the unit suite — the same shape as `PublicApiGenerator`. They are
-statements about pure logic and hold identically on every target; the net472 leg
-exists to execute the netstandard2.0 assembly, which they do not exercise
-differently.
+CsCheck 5 ships **net10.0 and newer assets only**, so the properties run on the
+`net10.0` leg of the unit suite alone — the same shape as `PublicApiGenerator`
+(DECISIONS #45). They are statements about pure logic and hold identically on
+every target: `BoundedLru` has no `#if` and, since the fix above, no clock. The
+net8.0 and net472 legs exist to execute the net8.0 and netstandard2.0
+assemblies, which the properties do not exercise differently.
 
 ---
 
