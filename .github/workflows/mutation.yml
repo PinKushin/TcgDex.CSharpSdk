@@ -3,8 +3,7 @@ name: Mutation
 # Scheduled, not a per-push gate: a run takes about 6 minutes, which is too slow
 # to block a merge on and too valuable to skip. Moved here from the Oracle
 # mutation box (DECISIONS #15). A score under the `break` threshold in
-# TcgDex.CSharpSdk.Tests/stryker-config.json
-# threshold fails the run.
+# TcgDex.CSharpSdk.Tests/stryker-config.json fails the run.
 on:
   schedule:
     # Daily 05:17 UTC, off the hour to avoid the on-the-hour queue.
@@ -23,7 +22,7 @@ jobs:
   stryker:
     name: Stryker
     runs-on: ubuntu-latest
-    # measured healthy: ~6 min (runs 42477802953 and 42495890976, 2026-11-08)
+    # measured healthy: ~6 min (run 42497433243, project mode, 2026-11-08)
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1

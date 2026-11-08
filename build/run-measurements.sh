@@ -279,6 +279,9 @@ case "$MODE" in
     ;;
 
   stryker)
+    # RETIRED with the mutation box (DECISIONS #15), and now broken. From the root it
+    # finds the .sln, so it runs in solution mode without stryker-config.json, which
+    # lives in TcgDex.CSharpSdk.Tests/ (DECISIONS #44). Run from there if revived.
     dotnet tool restore 9>&-
     # Stryker adds a dated folder per run and never prunes, so the copy below would carry
     # every past report into every run directory (~300 MB each by 2026-09-23).

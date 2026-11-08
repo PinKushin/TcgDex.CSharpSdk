@@ -763,6 +763,9 @@ per-push CI does not run the live tests either.
 The owner asked for this one-line change to be split out of the mutation-score work and merged the
 same day.
 
+*Superseded in part by #44.* Stryker now runs in project mode from `TcgDex.CSharpSdk.Tests/`, so
+the solution no longer brings `IntegrationTests` in. The filter stays as a guard.
+
 ## 32. No file's mutation score stays below its best without being examined
 
 After 0.8.0 the total was 92.45% against 92.57%, and I called that flat, within the ±2.7 noise.
@@ -1275,7 +1278,9 @@ library's `obj/` while the library is being analysed. Sometimes the library's an
 success but returns no source files. Stryker's fallback rescans the folder for `.cs` files, but it
 does not recover the references. The mutated assembly is then compiled against nothing, which
 gives CS0518.
-- *From the log:* the analysis reported success, then the fallback warning, then CS0518.
+- *From the debug log of the reproduced failure* (experiment job `control-45`): the library's
+  analysis reported success, then the fallback warning, then CS0518. The info-level log in the
+  scheduled runs prints only the warning.
 - *From the source, not the log:* that the references were missing. The run was not in diag mode,
   so the log does not list them.
 - *Not shown by anything:* why the analysis came back empty.
@@ -1290,16 +1295,21 @@ analysed from 10:52:38 to 10:52:49, then the library from 10:52:49 to 10:52:55. 
 analysed now instead of 6.
 
 Running from the root falls back into solution mode. `CLAUDE.md`, the `tcgdex-verify` skill and
-`docs/measuring.md` now give the command from the test folder. `build/run-measurements.sh` is the
-retired mutation box's script and was left alone.
+`docs/measuring.md` now give the command from the test folder. The `stryker` mode in
+`build/run-measurements.sh` belongs to the retired mutation box and now runs from the root without
+the config. It is not fixed, because its `fuzz` mode is still in use and the box is gone. It now
+carries a note saying it is broken.
 
 **What changes in the run.** 823 tests are discovered instead of 834. The 11 offline `JsonShape`
 tests in `TcgDex.CSharpSdk.IntegrationTests` came in only through the solution, and they test the
 drift engine, not the library. `test-case-filter` now matches nothing, but it stays as the #31
 guard in case another test project is ever added. *Measured* on GitHub Actions, run 42497433243:
 the score was 95.43% with 1413 mutants, both identical to the last scheduled run on `main`
-(42477802953). There was no fallback warning, and the report uploaded from its new path. Dropping
-tests can only lose kills, so an identical total means no file lost one.
+(42477802953). There was no fallback warning, and the report uploaded from its new path. The two
+`mutation-report.html` artifacts were also compared mutant by mutant: id, status, mutator and line.
+All 1413 mutants matched across all 55 files, with 919 killed or timed out and 41 survived in
+both. So no file moved, which the #32 rule needs. The comparison was checked by planting one
+change (`BoundedLru.cs` mutant 1, Killed to Survived), which it reported.
 
 **First attempt, replaced.** The first version of this change ran `dotnet restore` before Stryker.
 A throwaway A/B workflow tested it: each job was a cold checkout running Stryker on one file. With
