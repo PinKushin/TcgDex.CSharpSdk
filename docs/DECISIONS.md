@@ -1226,3 +1226,31 @@ manual dispatch would attempt a real publish. The workflow files were checked fo
 dependencies (`ci-gate` -> `publish` -> `announce`), and the release build and pack flags were run locally with a
 new version number; nothing was published.
 
+## 43. `serie-full.json` is recorded from `xy`, not `swsh`
+
+On 2026-11-08 the scheduled live-API run failed fixture drift on `serie-full.json`:
+`removed: 'lastSet.logo'` and `'lastSet.symbol'`. This happened after TCGdex released `v2.49.0`. It
+was not a schema change. `swsh12.5` (Crown Zenith) and `swsh12.5gg` (its Galarian Gallery) share the
+release date 2023-01-20. The API now sorts `swsh12.5gg` last, and that set has no logo or symbol.
+`CardSetBrief.Logo` and `Symbol` were already nullable, and `sets[]` still carries both fields.
+Only the recording's `lastSet` had changed.
+
+This is the second time `swsh`'s `lastSet` has drifted for a data reason (#11 records the first).
+A tie at the end of the series can flip again. If it does, the drift check fails the other way,
+on an added field. I recommended pointing the fixture at a series with no tie at either end, and
+the owner said "fix them". `xy` starts `xyp` 2013-10-12, then `xy0` 2013-11-08, and ends `xy11`
+2016-08-03, then `xy12` 2016-11-02. All four sets have a logo and a symbol. Two other candidates
+were rejected. `sv` ends in a tie (`sv10.5b` and `sv10.5w`, 2025-07-17). `sm` was my first pick,
+but the review found it starts in a tie (`smp` and `sm1`, 2017-02-03); that one would not trip the
+drift check, but on a re-record it would break the `FirstSet` assertion. `dp` also starts in a tie.
+The unit tests that read the fixture's values now expect `xy`: `SetSerieContractTests` and
+`TypedCacheTests`.
+
+**The recorder could overwrite a fixture with an outage.** The first refresh wrote the 20-byte
+body `no available server` over `serie-full.json`. `Update-Fixtures.ps1` passes
+`-SkipHttpErrorCheck` so that it can record the two deliberate error fixtures, which means it
+accepted any response at all. It now refuses a 5xx status, an empty body, and any body that is
+not JSON. The empty body is checked separately because `Test-Json` cannot bind an empty string.
+*Measured* with that guard expression against live responses: refused a 503, a 200 HTML page and
+an empty body, and accepted the `nope-999` 404 recording and `series/swsh`.
+
