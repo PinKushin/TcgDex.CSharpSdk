@@ -1330,7 +1330,35 @@ both. 5.0.0's runtime-based timeouts therefore changed nothing here. The 919 agr
   to `app.report = ` in `mutation-report.html`. For every mutant in `files.<path>.mutants`, match
   on `id` and compare `status`, `mutatorName` and `location.start.line`. The same comparison
   reported a planted change (#111).
-- *Dependabot:* it has never touched `dotnet-tools.json`. No Dependabot PR lists the file, and
-  `dependabot.yml` has no entry for tool manifests. Why is not verified. `docfx` in the same file is
-  behind too (2.78.5, latest 2.81.0).
+- *Dependabot:* it has never touched `dotnet-tools.json`. No Dependabot PR lists the file. The
+  cause was found and fixed in #45.
+
+## 45. CsCheck runs on `net10.0` only, and the tool manifest lives in `.config/`
+
+Both came out of the 2026-11-08 update of every outdated package, tool and action, which the owner
+asked for ("yes, update everything"). The runtime packages for `net8.0` and `netstandard2.0` stay
+on the 8.0.x line (#17), which is at its newest patch.
+
+**CsCheck 5 dropped `net8.0`.** 5.0.1 ships only `net10.0` and `net11.0` assets. 4.9.1 shipped
+`net8.0`. The owner asked whether both could run: 5.0.1 on `net10.0` and 4.9.1 on `net8.0`. They
+can, with a per-TFM `PackageVersion` like the one #17 uses. I recommended against it, and the owner
+said "ok your rec sounds fine do it". My reasons: the same test source would have to compile
+against two CsCheck APIs, and 4.9.1 would be held back for good. A second leg also proves nothing
+extra here. The unit suite's one property file, `BoundedLruProperties`, tests `BoundedLru`, which
+has no `#if` and no clock. A clock is how it once failed on one target only (`docs/measuring.md`),
+and that clock is gone. So `net8.0` now skips the properties, as `net472` already did.
+`IntegrationTests` was already `net10.0` only. 5.0.1 built with no source change.
+- *Measured* against `main` (258d5b2), same machine: `net8.0` went from 821 tests to 817, which is
+  exactly the 4 properties. `net10.0` stays at 823 and `net472` at 816. Line coverage is unchanged
+  at 1862/1866. Branch coverage moved from 690/707 to 691/707, all at `BoundedLru.cs` L170. That
+  line is the retry after a concurrent write, so whether a run reaches it is timing.
+
+**Dependabot never read the tool manifest.** Its NuGet updater looks only for
+`./.config/dotnet-tools.json` (`MSBuildHelper.TryGetDotNetToolsJsonPath` in dependabot-core).
+Ours was at the root, so `dotnet-stryker` sat two months behind 5.0.0 (#44), and `docfx` sat at
+2.78.5 behind 2.81.0. The manifest moved to `.config/`, which is also where
+`dotnet new tool-manifest` puts it. `dotnet tool list --local` finds it from
+`TcgDex.CSharpSdk.Tests/`, where Stryker runs. Both tools and CsCheck joined the
+`test-and-tooling` group. CsCheck had been falling into `runtime`. Whether Dependabot now raises
+the tools is unverified until its first Monday run after the merge.
 
