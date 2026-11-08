@@ -74,8 +74,7 @@ this is the shape of it.
    - `ci-gate` waits for CI on that exact commit and fails the release unless it
      passed (`scripts/Assert-CiPassed.ps1`, DECISIONS #42). If CI was slow or
      briefly unreachable, "Re-run all jobs" on that run is the recovery.
-     **This job has not yet run in a real release:** 0.9.0 was tagged before it
-     existed, so the next tag is its first run.
+     0.9.1 was its first real release; 0.9.0 was tagged before it existed.
    - `publish` resolves the version from the tag, builds with `-warnaserror`, runs
      the unit tests (net8.0 and net10.0 on its Linux runner; net472 and the rest
      of CI are what the gate vouches for), packs, installs and runs the packed
