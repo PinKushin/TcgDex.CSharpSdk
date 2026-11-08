@@ -1320,6 +1320,11 @@ the restores during analysis. It only turns them into no-ops, and only if NuGet'
 ignores the properties Buildalyzer sets, which is unverified. Project mode removes the concurrency
 itself, so it replaced the restore.
 
-Separately, Stryker 5.0.0 was released on 2026-09-11 and nothing raised it. Upgrading is a separate
-change, because it can move the mutation score.
+Separately, Stryker 5.0.0 was released on 2026-09-11 and nothing raised it. It was upgraded as its
+own change on 2026-11-08, because it can move the mutation score; the owner said yes to doing it.
+*Measured* on run 42499809793 against the 4.16.0 project-mode report (42497433243): 0 of 1413
+mutants differ in id, status, mutator or line, with 919 killed or timed out and 14 timeouts in
+both. 5.0.0's runtime-based timeouts therefore changed nothing here. Dependabot did not raise it
+because it does not update `dotnet-tools.json` in this repository; `docfx` is behind too (2.78.5,
+latest 2.81.0).
 
