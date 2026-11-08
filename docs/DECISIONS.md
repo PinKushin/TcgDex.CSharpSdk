@@ -1324,7 +1324,13 @@ Separately, Stryker 5.0.0 was released on 2026-09-11 and nothing raised it. It w
 own change on 2026-11-08, because it can move the mutation score; the owner said yes to doing it.
 *Measured* on run 42499809793 against the 4.16.0 project-mode report (42497433243): 0 of 1413
 mutants differ in id, status, mutator or line, with 919 killed or timed out and 14 timeouts in
-both. 5.0.0's runtime-based timeouts therefore changed nothing here. Dependabot did not raise it
-because it does not update `dotnet-tools.json` in this repository; `docfx` is behind too (2.78.5,
-latest 2.81.0).
+both. 5.0.0's runtime-based timeouts therefore changed nothing here. The 919 agrees with the log:
+960 tested minus 41 survived, and 919 / (960 + 3 no-coverage) = 95.43%.
+- *Method, to repeat it:* download each run's `mutation-report` artifact. Parse the JSON assigned
+  to `app.report = ` in `mutation-report.html`. For every mutant in `files.<path>.mutants`, match
+  on `id` and compare `status`, `mutatorName` and `location.start.line`. The same comparison
+  reported a planted change (#111).
+- *Dependabot:* it has never touched `dotnet-tools.json`. No Dependabot PR lists the file, and
+  `dependabot.yml` has no entry for tool manifests. Why is not verified. `docfx` in the same file is
+  behind too (2.78.5, latest 2.81.0).
 
