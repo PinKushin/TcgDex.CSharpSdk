@@ -1333,9 +1333,9 @@ both. 5.0.0's runtime-based timeouts therefore changed nothing here. The 919 agr
 - *Dependabot:* it has never touched `dotnet-tools.json`. No Dependabot PR lists the file. The
   cause was found and fixed in #45.
 
-## 45. CsCheck runs on `net10.0` only, and the tool manifest lives in `.config/`
+## 45. CsCheck on `net10.0` only, the tool manifest in `.config/`, no version pins in the smoke test
 
-Both came out of the 2026-11-08 update of every outdated package, tool and action, which the owner
+All three came out of the 2026-11-08 update of every outdated package, tool and action, which the owner
 asked for ("yes, update everything"). The runtime packages for `net8.0` and `netstandard2.0` stay
 on the 8.0.x line (#17), which is at its newest patch.
 
@@ -1368,11 +1368,12 @@ the tools is unverified until its first Monday run after the merge.
 **The package smoke test pinned a copy of the SDK's version line.** `TcgDex.CSharpSdk.PackageSmokeTest`
 has central package management off (#34), and it referenced `Microsoft.Extensions.DependencyInjection`
 by hand: 10.0.13 on `net10.0`, 8.0.1 elsewhere. The 10.0.14 bump failed both required smoke jobs with
-`NU1605: Detected package downgrade: Microsoft.Extensions.DependencyInjection from 10.0.14 to
+NU1605, `Detected package downgrade: Microsoft.Extensions.DependencyInjection from 10.0.14 to
 10.0.13`. The project was added on 2026-10-19, after the 10.0.13 bump, so this was the first patch it
 had to follow, and every later patch would have failed it the same way. The reference was deleted, not
 bumped. The SDK already brings the concrete `ServiceCollection` (`Microsoft.Extensions.Http` ->
-`Logging` -> `DependencyInjection`) at whatever patch it requires. *Measured* with
+`Logging` -> `DependencyInjection`), at the version its own dependency graph resolves on each
+target. *Measured* with
 `Test-Package.ps1` on a locally packed 0.9.0: net472, net8.0 and net10.0 all ran against the
 packed package, including both `AddTcgDex` checks.
 

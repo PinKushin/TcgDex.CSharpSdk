@@ -25,8 +25,8 @@
   </PropertyGroup>
 
   <!-- The SDK is the only reference. The concrete ServiceCollection arrives through
-       it (Microsoft.Extensions.Http -> Logging -> DependencyInjection), at whatever
-       patch the SDK requires. A hand-pinned copy here fell one patch behind the SDK
+       it (Microsoft.Extensions.Http -> Logging -> DependencyInjection), at the version
+       the SDK's dependency graph resolves on each target. A hand-pinned copy here fell one patch behind the SDK
        and failed restore with NU1605 (DECISIONS #45). -->
   <ItemGroup>
     <PackageReference Include="TcgDex.CSharpSdk" Version="$(SmokeSdkVersion)" />
