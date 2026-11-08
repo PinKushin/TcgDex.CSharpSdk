@@ -108,6 +108,17 @@
     <EnableStrictModeForCompatibleFrameworksInPackage>true</EnableStrictModeForCompatibleFrameworksInPackage>
   </PropertyGroup>
 
+  <!--
+    release.yml passes -p:TcgDexReleaseBuild=true, which turns on ContinuousIntegrationBuild for this project
+    alone: source paths are normalised to /_/, so the shipped binary and symbols carry no runner path. Passing
+    ContinuousIntegrationBuild itself reached the test project too, and PublicApiTests finds its baseline through
+    [CallerFilePath], so it looked for /_/TcgDex.CSharpSdk.Tests/PublicApi.approved.cs and the 0.9.1 tag's run
+    failed (DECISIONS #46).
+  -->
+  <PropertyGroup Condition="'$(TcgDexReleaseBuild)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" Visible="false" />
     <None Include="..\LICENSE.txt" Pack="true" PackagePath="\" Visible="false" />

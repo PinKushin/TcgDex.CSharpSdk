@@ -361,7 +361,7 @@ matter:
 | `id-token: write` | Lets the job request the OIDC token. Missing it is the commonest reason trusted publishing fails first time, and the error is unhelpful. |
 | `Resolve version` runs **before** `Build` | The version has to reach the compile, not just the pack. `dotnet pack --no-build -p:Version=` alone stamps the package while the assembly inside keeps the csproj value — a DLL and a package that disagree. |
 | Semantic-version, `<Version>` and changelog checks | Fail loudly on a typo or a release whose pull request forgot the bump. NuGet accepts a surprising amount of nonsense as a version, and a published one cannot be withdrawn. |
-| `ContinuousIntegrationBuild` on the build and pack | Keeps the runner's checkout path out of the binary and its symbols. |
+| `TcgDexReleaseBuild` on the build and pack | Turns on `ContinuousIntegrationBuild` in the library project only, keeping the runner's checkout path out of the binary and its symbols. Not `ContinuousIntegrationBuild` itself: that reaches the test project, whose public-API test finds its baseline by source path (DECISIONS #46). |
 | Every action pinned to a commit SHA | `NuGet/login` receives the publish token, so a moved tag there matters most. |
 | `user: PinKushin` | The nuget.org **profile name**, not an email — the commonest `NuGet/login` failure. Written literally rather than as a secret because it is public: it is the package owner on every package page and in the policy itself. |
 | `--skip-duplicate` | Makes a re-run harmless, which is what lets a retry follow a partial run. |
