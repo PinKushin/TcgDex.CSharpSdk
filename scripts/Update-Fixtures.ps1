@@ -73,6 +73,12 @@ foreach ($entry in $entries) {
         Write-Error "Failed to fetch '$url': $_"
     }
 
+    # ...but an outage is not one. With the status check off, a load balancer's
+    # plain-text "no available server" was once written over serie-full.json.
+    if ([int]$response.StatusCode -ge 500 -or -not (Test-Json -Json $fresh -ErrorAction Ignore)) {
+        Write-Error "Refusing to record '$url': HTTP $([int]$response.StatusCode), body is not a recording: $fresh"
+    }
+
     $existing = if (Test-Path $path) { Get-Content -Path $path -Raw } else { $null }
 
     if ($existing -eq $fresh) {

@@ -1226,3 +1226,27 @@ manual dispatch would attempt a real publish. The workflow files were checked fo
 dependencies (`ci-gate` -> `publish` -> `announce`), and the release build and pack flags were run locally with a
 new version number; nothing was published.
 
+## 43. `serie-full.json` is recorded from `sm`, not `swsh`
+
+On 2026-11-08 the scheduled live-API run failed fixture drift on `serie-full.json`:
+`removed: 'lastSet.logo'` and `'lastSet.symbol'`. This happened after TCGdex released `v2.49.0`. It
+was not a schema change. `swsh12.5` (Crown Zenith) and `swsh12.5gg` (its Galarian Gallery) share the
+release date 2023-01-20. The API now sorts `swsh12.5gg` last, and that set has no logo or symbol.
+`CardSetBrief.Logo` and `Symbol` were already nullable, and `sets[]` still carries both fields.
+Only the recording's `lastSet` had changed.
+
+This is the second time `swsh`'s `lastSet` has drifted for a data reason (#11 records the first).
+A tie at the end of the series can flip again. If it does, the drift check fails the other way,
+on an added field. I recommended pointing the fixture at a series with a clean ending, and the
+owner said "fix them". `sm` ends `sm115` 2019-08-23, then `sm12` 2019-11-01, and both have a logo
+and a symbol. `sv` was rejected because it ends in a tie (`sv10.5b` and `sv10.5w`, 2025-07-17). The
+unit tests that read the fixture's values now expect `sm`: `SetSerieContractTests` and
+`TypedCacheTests`.
+
+**The recorder could overwrite a fixture with an outage.** The first refresh wrote the 20-byte
+body `no available server` over `serie-full.json`. `Update-Fixtures.ps1` passes
+`-SkipHttpErrorCheck` so that it can record the two deliberate error fixtures, which means it
+accepted any response at all. It now refuses a 5xx status and any body that is not JSON.
+*Measured* with that guard expression against live responses: refused a 503 and a 200 HTML page,
+accepted the `nope-999` 404 recording and `series/swsh`.
+

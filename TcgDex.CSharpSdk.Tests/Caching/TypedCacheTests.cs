@@ -170,14 +170,14 @@ public sealed class TypedCacheTests
         TaggedHandler handler = new(Fixture.ReadText("serie-full.json"));
         using TcgDexClient client = Client(handler);
 
-        Series? asSerie = await client.Series.GetAsync("swsh", CancellationToken.None);
+        Series? asSerie = await client.Series.GetAsync("sm", CancellationToken.None);
 
         handler.Body = Card();
         handler.ETag = "W/\"v2\"";
 
         Card? asCard = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
 
-        asSerie.ShouldNotBeNull().Id.ShouldBe("swsh");
+        asSerie.ShouldNotBeNull().Id.ShouldBe("sm");
         asCard.ShouldNotBeNull().Name.ShouldBe("Furret");
     }
 

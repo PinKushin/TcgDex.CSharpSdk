@@ -52,11 +52,11 @@ public sealed class SetSerieContractTests
     {
         Series serie = Fixture.Load<Series>("serie-full.json");
 
-        serie.Id.ShouldBe("swsh");
-        serie.Name.ShouldBe("Sword & Shield");
-        serie.ReleaseDate.ShouldBe(new DateTime(2019, 11, 15));
-        serie.FirstSet.ShouldNotBeNull().Id.ShouldBe("swshp");
-        serie.LastSet.ShouldNotBeNull();
+        serie.Id.ShouldBe("sm");
+        serie.Name.ShouldBe("Sun & Moon");
+        serie.ReleaseDate.ShouldBe(new DateTime(2017, 2, 3));
+        serie.FirstSet.ShouldNotBeNull().Id.ShouldBe("smp");
+        serie.LastSet.ShouldNotBeNull().Id.ShouldBe("sm12");
         serie.Sets.ShouldNotBeEmpty();
     }
 
@@ -160,7 +160,7 @@ public sealed class SetSerieContractTests
 
         string json = JsonSerializer.Serialize(serie, TcgDex.Serialization.TcgDexJsonContext.Default.Series);
 
-        json.ShouldContain("\"releaseDate\":\"2019-11-15\"");
+        json.ShouldContain("\"releaseDate\":\"2017-02-03\"");
         Fixture.Parse<Series>(json).ReleaseDate.ShouldBe(serie.ReleaseDate);
     }
 
