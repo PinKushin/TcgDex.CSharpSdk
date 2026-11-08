@@ -30,9 +30,11 @@ dotnet test TcgDex.CSharpSdk.IntegrationTests/TcgDex.CSharpSdk.IntegrationTests.
 ```
 
 Mutation testing — **takes the machine-wide lock**, because Stryker rebuilds continuously into
-the same `obj/` a neighbouring test run needs:
+the same `obj/` a neighbouring test run needs. Run it **from `TcgDex.CSharpSdk.Tests/`**; from the
+root it auto-detects the `.sln` and falls into solution mode (DECISIONS #44):
 
 ```bash
+cd TcgDex.CSharpSdk.Tests
 C:\Users\pinku\source\repos\PinKushin\run-exclusive.ps1 -TimeoutMinutes 45 dotnet stryker
 ```
 

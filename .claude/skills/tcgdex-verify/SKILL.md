@@ -90,5 +90,6 @@ tr -d '\r' < TcgDex.CSharpSdk.Tests/PublicApi.received.cs > TcgDex.CSharpSdk.Tes
 - **Mutation testing** takes the machine-wide lock and runs ~20 minutes:
 
   ```bash
+  cd TcgDex.CSharpSdk.Tests   # not the root: see DECISIONS #44
   C:\Users\pinku\source\repos\PinKushin\run-exclusive.ps1 -TimeoutMinutes 45 dotnet stryker
   ```
