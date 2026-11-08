@@ -143,7 +143,10 @@ public sealed class PublicApiTests
     /// <summary>
     /// The directory holding this source file, so the baseline is written back
     /// to the repository rather than into <c>bin</c>, where it would be lost on
-    /// the next clean and could never be committed.
+    /// the next clean and could never be committed. Under
+    /// <c>ContinuousIntegrationBuild</c> this path is mapped to <c>/_/...</c> and the
+    /// baseline is not found, so that flag must never reach this project: the release
+    /// workflow scopes it to the library (DECISIONS #46).
     /// </summary>
     /// <param name="path">Supplied by the compiler; never pass this.</param>
     /// <returns>The directory containing this file.</returns>
