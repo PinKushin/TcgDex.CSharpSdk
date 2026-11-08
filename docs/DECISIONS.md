@@ -1362,8 +1362,10 @@ the root, so `dotnet-stryker` sat two months behind 5.0.0 (#44), and `docfx` sat
 `TcgDex.CSharpSdk.Tests/`, where Stryker runs. Both tools and CsCheck joined the
 `test-and-tooling` group, with the three analyzers. CsCheck and the analyzers had been falling into
 `runtime`, which is meant for shipped packages only; the analyzers are `PrivateAssets=all` and
-never reach a consumer. Whether Dependabot now raises
-the tools is unverified until its first Monday run after the merge.
+never reach a consumer. *Verified* on the Dependabot run that the merge
+triggered (42512234825, 2026-11-08): it logged `Discovered [.config/dotnet-tools.json] file.`,
+analysed `docfx` and `dotnet-stryker`, and found no updatable version for either, since both were
+then at their latest release.
 
 **The package smoke test pinned a copy of the SDK's version line.** `TcgDex.CSharpSdk.PackageSmokeTest`
 has central package management off (#34), and it referenced `Microsoft.Extensions.DependencyInjection`
