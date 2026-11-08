@@ -1296,7 +1296,10 @@ retired mutation box's script and was left alone.
 **What changes in the run.** 823 tests are discovered instead of 834. The 11 offline `JsonShape`
 tests in `TcgDex.CSharpSdk.IntegrationTests` came in only through the solution, and they test the
 drift engine, not the library. `test-case-filter` now matches nothing, but it stays as the #31
-guard in case another test project is ever added.
+guard in case another test project is ever added. *Measured* on GitHub Actions, run 42497433243:
+the score was 95.43% with 1413 mutants, both identical to the last scheduled run on `main`
+(42477802953). There was no fallback warning, and the report uploaded from its new path. Dropping
+tests can only lose kills, so an identical total means no file lost one.
 
 **First attempt, replaced.** The first version of this change ran `dotnet restore` before Stryker.
 A throwaway A/B workflow tested it: each job was a cold checkout running Stryker on one file. With
