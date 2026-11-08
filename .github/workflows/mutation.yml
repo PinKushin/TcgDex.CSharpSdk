@@ -35,6 +35,11 @@ jobs:
 
       - run: dotnet tool restore
 
+      # Restore before Stryker analyses the solution (DECISIONS #44). On a cold
+      # checkout its parallel analysis sometimes came back empty for the library,
+      # which then compiled with no references and failed with CS0518.
+      - run: dotnet restore TcgDex.CSharpSdk.sln
+
       # Stryker defaults to half the logical processors.
       - name: Run Stryker
         run: |

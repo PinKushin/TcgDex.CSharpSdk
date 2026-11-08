@@ -1254,3 +1254,38 @@ not JSON. The empty body is checked separately because `Test-Json` cannot bind a
 *Measured* with that guard expression against live responses: refused a 503, a 200 HTML page and
 an empty body, and accepted the `nope-999` 404 recording and `series/swsh`.
 
+## 44. The mutation workflow restores before Stryker runs
+
+The scheduled mutation run failed on 2026-11-04 and 2026-11-07. Both times Stryker crashed before
+any mutant ran: `Failed to build the mutated assembly due to unrecoverable error: error CS0518:
+Predefined type 'System.Attribute' is not defined or imported`. Both runs were on the same commit,
+with the same Stryker (4.16.0) and the same config, as eleven runs that passed with the same score
+(95.43%). So this is a flake, not a regression.
+
+**What happens.** Each failing run, and no passing run, logs `Buildalyzer could not find source
+files ... We fall back to filesystem scan`. In solution mode Stryker analyses all six projects in
+the solution at once, four at a time, on a cold checkout. The other five all reference the library,
+and in the reproduced failure three of them were analysed alongside it. Sometimes the library's
+analysis reports success but returns no source files. Stryker's fallback
+rescans the folder for `.cs` files, but it still takes references from the empty analysis. The
+mutated assembly is then compiled with no references, which gives CS0518. The debug log of one
+reproduced failure shows this sequence. It does not show *why* the analysis came back empty. My
+hypothesis is that concurrent restores, which write the library's `obj/` while it is being
+analysed, race. That is not proven.
+
+**The fix.** Run `dotnet restore` on the solution before `dotnet stryker`. The restores during
+analysis then have nothing to write.
+
+*Measured* with a throwaway A/B workflow on GitHub Actions. Each job was a cold checkout running
+Stryker on one file. Without a restore, 2 of 70 jobs failed with the same signature. With a restore,
+0 of 70 failed. That **does not prove the fix**: at this failure rate the difference is not
+significant (p about 0.5). The failure rate in the experiment (about 3%) was also lower than on the
+schedule (2 of 13 days). The step costs a few seconds and Stryker builds the solution next anyway,
+so it is kept on the evidence there is. The schedule is the check. At the scheduled failure rate,
+20 green days in a row would happen by chance about 4% of the time. Any failure with this
+signature after this change means the hypothesis was wrong, and the next candidate is project mode
+(dropping `solution` from `stryker-config.json`), which analyses fewer projects.
+
+Separately, Stryker 5.0.0 was released on 2026-09-11 and nothing raised it. Upgrading is a separate
+change, because it can move the mutation score.
+
