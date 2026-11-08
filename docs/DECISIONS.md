@@ -1190,10 +1190,12 @@ resolve subpath actions). The one that matters most is `NuGet/login`, which rece
 `github-actions` entry should keep them current, since it is meant to update a SHA pin together with its comment;
 the first Dependabot action PR after this is the check that it does.
 
-**CI-build flag (row 7).** `-p:ContinuousIntegrationBuild=true` is passed to the `Build` and `Pack` steps of
-`release.yml`, not set repository-wide: set globally it would also rewrite the source paths CI's coverage tooling
-maps back to files. *Measured:* the symbols of a pack with the flag carry the normalised `/_/` path and no trace of
-the checkout directory; without it they embed the local path.
+**CI-build flag (row 7).** `ContinuousIntegrationBuild` is on for the library in release builds only:
+`release.yml` passes `-p:TcgDexReleaseBuild=true` to `Build` and `Pack`, and the library csproj turns it on. It was
+first passed as `-p:ContinuousIntegrationBuild=true`, which also reached the test project and failed the first real
+release (#46). It is not set repository-wide: set globally it would also rewrite the source paths CI's coverage
+tooling maps back to files. *Measured:* the symbols of a pack with the flag carry the normalised `/_/` path and no
+trace of the checkout directory; without it they embed the local path.
 
 **`global.json` (row 7): a floor, not a pin.** `{ "version": "10.0.100", "rollForward": "latestFeature" }`. It stops a
 build with an SDK older than the one `net10.0` needs, and documents it. It does not pin the exact SDK: the owner's
@@ -1407,4 +1409,19 @@ compared with its best in all 32 successful runs, counting unit-test kills only.
 
 The package validation baseline stays 0.9.0, the newest release on nuget.org (`docs/publishing.md`,
 step 1). It moves to 0.9.1 in the PR that prepares the next release.
+
+**The first tag run failed, and nothing was published.** `v0.9.1` on `bbc0440` passed `ci-gate`, then failed
+the `publish` job's `Test` step (run 42516058274): `ThePublicSurface_MatchesTheApprovedBaseline` threw
+`DirectoryNotFoundException: '/_/TcgDex.CSharpSdk.Tests/PublicApi.approved.cs'`. PR #105 (DECISIONS #42) had
+added `-p:ContinuousIntegrationBuild=true` to the `Build` step, which builds the whole solution. That normalised the
+test project's `[CallerFilePath]` too, and that is how the test finds its baseline in the source tree. CI never sets
+the flag, and 0.9.0 was released before PR #105, so this was the first run that could fail this way. No package reached
+nuget.org, no GitHub Release was created, and the Discord job was skipped.
+- *Fix:* `release.yml` passes `-p:TcgDexReleaseBuild=true`, and only the library csproj turns that into
+  `ContinuousIntegrationBuild`. *Reproduced* locally with `-p:ContinuousIntegrationBuild=true`, which gave the same
+  exception. With the new property the full suite passes (823, 817, 816). Reading the packed symbols with
+  `System.Reflection.Metadata` shows `/_/TcgDex.CSharpSdk/...` document paths on all three targets, while the test
+  PDB keeps real paths.
+- *The tag:* nothing was published from `bbc0440`, so `v0.9.1` moves to the merge commit of the fix (PR #116),
+  rather than a 0.9.2 being cut for a release that never happened.
 

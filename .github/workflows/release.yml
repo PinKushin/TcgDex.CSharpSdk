@@ -124,15 +124,15 @@ jobs:
       # -warnaserror here as well as in CI: a release is exactly the build that
       # should not be the first one to skip the zero-warning rule.
       #
-      # ContinuousIntegrationBuild makes the compiler normalise source paths (to /_/...), so the binary and its
-      # symbols do not carry this runner's checkout path. (It does not by itself make a rebuild byte-identical: that
-      # also needs the same SDK, and global.json is a floor, not a pin.) It is
-      # passed here, to the build that ships, and not set repository-wide: it would also rewrite the paths coverage
+      # TcgDexReleaseBuild turns on ContinuousIntegrationBuild in the library project only (its csproj says why):
+      # the compiler normalises source paths (to /_/...), so the binary and its symbols do not carry this runner's
+      # checkout path. (It does not by itself make a rebuild byte-identical: that also needs the same SDK, and
+      # global.json is a floor, not a pin.) It is not set repository-wide: it would also rewrite the paths coverage
       # tooling maps back to files in CI's test run.
       - name: Build
         run: >
           dotnet build --configuration Release --no-restore -warnaserror
-          -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
+          -p:Version="$VERSION" -p:TcgDexReleaseBuild=true
 
       # Never publish something that is not green. On this Linux runner that is net8.0 and net10.0: net472, which is
       # what executes the netstandard2.0 asset, is Windows-only (TcgDex.CSharpSdk.Tests.csproj). It, the coverage
@@ -150,7 +150,7 @@ jobs:
         run: >
           dotnet pack TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj
           --configuration Release --no-build
-          -o ./artifacts -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
+          -o ./artifacts -p:Version="$VERSION" -p:TcgDexReleaseBuild=true
 
       # The package that is about to ship, installed into a fresh project and run on net8.0 and
       # net10.0. Linux cannot run net472, so the netstandard2.0 asset is covered by CI's Windows
