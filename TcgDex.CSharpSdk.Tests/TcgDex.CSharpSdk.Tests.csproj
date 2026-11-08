@@ -48,17 +48,17 @@
     <PackageReference Include="PublicApiGenerator" />
   </ItemGroup>
 
-  <!-- CsCheck ships a net8.0 asset and nothing older, so the net472 leg cannot
-       reference it. The properties under Properties/ are statements about pure
-       logic — an LRU that never exceeds its bound, an escaper that round-trips
-       — and those hold identically on every target, so proving them on the
-       modern legs is enough. The net472 leg exists to execute the
-       netstandard2.0 assembly, which these do not exercise differently. -->
-  <ItemGroup Condition="'$(TargetFramework)' != 'net472'">
+  <!-- CsCheck 5 ships net10.0 assets and nothing older, so only the net10.0
+       leg can reference it (DECISIONS #45). The properties under Properties/
+       are statements about pure logic — an LRU that never exceeds its bound —
+       and those hold identically on every target, so proving them on one leg
+       is enough. The net8.0 and net472 legs exist to execute the net8.0 and
+       netstandard2.0 assemblies, which these do not exercise differently. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <PackageReference Include="CsCheck" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
     <Compile Remove="Properties\**\*.cs" />
   </ItemGroup>
 
