@@ -83,11 +83,11 @@
          nullability annotations and has no supported way to generate them
          outside an IDE. MIT licensed, test-only, never shipped. -->
     <PackageVersion Include="PublicApiGenerator" Version="11.5.4" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <PackageVersion Include="NUnit" Version="5.0.0" />
     <PackageVersion Include="NUnit3TestAdapter" Version="6.3.1" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />
-    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.1" />
 
     <!-- Property-based testing: generates thousands of inputs and shrinks a
          failure to its smallest reproducing case. Complements the fuzzers,
@@ -115,9 +115,9 @@
        HTTP client throughout, which is exactly the shape those rules target.
        See docs/DECISIONS.md for the full record. -->
   <ItemGroup>
-    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.36.0.15337" />
     <PackageVersion Include="Roslynator.Analyzers" Version="5.0.1" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.321" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.341" />
   </ItemGroup>
 
 </Project>
