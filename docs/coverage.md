@@ -328,23 +328,22 @@ GraphQL error log, the `'9'` boundary in `Attack.BaseDamage`, and the five `Conf
 ### Fifth round: survivors with no entry yet
 
 GitHub Actions run 44749084838 on `05a1bb2` (95.35%) left 46 undetected mutants. 34 are rows above,
-at line numbers that have since moved. Of the other 12, five now have a killing test, checked by
+at line numbers that have since moved. Of the other 12, eight now have a killing test, checked by
 hand the same way: the reused-parse log (`TcgDexTransport.cs:194`), the `ConfigureAwait` on the
-success-path body read (`:205`), the unreadable-404-body message (`:370`), and both mutants that
-drop the value from `ValueDictionary`'s hash (`ValueDictionary.cs:131`). The seven below cannot be
-killed by a test of behaviour.
+success-path body read (`:205`), the unreadable-404-body message (`:370`), the two mutants that
+drop the value from `ValueDictionary`'s hash (`ValueDictionary.cs:131`, Conditional (true) and
+Equality), the divided key in the same hash (`:132`), and the subtracted item and divided running
+value in `ValueList`'s hash (`ValueList.cs:107`). The hash tests use `int` items, which hash to
+themselves, so each expected difference is exact rather than likely. The four below cannot be killed.
 
 Line numbers are those of `05a1bb2`.
 
 | File:line | Mutator | Why it is not killed |
 |---|---|---|
-| `TcgPlayerPricingConverter.cs:69` | Statement (`continue` removed) | Equivalent. `isUpdated` is false whenever `isUnit` is true, so control reaches the shape check. The `unit` value is a string or null, a scalar, so `Skip()` does nothing and the loop continues as before. A non-scalar `unit` already throws in `GetString()` on the line above. |
-| `TcgPlayerPricingConverter.cs:75` | Statement (`continue` removed) | Equivalent, for the same reason: `ReadTimestamp` leaves the reader on the scalar it read, and `Skip()` on a scalar does nothing. |
-| `ValueDictionary.cs:131` | Conditional (false) | Equivalent. `EqualityComparer<TValue>.Default.GetHashCode(null)` is 0, the value the branch supplies. |
-| `ValueDictionary.cs:132` | Arithmetic (`*` to `/`) | Hash quality, not behaviour. Equal dictionaries still hash alike, since the result still depends only on the entries and is still summed. Only how widely the hashes spread changes, and a test could pin that only by restating the formula. |
-| `ValueList.cs:107` | Arithmetic (`+` to `-`) | Hash quality, not behaviour, for the same reason. The fold stays order-sensitive, which `AList_WithTheSameItemsInADifferentOrder_HasADifferentHash` pins. |
-| `ValueList.cs:107` | Arithmetic (`*` to `/`) | Hash quality, not behaviour. Equal lists still hash alike. |
-| `ValueList.cs:107` | Conditional (false) | Equivalent. `EqualityComparer<T>.Default.GetHashCode(null)` is 0, the value the branch supplies. |
+| `TcgPlayerPricingConverter.cs:69` | Statement (`continue` removed) | Equivalent. `isUpdated` is false whenever `isUnit` is true, so control reaches the shape check. Only a string or null `unit` gets this far, since `GetString()` on the line above throws on anything else. Both are scalars, so `Skip()` does nothing and the loop continues as before. |
+| `TcgPlayerPricingConverter.cs:75` | Statement (`continue` removed) | Equivalent. `ReadTimestamp` leaves the reader on a token that `Skip()` does nothing on: the scalar it read, or the closing `}` or `]` of an object or array it skipped. Neither is `StartObject`, so the shape check skips and continues as before. |
+| `ValueDictionary.cs:131` | Conditional (false) | Equivalent. `EqualityComparer<TValue>.Default.GetHashCode(null)` is 0, the value the branch supplies, for nullable value types and reference types alike. |
+| `ValueList.cs:107` | Conditional (false) | Equivalent, for the same reason. |
 
 ## What coverage does not tell you
 

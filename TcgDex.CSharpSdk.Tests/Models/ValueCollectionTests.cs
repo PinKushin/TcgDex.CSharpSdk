@@ -75,6 +75,16 @@ public sealed class ValueCollectionTests
             .ShouldNotBe(ValueList<string>.From(["b", "a"]).GetHashCode());
     }
 
+    [TestCase(new[] { 31 }, new int[0])]
+    [TestCase(new[] { 1, 2 }, new[] { 0, 2 })]
+    public void Lists_ThatDifferOnlyInTheirItems_HaveDifferentHashes(int[] first, int[] second)
+    {
+        // Not guaranteed by the contract either; ints hash to themselves, so these are exact. The fold scales the
+        // running value and adds each item: [31] is 1 * 31 + 31 = 62 against 0 for the empty list, and [1, 2] and
+        // [0, 2] are 1955 and 1924. Subtracting the item, or dividing the running value, makes each pair collide.
+        ValueList<int>.From(first).GetHashCode().ShouldNotBe(ValueList<int>.From(second).GetHashCode());
+    }
+
     // ----- ValueDictionary -----
 
     private static IReadOnlyDictionary<string, int> Dictionary(params (string Key, int Value)[] entries)
@@ -155,6 +165,16 @@ public sealed class ValueCollectionTests
         // with the same keys would collide. Certain here, not just likely: an int hashes to itself, so the two hashes
         // are the same key term XORed with 1 and with 2.
         Dictionary(("a", 1)).GetHashCode().ShouldNotBe(Dictionary(("a", 2)).GetHashCode());
+    }
+
+    [Test]
+    public void ADictionary_WithTheSameValueUnderADifferentKey_HasADifferentHash()
+    {
+        // The key is scaled before the value is folded in. Int keys hash to themselves, so 1 and 2 give 31 and 62
+        // here; a scaling that collapsed small keys together (dividing instead) would make the two collide.
+        static IReadOnlyDictionary<int, int> Keyed(int key) => ValueDictionary<int, int>.From(new Dictionary<int, int> { [key] = 5 });
+
+        Keyed(1).GetHashCode().ShouldNotBe(Keyed(2).GetHashCode());
     }
 
     [Test]
