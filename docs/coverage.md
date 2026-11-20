@@ -333,8 +333,9 @@ hand the same way: the reused-parse log (`TcgDexTransport.cs:194`), the `Configu
 success-path body read (`:205`), the unreadable-404-body message (`:370`), the two mutants that
 drop the value from `ValueDictionary`'s hash (`ValueDictionary.cs:131`, Conditional (true) and
 Equality), the divided key in the same hash (`:132`), and the subtracted item and divided running
-value in `ValueList`'s hash (`ValueList.cs:107`). The hash tests use `int` items, which hash to
-themselves, so each expected difference is exact rather than likely. The four below cannot be killed.
+value in `ValueList`'s hash (`ValueList.cs:107`). The hash tests use `int` keys and items, which
+hash to themselves, so each expected difference is exact on every target. A `string` key would not
+be: its hash is randomised per process on .NET 8 and later. The four below cannot be killed.
 
 Line numbers are those of `05a1bb2`.
 

@@ -81,7 +81,8 @@ public sealed class ValueCollectionTests
     {
         // Not guaranteed by the contract either; ints hash to themselves, so these are exact. The fold scales the
         // running value and adds each item: [31] is 1 * 31 + 31 = 62 against 0 for the empty list, and [1, 2] and
-        // [0, 2] are 1955 and 1924. Subtracting the item, or dividing the running value, makes each pair collide.
+        // [0, 2] are 1955 and 1924. Subtracting the item makes the first pair collide (0 and 0); dividing the
+        // running value makes the second collide (2 and 2).
         ValueList<int>.From(first).GetHashCode().ShouldNotBe(ValueList<int>.From(second).GetHashCode());
     }
 
@@ -162,9 +163,12 @@ public sealed class ValueCollectionTests
     public void ADictionary_WithTheSameKeysAndADifferentValue_HasADifferentHash()
     {
         // Not guaranteed by the contract, but the hash folds each value in on purpose: without it every dictionary
-        // with the same keys would collide. Certain here, not just likely: an int hashes to itself, so the two hashes
-        // are the same key term XORed with 1 and with 2.
-        Dictionary(("a", 1)).GetHashCode().ShouldNotBe(Dictionary(("a", 2)).GetHashCode());
+        // with the same keys would collide. Int keys and values hash to themselves, so the result is exact on every
+        // target, where a string key would be randomised per process: key 2 scales to 62, and 62 ^ 1 = 63 against
+        // 62 ^ 2 = 60. Ignoring the value makes the two equal.
+        static IReadOnlyDictionary<int, int> Valued(int value) => ValueDictionary<int, int>.From(new Dictionary<int, int> { [2] = value });
+
+        Valued(1).GetHashCode().ShouldNotBe(Valued(2).GetHashCode());
     }
 
     [Test]
