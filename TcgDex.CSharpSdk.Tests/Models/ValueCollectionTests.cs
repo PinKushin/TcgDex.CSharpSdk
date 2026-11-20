@@ -149,6 +149,15 @@ public sealed class ValueCollectionTests
     }
 
     [Test]
+    public void ADictionary_WithTheSameKeysAndADifferentValue_HasADifferentHash()
+    {
+        // Not guaranteed by the contract, but the hash folds each value in on purpose: without it every dictionary
+        // with the same keys would collide. Certain here, not just likely: an int hashes to itself, so the two hashes
+        // are the same key term XORed with 1 and with 2.
+        Dictionary(("a", 1)).GetHashCode().ShouldNotBe(Dictionary(("a", 2)).GetHashCode());
+    }
+
+    [Test]
     public void ADictionary_ComparesKeysOrdinally_WhateverComparerTheCallerBuiltItWith()
     {
         // A key comparer is not part of the entries, so honouring each side's own would make Equals asymmetric

@@ -284,6 +284,28 @@ public sealed class ContextCaptureTests
     }
 
     [Test]
+    public async Task TheTransport_ResumesOffTheCallersContext_AfterReadingTheBody()
+    {
+        // The send completes at once, so the caller's context is still current at
+        // the success-path body read, and only that read is held open.
+        TaskCompletionSource<bool> gate = new();
+        byte[] payload = System.Text.Encoding.UTF8.GetBytes(Fixture.ReadText("card-pokemon-full.json"));
+
+        Handler handler = new(
+            () => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(new GatedStream(payload, gate.Task)),
+            },
+            gated: false);
+
+        using TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
+
+        Task work = await AssertNoPostsAsync(() => client.Cards.GetAsync("swsh3-136", CancellationToken.None), gate);
+
+        work.Status.ShouldBe(TaskStatus.RanToCompletion);
+    }
+
+    [Test]
     public async Task TheTransport_ResumesOffTheCallersContext_ReadingAnErrorBody()
     {
         TaskCompletionSource<bool> gate = new();

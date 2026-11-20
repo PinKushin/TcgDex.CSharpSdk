@@ -133,6 +133,39 @@ public sealed class LoggingTests
     }
 
     [Test]
+    public async Task AReusedParse_LogsAtTrace_OnlyOnTheRepeat()
+    {
+        // The typed cache skipping a parse is a different saving from the byte
+        // cache skipping a request, and someone sizing the caches needs to see it.
+        static HttpResponseMessage Tagged(HttpRequestMessage _)
+        {
+            HttpResponseMessage response = new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(Fixture.ReadText("card-pokemon-full.json"), System.Text.Encoding.UTF8, "application/json"),
+            };
+            response.Headers.TryAddWithoutValidation("ETag", "W/\"v1\"");
+            return response;
+        }
+
+        RecordingLogger log = new(LogLevel.Trace);
+        using TcgDexClient client = new(
+            new HttpClient(new RecordingHandler().RespondWith(Tagged).RespondWith(Tagged)),
+            new TcgDexOptions { MaxDeserializedCacheEntries = 64 },
+            log.Factory);
+
+        await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+
+        // The control: the first fetch parses, so it has nothing to report.
+        log.Entries.ShouldNotContain(e => e.EventId == 1007);
+
+        await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+
+        LogEntry entry = log.Entries.Where(e => e.EventId == 1007).ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Trace);
+        entry.Message.ShouldBe("TCGdex reused the parsed Card for https://api.tcgdex.net/v2/en/cards/swsh3-136; the ETag was unchanged");
+    }
+
+    [Test]
     public async Task AMissingResource_LogsAtDebugNotWarning()
     {
         // Asking for a card that does not exist is an ordinary outcome, and
