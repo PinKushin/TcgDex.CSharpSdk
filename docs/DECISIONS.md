@@ -1468,8 +1468,8 @@ target, since 10 is the long-term-support release. It does, and the decision is 
 - **`global.json` is now `11.0.100`, still `latestFeature`.** The #42 reasoning holds: a floor, not a pin.
 - **Not `latestMajor`.** Every workflow installs SDKs explicitly through `setup-dotnet`, not from `global.json`,
   so `latestMajor` would have built locally on 11 while CI stayed on 10: two compilers and two analyzer sets.
-- **Every `setup-dotnet` step installs `11.0.x`** beside the runtimes the tests and AOT smoke run on (`8.0.x`,
-  `10.0.x`). Those stay: the SDK builds the targets, the runtimes run them.
+- **Every `setup-dotnet` step installs `11.0.x`** beside the runtimes that job runs on, which stay: the SDK builds
+  the targets, the runtimes run them.
 - **The package targets are unchanged** (`net10.0;net8.0;netstandard2.0`). The SDK only builds the package, and
   consumers never see which one did. Adding a `net11.0` target is a separate decision, not taken; .NET 11 is a
   short-term-support release.
@@ -1477,5 +1477,7 @@ target, since 10 is the long-term-support release. It does, and the decision is 
   there beside it (`dotnet-install.sh --channel 11.0`).
 - *Measured locally on SDK 11.0.100*, before and after the change: Release build with `-warnaserror` clean; unit
   tests 817 (net8.0), 823 (net10.0), 816 (net472), all passing; coverage 99.79% line, 97.73% branch.
-- `release.yml` only runs on a tag push, so the next release is the first proof of its SDK step (as in #46).
+- Pull-request CI does not run the scheduled workflows, so Mutation, Fuzz and Live API were dispatched on the
+  branch before merge. `release.yml` only runs on a tag push, so the next release is the first proof of its SDK
+  step (as in #46).
 
