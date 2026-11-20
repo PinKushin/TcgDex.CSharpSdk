@@ -327,8 +327,8 @@ GraphQL error log, the `'9'` boundary in `Attack.BaseDamage`, and the five `Conf
 
 ### Fifth round: survivors with no entry yet
 
-GitHub Actions run 44749084838 on `05a1bb2` (95.35%) left 46 undetected mutants. 34 are rows above,
-at line numbers that have since moved. Of the other 12, eight now have a killing test, checked by
+GitHub Actions run 44749084838 on `05a1bb2` (95.35%) left 46 undetected mutants. 34 are written off
+above, at line numbers that have since moved; one row there can cover several mutants. Of the other 12, eight now have a killing test, checked by
 hand the same way: the reused-parse log (`TcgDexTransport.cs:194`), the `ConfigureAwait` on the
 success-path body read (`:205`), the unreadable-404-body message (`:370`), the two mutants that
 drop the value from `ValueDictionary`'s hash (`ValueDictionary.cs:131`, Conditional (true) and
@@ -343,6 +343,12 @@ Line numbers are those of `05a1bb2`.
 |---|---|---|
 | `TcgPlayerPricingConverter.cs:69` | Statement (`continue` removed) | Equivalent. `isUpdated` is false whenever `isUnit` is true, so control reaches the shape check. Only a string or null `unit` gets this far, since `GetString()` on the line above throws on anything else. Both are scalars, so `Skip()` does nothing and the loop continues as before. |
 | `TcgPlayerPricingConverter.cs:75` | Statement (`continue` removed) | Equivalent. `ReadTimestamp` leaves the reader on a token that `Skip()` does nothing on: the scalar it read, or the closing `}` or `]` of an object or array it skipped. Neither is `StartObject`, so the shape check skips and continues as before. |
+
+Both `continue` rows hold under stream deserialization too, where a reader that is not on its final
+block would make `Skip()` throw. System.Text.Json buffers a custom converter's whole value before
+calling it. Checked by hand: `DeserializeAsync` with a 16-byte `DefaultBufferSize`, on a pricing
+block with a null printing, an object-valued `updated` and an unknown scalar, succeeds on every
+target against the original and against both mutants.
 | `ValueDictionary.cs:131` | Conditional (false) | Equivalent. `EqualityComparer<TValue>.Default.GetHashCode(null)` is 0, the value the branch supplies, for nullable value types and reference types alike. |
 | `ValueList.cs:107` | Conditional (false) | Equivalent, for the same reason. |
 
