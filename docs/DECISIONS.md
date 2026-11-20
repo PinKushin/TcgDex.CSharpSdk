@@ -1203,7 +1203,7 @@ I chose the floor, and a Fable review then asked the owner to confirm it rather 
 by the owner, 2026-10-25: "Yes, keep global.json as a floor (10.0.100, latestFeature)."** He gave no further
 reasoning; the reasons above are the ones I put in front of him. The alternative he declined was an exact SDK pin
 with `setup-dotnet`'s `global-json-file`, which would also be what makes a rebuild byte-identical. Revisit only as a
-deliberate change.
+deliberate change. The floor moved to 11.0.100 in #48.
 
 **Amended after the Fable review of this change (0 blockers, 6 risks):**
 - *The gate aborted on the first `gh` error.* Reproduced (a bad repository made it die in 1 second with a stack
@@ -1456,4 +1456,28 @@ compares against the right version.
 
 `dotnet pack -p:Version=0.9.2` with the 0.9.1 baseline packs with no compatibility error, and restore records the
 0.9.1 package as the download.
+
+## 48. Build with the .NET 11 SDK; `net10.0` stays the long-term-support target
+
+On 2026-11-20 the owner's machine had only the .NET 11.0.100 SDK. The `global.json` floor from #42
+(`10.0.100`, `latestFeature`) does not roll forward across a major version, so nothing built locally. I offered
+three fixes: install the .NET 10 SDK, change `rollForward` to `latestMajor`, or move the floor to 11. The owner:
+"i want to keep .net at the highest it can be". He then asked whether the 11 compiler still builds the `net10.0`
+target, since 10 is the long-term-support release. It does, and the decision is to move the SDK only.
+
+- **`global.json` is now `11.0.100`, still `latestFeature`.** The #42 reasoning holds: a floor, not a pin.
+- **Not `latestMajor`.** Every workflow installs SDKs explicitly through `setup-dotnet`, not from `global.json`,
+  so `latestMajor` would have built locally on 11 while CI stayed on 10: two compilers and two analyzer sets.
+- **Every `setup-dotnet` step installs `11.0.x`** beside the runtimes that job runs on, which stay: the SDK builds
+  the targets, the runtimes run them.
+- **The package targets are unchanged** (`net10.0;net8.0;netstandard2.0`). The SDK only builds the package, and
+  consumers never see which one did. Adding a `net11.0` target is a separate decision, not taken; .NET 11 is a
+  short-term-support release.
+- **fuzz-box** had only SDK 10.0.302, and its nightly fuzz builds from this checkout, so SDK 11.0.100 was installed
+  there beside it (`dotnet-install.sh --channel 11.0`).
+- *Measured locally on SDK 11.0.100*, before and after the change: Release build with `-warnaserror` clean; unit
+  tests 817 (net8.0), 823 (net10.0), 816 (net472), all passing; coverage 99.79% line, 97.73% branch.
+- Pull-request CI does not run the scheduled workflows, so Mutation, Fuzz and Live API were dispatched on the
+  branch before merge. `release.yml` only runs on a tag push, so the next release is the first proof of its SDK
+  step (as in #46).
 

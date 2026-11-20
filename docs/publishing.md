@@ -317,7 +317,8 @@ then delete it on nuget.org immediately afterwards.
 `--api-key` lands in your shell history, and on Windows in
 `ConsoleHost_history.txt`, where it outlives the "delete it the same day" plan.
 `NUGET_API_KEY` is supported from NuGet 7.6 (.NET SDK 10.0.300). The repo's own
-SDK floor is lower (`global.json`, 10.0.100), so check `dotnet --version` first.
+SDK floor (`global.json`, 11.0.100) is above that, so any SDK that builds the repo
+has it.
 
 ```bash
 # PowerShell

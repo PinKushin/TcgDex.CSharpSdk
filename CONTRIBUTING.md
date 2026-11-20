@@ -18,8 +18,9 @@ like it might be revisiting settled ground.
 
 ## Environment
 
-- .NET SDK matching `TargetFrameworks` in `TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj` — currently
-  `net10.0`, `net8.0`, `netstandard2.0`.
+- The .NET SDK at or above the floor in `global.json` (currently 11.0.100), plus the runtimes for the
+  test targets (`net10.0`, `net8.0`). The library targets are `TargetFrameworks` in
+  `TcgDex.CSharpSdk/TcgDex.CSharpSdk.csproj`.
 - The `net472` test lane needs the .NET Framework 4.6.1+ targeting pack (or Visual Studio, which
   installs it). This is the only lane that actually **executes** the `netstandard2.0` asset rather
   than merely compiling it — see [`docs/learnings.md`](docs/learnings.md) for why that distinction
