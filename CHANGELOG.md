@@ -15,6 +15,8 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-21
+
 ### Fixed
 
 - The response cache and the parsed-model cache could stay above `MaxEntries` for good after many concurrent writes:
@@ -24,9 +26,14 @@ something an application can observe — those live in the commit history.
 
 ### Documentation
 
-- `TcgDexClient` now states that one instance may be shared across threads, and `TcgDexCacheOptions` that, unlike
-  `TcgDexOptions`, it is read on every request rather than copied, so it should not be changed once the client is
-  built.
+- `TcgDexClient` now states that one instance may be shared across threads, with what that asks of you: a custom
+  `ITcgDexResponseCache` or `GetTimeToLive` override must be thread-safe, and `Dispose` must not run while requests
+  do. `TcgDexCacheOptions` states that, unlike `TcgDexOptions`, it is read on every request rather than copied, so it
+  should not be changed once the client is built; and `TcgDexOptions` that, with dependency injection, every resolved
+  client reads the same registered instance.
+- The getting-started guide says what a rate-limited request produces: a 429 throws `TcgDexApiException` with
+  `Kind = HttpStatus`, is not retried, and carries no `Retry-After`. The README says the .NET Framework tests target
+  `net472`; earlier versions are untested.
 
 ## [0.9.2] - 2026-11-21
 
@@ -623,7 +630,8 @@ Models were built against verified live API responses, including the traps that
 break a naive port: polymorphic `attacks[].damage`, `weaknesses[].value` as a
 string, and `boosters` as an array of objects.
 
-[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/PinKushin/TcgDex.CSharpSdk/compare/v0.8.1...v0.9.0
