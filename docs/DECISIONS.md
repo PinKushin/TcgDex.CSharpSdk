@@ -1508,8 +1508,9 @@ the name as optional, in its place. It was deferred until after the interface re
 - **Same shape as its neighbours.** Asked what to do with the fields REST returns and GraphQL never selects, the owner
   chose to strip them: `Pricing`, `Updated`, `ThirdParty`, `DetailedVariants` and `Boosters` are cleared, so the
   documented "`Pricing` is never populated on this path" stays true.
-- **Logged.** Event 1303, a warning naming the refetched ids, like 1302 for dropped entries. The REST fetch logs the
-  nameless attack itself as a data-quality warning (1400).
+- **Logged.** Event 1303, a warning naming the refetched ids, like 1302 for dropped entries. The REST fetch also logs the
+  nameless attack as a data-quality warning (1400), exactly as `Cards.GetAsync` would; the repair adds no logging
+  of its own for it.
 - **Cost.** One sequential REST request per affected card, each under its own `Timeout` budget like any REST call,
   so the worst case is (1 + N) × `Timeout`. The caller's token is passed through and cancels a refetch like any
   other request. Searches without such a card are unchanged.
@@ -1519,4 +1520,31 @@ the name as optional, in its place. It was deferred until after the interface re
   against a fixture that has it at card level (the first fixture did not, so that line could not fail).
 - *Verified by manipulation:* skipping the strip, fetching in the client's language, and accepting a path that ends
   at the card each failed exactly the test written for it.
+- **After a second Fable review, of the merged PR (#122), fixed in #123:** two tests whose attack count was the same
+  before and after the repair now also assert the attacks are non-null; the failure cases gained an index exactly one
+  past the end and a path whose first element is not a name; the 1400 claim above was reworded, and the repair test
+  asserts the single 1400 entry by its full message. *Verified by manipulation:* `>=` to `>` on the index bound,
+  removing the first-element kind check, and keeping the GraphQL attacks on a repaired card each failed exactly the
+  tests written for them.
+- **The id rule, over two rounds of #123.** Fable asked for the blank-and-dot check to be shared with the REST path.
+  A first attempt shared both as `IsPathSegment`; Fable and Sonnet then noted that it made `EscapeSegment`'s "cannot
+  be a dot segment" message correct only because `Guard` runs first. Only the dot rule is shared now, as
+  `ResourceBase.IsDotSegment`; both paths check blank ids with `string.IsNullOrWhiteSpace`, which is what `Guard`
+  calls. Sonnet's suggestion to move the predicate into `Guard`, so `GraphQLTransport` does not reference
+  `ResourceBase`, was not taken: both are internal to the one assembly, and `Guard` holds throwing argument checks,
+  not predicates.
+
+## 50. Every merge gets three reviewer models
+
+**Decision (owner, 2026-11-21):** *"every merge needs 3 different models reviewing them, each time."* Asked how to
+read it, the owner answered: *"authors own can be one of the 3, manip and local build and tests dont, and reviews on
+the merges, not every single little commit. codex also sucks use gemini."*
+
+- Three different models review each merge. The model that wrote the change may be one of them.
+- The author's manipulation checks and local build and tests are still required, but do not count as a review.
+- The reviews are of the merge, not of every commit on the branch.
+- Gemini, not Codex, is the non-Claude reviewer.
+
+**Why.** The owner gave no reason. What preceded it: PR #122 merged with two reviews (Fable and Gemini 3.8 Flash),
+both of its first commit; a Fable pass on the merged diff then found five risks, fixed under #49 above.
 
