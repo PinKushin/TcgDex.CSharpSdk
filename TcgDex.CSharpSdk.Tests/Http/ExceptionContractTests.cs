@@ -177,6 +177,7 @@ public sealed class ExceptionContractTests
 
         error.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         error.Message.ShouldContain("404");
+        error.Message.ShouldContain("the response body could not be read");
         error.Message.ShouldNotContain(nameof(TcgDexOptions.MaxResponseBytes));
         error.InnerException.ShouldBeOfType<TcgDexApiException>();
     }

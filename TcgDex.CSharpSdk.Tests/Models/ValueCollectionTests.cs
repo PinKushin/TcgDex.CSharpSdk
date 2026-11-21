@@ -75,6 +75,17 @@ public sealed class ValueCollectionTests
             .ShouldNotBe(ValueList<string>.From(["b", "a"]).GetHashCode());
     }
 
+    [TestCase(new[] { 31 }, new int[0])]
+    [TestCase(new[] { 1, 2 }, new[] { 0, 2 })]
+    public void Lists_ThatDifferOnlyInTheirItems_HaveDifferentHashes(int[] first, int[] second)
+    {
+        // Not guaranteed by the contract either; ints hash to themselves, so these are exact. The fold scales the
+        // running value and adds each item: [31] is 1 * 31 + 31 = 62 against 0 for the empty list, and [1, 2] and
+        // [0, 2] are 1955 and 1924. Subtracting the item makes the first pair collide (0 and 0); dividing the
+        // running value makes the second collide (2 and 2).
+        ValueList<int>.From(first).GetHashCode().ShouldNotBe(ValueList<int>.From(second).GetHashCode());
+    }
+
     // ----- ValueDictionary -----
 
     private static IReadOnlyDictionary<string, int> Dictionary(params (string Key, int Value)[] entries)
@@ -146,6 +157,28 @@ public sealed class ValueCollectionTests
         one.Equals(Dictionary(("b", 1))).ShouldBeFalse();
         one.Equals(Dictionary(("a", 2))).ShouldBeFalse();
         one.Equals(Dictionary(("a", 1))).ShouldBeTrue();
+    }
+
+    [Test]
+    public void ADictionary_WithTheSameKeysAndADifferentValue_HasADifferentHash()
+    {
+        // Not guaranteed by the contract, but the hash folds each value in on purpose: without it every dictionary
+        // with the same keys would collide. Int keys and values hash to themselves, so the result is exact on every
+        // target, where a string key would be randomised per process: key 2 scales to 62, and 62 ^ 1 = 63 against
+        // 62 ^ 2 = 60. Ignoring the value makes the two equal.
+        static IReadOnlyDictionary<int, int> Valued(int value) => ValueDictionary<int, int>.From(new Dictionary<int, int> { [2] = value });
+
+        Valued(1).GetHashCode().ShouldNotBe(Valued(2).GetHashCode());
+    }
+
+    [Test]
+    public void ADictionary_WithTheSameValueUnderADifferentKey_HasADifferentHash()
+    {
+        // The key is scaled before the value is folded in. Int keys hash to themselves, so 1 and 2 give 31 and 62
+        // here; a scaling that collapsed small keys together (dividing instead) would make the two collide.
+        static IReadOnlyDictionary<int, int> Keyed(int key) => ValueDictionary<int, int>.From(new Dictionary<int, int> { [key] = 5 });
+
+        Keyed(1).GetHashCode().ShouldNotBe(Keyed(2).GetHashCode());
     }
 
     [Test]

@@ -325,6 +325,33 @@ GraphQL error log, the `'9'` boundary in `Attack.BaseDamage`, and the five `Conf
 | `TcgDexJsonContracts.cs:106` | Statement (`return;` removed) | Equivalent today. For any type other than `Card` and `DetailedVariant` the loop below would run, and it only touches a property named `pricing`; no other model has one. It would start to matter if a model gained a `pricing` property, which the option would then skip as well. (`TcgDexJsonContracts.cs:104`, the check above it, is killed by `AFreshWithoutPricingContract_SkipsPricingOnTheCardAndOnEveryVariant`; the shared options cache their contracts per process, so only a freshly built one runs a mutated modifier.) |
 | `CardDiagnostics.cs:44` | Statement (`return;` removed) | Equivalent. With warnings disabled the walk would run, and every log call it makes is filtered by the generated logger's own `IsEnabled` check. The early return only saves the walk, which nothing observable depends on. |
 
+### Fifth round: survivors with no entry yet
+
+GitHub Actions run 44749084838 on `05a1bb2` (95.35%) left 46 undetected mutants. 34 are written off
+above, at line numbers that have since moved; one row there can cover several mutants. Of the other 12, eight now have a killing test, checked by
+hand the same way: the reused-parse log (`TcgDexTransport.cs:194`), the `ConfigureAwait` on the
+success-path body read (`:205`), the unreadable-404-body message (`:370`), the two mutants that
+drop the value from `ValueDictionary`'s hash (`ValueDictionary.cs:131`, Conditional (true) and
+Equality), the divided key in the same hash (`:132`), and the subtracted item and divided running
+value in `ValueList`'s hash (`ValueList.cs:107`). The hash tests use `int` keys and items, which
+hash to themselves, so each expected difference is exact on every target. A `string` key would not
+be: its hash is randomised per process on .NET 8 and later. The four below cannot be killed.
+
+Line numbers are those of `05a1bb2`.
+
+| File:line | Mutator | Why it is not killed |
+|---|---|---|
+| `TcgPlayerPricingConverter.cs:69` | Statement (`continue` removed) | Equivalent. `isUpdated` is false whenever `isUnit` is true, so control reaches the shape check. Only a string or null `unit` gets this far, since `GetString()` on the line above throws on anything else. Both are scalars, so `Skip()` does nothing and the loop continues as before. |
+| `TcgPlayerPricingConverter.cs:75` | Statement (`continue` removed) | Equivalent. `ReadTimestamp` leaves the reader on a token that `Skip()` does nothing on: the scalar it read, or the closing `}` or `]` of an object or array it skipped. Neither is `StartObject`, so the shape check skips and continues as before. |
+
+Both `continue` rows hold under stream deserialization too, where a reader that is not on its final
+block would make `Skip()` throw. System.Text.Json buffers a custom converter's whole value before
+calling it. Checked by hand: `DeserializeAsync` with a 16-byte `DefaultBufferSize`, on a pricing
+block with a null printing, an object-valued `updated` and an unknown scalar, succeeds on every
+target against the original and against both mutants.
+| `ValueDictionary.cs:131` | Conditional (false) | Equivalent. `EqualityComparer<TValue>.Default.GetHashCode(null)` is 0, the value the branch supplies, for nullable value types and reference types alike. |
+| `ValueList.cs:107` | Conditional (false) | Equivalent, for the same reason. |
+
 ## What coverage does not tell you
 
 100% line coverage means every line ran, not that behaviour is correct. A suite
