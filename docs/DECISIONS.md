@@ -1520,13 +1520,19 @@ the name as optional, in its place. It was deferred until after the interface re
   against a fixture that has it at card level (the first fixture did not, so that line could not fail).
 - *Verified by manipulation:* skipping the strip, fetching in the client's language, and accepting a path that ends
   at the card each failed exactly the test written for it.
-- **After a second Fable review, of the merged PR (#122):** the dot-segment rule is now one predicate,
-  `ResourceBase.IsDotSegment`, shared with the REST path's own guard (both check blank ids with
-  `string.IsNullOrWhiteSpace`); two tests whose
-  attack count was the same before and after the repair now also assert the attacks are non-null; the failure cases
-  gained an index exactly one past the end and a path whose first element is not a name; and the 1400 claim above
-  was qualified. *Verified by manipulation:* `>=` to `>` on the index bound, removing the first-element kind check,
-  and keeping the GraphQL attacks on a repaired card each failed exactly the tests written for them.
+- **After a second Fable review, of the merged PR (#122), fixed in #123:** two tests whose attack count was the same
+  before and after the repair now also assert the attacks are non-null; the failure cases gained an index exactly one
+  past the end and a path whose first element is not a name; the 1400 claim above was qualified, and the repair test
+  asserts the single 1400 entry by its full message. *Verified by manipulation:* `>=` to `>` on the index bound,
+  removing the first-element kind check, and keeping the GraphQL attacks on a repaired card each failed exactly the
+  tests written for them.
+- **The id rule, over two rounds of #123.** Fable asked for the blank-and-dot check to be shared with the REST path.
+  A first attempt shared both as `IsPathSegment`; Fable and Sonnet then noted that it made `EscapeSegment`'s "cannot
+  be a dot segment" message correct only because `Guard` runs first. Only the dot rule is shared now, as
+  `ResourceBase.IsDotSegment`; both paths check blank ids with `string.IsNullOrWhiteSpace`, which is what `Guard`
+  calls. Sonnet's suggestion to move the predicate into `Guard`, so `GraphQLTransport` does not reference
+  `ResourceBase`, was not taken: both are internal to the one assembly, and `Guard` holds throwing argument checks,
+  not predicates.
 
 ## 50. Every merge gets three reviewer models, on the head being merged
 
