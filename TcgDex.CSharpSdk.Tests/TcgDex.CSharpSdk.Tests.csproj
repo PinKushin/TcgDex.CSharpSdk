@@ -41,9 +41,9 @@
   </ItemGroup>
 
   <!-- The public-surface approval test runs on net10.0 only. PublicApiGenerator
-       does not support netstandard2.0 or net472 consumers, and one baseline per
-       target framework would mean three files describing overlapping surfaces —
-       net10.0 is the richest and a superset, so it catches every change. -->
+       does not support netstandard2.0 or net472 consumers, and package validation
+       (DECISIONS #41) already checks that the three assets expose the same API, so
+       one baseline covers them. See the PublicApiTests remarks. -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <PackageReference Include="PublicApiGenerator" />
   </ItemGroup>
