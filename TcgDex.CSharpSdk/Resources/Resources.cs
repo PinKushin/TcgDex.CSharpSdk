@@ -35,7 +35,7 @@ internal abstract class ResourceBase(TcgDexTransport transport)
     /// </summary>
     /// <remarks>
     /// The GraphQL repair uses it, with <see cref="string.IsNullOrWhiteSpace"/>,
-    /// to skip a card whose id the REST path would refuse.
+    /// to fail the search rather than fetch a card whose id the REST path would refuse.
     /// </remarks>
     /// <param name="value">The candidate segment.</param>
     /// <returns><see langword="true"/> for <c>.</c> and <c>..</c>.</returns>

@@ -1509,8 +1509,8 @@ the name as optional, in its place. It was deferred until after the interface re
   chose to strip them: `Pricing`, `Updated`, `ThirdParty`, `DetailedVariants` and `Boosters` are cleared, so the
   documented "`Pricing` is never populated on this path" stays true.
 - **Logged.** Event 1303, a warning naming the refetched ids, like 1302 for dropped entries. The REST fetch also logs the
-  nameless attack as a data-quality warning (1400) when it deserializes the card; a hit in the parsed-model cache
-  returns the card without logging it again.
+  nameless attack as a data-quality warning (1400), exactly as `Cards.GetAsync` would; the repair adds no logging
+  of its own for it.
 - **Cost.** One sequential REST request per affected card, each under its own `Timeout` budget like any REST call,
   so the worst case is (1 + N) × `Timeout`. The caller's token is passed through and cancels a refetch like any
   other request. Searches without such a card are unchanged.
@@ -1522,7 +1522,7 @@ the name as optional, in its place. It was deferred until after the interface re
   at the card each failed exactly the test written for it.
 - **After a second Fable review, of the merged PR (#122), fixed in #123:** two tests whose attack count was the same
   before and after the repair now also assert the attacks are non-null; the failure cases gained an index exactly one
-  past the end and a path whose first element is not a name; the 1400 claim above was qualified, and the repair test
+  past the end and a path whose first element is not a name; the 1400 claim above was reworded, and the repair test
   asserts the single 1400 entry by its full message. *Verified by manipulation:* `>=` to `>` on the index bound,
   removing the first-element kind check, and keeping the GraphQL attacks on a repaired card each failed exactly the
   tests written for them.
@@ -1547,6 +1547,6 @@ them two tests blind to whether the repaired card landed; they are fixed under #
   and local gate are still required, but do not count as one of the three.
 - *Each time*: the reviews cover the head commit actually being merged. A commit added after a review, including one
   that applies review findings, needs the three again before the merge.
-- It extends the review-before-merge practice (#16 made auto-merge the default; auto-merge is enabled only after the
+- It extends the review-before-merge practice (#16 enabled auto-merge on the repository; auto-merge is enabled only after the
   reviews and their fixes).
 
