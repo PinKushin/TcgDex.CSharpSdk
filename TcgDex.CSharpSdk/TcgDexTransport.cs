@@ -31,6 +31,10 @@ internal sealed class TcgDexTransport
 {
     private readonly HttpClient _httpClient;
     private readonly Uri _languageBase;
+
+    /// <summary>The English segment, whatever the configured language. See <see cref="GetInEnglishAsync{T}"/>.</summary>
+    private readonly Uri _englishBase;
+
     private readonly ILogger _logger;
 
     /// <summary>Ceiling on a buffered response body. See <see cref="TcgDexOptions.MaxResponseBytes"/>.</summary>
@@ -79,6 +83,7 @@ internal sealed class TcgDexTransport
         // The trailing slash is what makes the resource path append to the
         // language segment rather than replace it.
         _languageBase = new Uri(options.BaseAddress, options.Language + "/");
+        _englishBase = new Uri(options.BaseAddress, TcgDexLanguages.English + "/");
         _maxResponseBytes = options.MaxResponseBytes;
         _timeout = options.Timeout;
         _jsonOptions = TcgDexJsonContracts.For(options);
@@ -117,13 +122,33 @@ internal sealed class TcgDexTransport
     /// <exception cref="TcgDexApiException">
     /// The request failed for any reason other than the resource being missing.
     /// </exception>
-    internal async Task<T?> GetAsync<T>(string relativePath, CancellationToken cancellationToken)
+    internal Task<T?> GetAsync<T>(string relativePath, CancellationToken cancellationToken)
         where T : class
     {
         Guard.NotNull(relativePath);
 
-        Uri uri = new(_languageBase, relativePath);
+        return FetchAsync<T>(new Uri(_languageBase, relativePath), cancellationToken);
+    }
 
+    /// <summary>
+    /// <see cref="GetAsync{T}"/> in English, whatever language the client is configured for.
+    /// </summary>
+    /// <remarks>
+    /// Only for repairing a GraphQL result, which is always English: a card fetched in the configured language
+    /// would be the one card in that result that is not (DECISIONS #49).
+    /// </remarks>
+    /// <typeparam name="T">The model to deserialize into.</typeparam>
+    /// <param name="relativePath">Path below the language segment.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The deserialized resource, or <see langword="null"/> if absent.</returns>
+    internal Task<T?> GetInEnglishAsync<T>(string relativePath, CancellationToken cancellationToken)
+        where T : class
+        => FetchAsync<T>(new Uri(_englishBase, relativePath), cancellationToken);
+
+    /// <summary>The body of <see cref="GetAsync{T}"/>, once the URI is resolved.</summary>
+    private async Task<T?> FetchAsync<T>(Uri uri, CancellationToken cancellationToken)
+        where T : class
+    {
         using Activity? activity = TcgDexActivity.Start($"TCGdex {typeof(T).Name}");
         activity?.AddTag("url.full", uri.ToString());
         activity?.AddTag("http.request.method", "GET");

@@ -70,8 +70,12 @@ internal sealed class CardResource(TcgDexTransport transport, GraphQLTransport g
         Guard.NotLessThanNamed(filter.Page, 1, nameof(filter.Page));
         Guard.NotLessThanNamed(filter.ItemsPerPage, 1, nameof(filter.ItemsPerPage));
 
-        return graphQL.SearchAsync(filter, filter.Page, filter.ItemsPerPage, cancellationToken);
+        return graphQL.SearchAsync(filter, filter.Page, filter.ItemsPerPage, RefetchInEnglishAsync, cancellationToken);
     }
+
+    /// <summary>Fetches a card the GraphQL search could not resolve; see <see cref="GraphQLTransport"/>.</summary>
+    private Task<Card?> RefetchInEnglishAsync(string id, CancellationToken cancellationToken)
+        => Transport.GetInEnglishAsync<Card>($"cards/{EscapeId(id)}", cancellationToken);
 
     public Task<Card?> GetAsync(string id, CancellationToken cancellationToken = default)
         => Transport.GetAsync<Card>($"cards/{EscapeId(id)}", cancellationToken);

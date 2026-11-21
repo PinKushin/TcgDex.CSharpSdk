@@ -148,6 +148,10 @@ IReadOnlyList<Card> cards = await tcgdex.Cards.SearchDetailedAsync(
 // 12 fully populated cards in one request. Over REST that is 13 round trips.
 ```
 
+A card the GraphQL endpoint cannot fully resolve, such as one with an unnamed
+attack, is fetched again over REST and returned in its place, at one extra
+request per such card (DECISIONS #49).
+
 To page the results, set `Page` and `ItemsPerPage` on the filter itself:
 `new CardFilter { Category = "Pokemon", Page = 2, ItemsPerPage = 25 }`.
 

@@ -1481,3 +1481,42 @@ target, since 10 is the long-term-support release. It does, and the decision is 
   branch before merge. `release.yml` only runs on a tag push, so the next release is the first proof of its SDK
   step (as in #46).
 
+## 49. `SearchDetailedAsync` fetches a card again over REST when GraphQL nulls something inside it
+
+The GraphQL schema types `AttacksListItem.name` as non-null, but some cards have attacks with no name. The server
+answers HTTP 200 with every card, `null` in place of each unnamed attack, and one error per null with a `path` into
+the card (`["cards", index, "attacks", n, "name"]`; see `api-info.md`). Until this change any `errors` entry made
+`SearchDetailedAsync` throw, so a broad search failed whenever its result held one of these cards. A scan of every
+card on 2026-11-21 found 14 (11 Pokémon, 3 Trainer); `dp5-65`, the example recorded in October, has since been fixed
+upstream.
+
+The owner chose this on 2026-10-20 from two options: "B, and its something to include in 1.0 imo, but not something
+we need to do right now". Option A was to drop the nulled attacks and log, rejected because a card would silently
+appear with fewer attacks than it has. The owner's concern with simply accepting the error was that it is harder for
+callers to work around. Option B, taken: return the result, and fetch each affected card again over REST, which types
+the name as optional, in its place. It was deferred until after the interface review, which ran on 2026-10-24.
+
+- **Narrow.** An error is repaired only when its message is the non-null violation and its path points *inside* a
+  card that is present: `["cards", index, field, ...]` with `index` in range and the card non-null. A null for one of
+  the card's own non-null fields nulls the whole card, which leaves no id to fetch it by, so that and every other
+  error still throws `TcgDexApiException` (`GraphQLError`), as before.
+- **All or nothing.** Every error is checked before anything is fetched, so a search that fails anyway does not first
+  cost a REST request per card. A card REST cannot find fails the search with the GraphQL errors; a REST failure
+  propagates as its own exception.
+- **English.** Asked which language a refetched card should be in, the owner chose English: GraphQL has no language,
+  so every other card in the result is English. The transport gained `GetInEnglishAsync`, used only here.
+- **Same shape as its neighbours.** Asked what to do with the fields REST returns and GraphQL never selects, the owner
+  chose to strip them: `Pricing`, `Updated`, `ThirdParty`, `DetailedVariants` and `Boosters` are cleared, so the
+  documented "`Pricing` is never populated on this path" stays true.
+- **Logged.** Event 1303, a warning naming the refetched ids, like 1302 for dropped entries. The REST fetch logs the
+  nameless attack itself as a data-quality warning (1400).
+- **Cost.** One sequential REST request per affected card, each under its own `Timeout` budget like any REST call,
+  so the worst case is (1 + N) × `Timeout`. The caller's token is passed through and cancels a refetch like any
+  other request. Searches without such a card are unchanged.
+- **After the first review (Fable):** a card REST cannot find now names its id in the exception; ids of `.` and `..`
+  are treated like a blank id, since the REST path would reject them with an `ArgumentException` naming an argument
+  the caller never passed; and tests were added for two broken cards with errors out of order, and for `ThirdParty`
+  against a fixture that has it at card level (the first fixture did not, so that line could not fail).
+- *Verified by manipulation:* skipping the strip, fetching in the client's language, and accepting a path that ends
+  at the card each failed exactly the test written for it.
+
