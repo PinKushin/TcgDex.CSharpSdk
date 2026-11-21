@@ -139,6 +139,31 @@ public sealed class ErrorKindTests
         error.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
     }
 
+    /// <summary>A 429 with a <c>Retry-After</c>, counting how often it was asked.</summary>
+    private static Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> RateLimited(int[] calls)
+        => (_, _) =>
+        {
+            calls[0]++;
+            HttpResponseMessage response = new((HttpStatusCode)429)
+            {
+                Content = new StringContent(string.Empty, System.Text.Encoding.UTF8, "application/json"),
+            };
+            response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(30));
+            return Task.FromResult(response);
+        };
+
+    [Test]
+    public async Task Rest_TooManyRequests_IsHttpStatus429_AskedOnce()
+    {
+        // What docs/getting-started.md promises a rate-limited caller: no special kind, no retry, status 429.
+        int[] calls = [0];
+        TcgDexApiException error = await RestFailure(RateLimited(calls));
+
+        ShouldBe(error, TcgDexErrorKind.HttpStatus, CardUri);
+        error.StatusCode.ShouldBe((HttpStatusCode)429);
+        calls[0].ShouldBe(1);
+    }
+
     [Test]
     public async Task Rest_LanguageNotFound_IsHttpStatusWithLanguageError()
     {
@@ -205,6 +230,17 @@ public sealed class ErrorKindTests
             await GraphQLFailure(Answer(HttpStatusCode.OK, """{"errors":[{"message":"bad"}]}""")),
             TcgDexErrorKind.GraphQLError,
             GraphQLUri);
+
+    [Test]
+    public async Task GraphQL_TooManyRequests_IsHttpStatus429_AskedOnce()
+    {
+        int[] calls = [0];
+        TcgDexApiException error = await GraphQLFailure(RateLimited(calls));
+
+        ShouldBe(error, TcgDexErrorKind.HttpStatus, GraphQLUri);
+        error.StatusCode.ShouldBe((HttpStatusCode)429);
+        calls[0].ShouldBe(1);
+    }
 
     [Test]
     public async Task GraphQL_ErrorStatus_IsHttpStatus()

@@ -23,7 +23,7 @@ dotnet add package TcgDex.CSharpSdk
 ## Why this SDK
 
 - **Runs everywhere .NET does:** .NET 8, .NET 10 and netstandard2.0 (.NET
-  Framework 4.6.1+, Unity), with the same API on every target.
+  Framework 4.6.1+, Unity), with the same API on every target ([details](#platforms)).
 - **Native AOT and trimming safe**, verified by a published AOT binary in CI on
   every push.
 - **Queries written in C#:** `Where(c => c.HitPoints > 100)` becomes the API's
@@ -215,7 +215,8 @@ discriminates on the error body and exposes `ex.IsLanguageError`.
 ## Platforms
 
 Targets **.NET 8**, **.NET 10** and **netstandard2.0**, so it runs on modern
-.NET and on **.NET Framework 4.6.1+**.
+.NET and on **.NET Framework 4.6.1+**. The tests target `net472`; earlier .NET Framework
+versions load the same asset but are not tested.
 
 **Unity** is a supported target by construction rather than by test: the
 `netstandard2.0` assembly contains no runtime code generation, no

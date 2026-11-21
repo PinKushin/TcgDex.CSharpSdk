@@ -8,7 +8,7 @@ A .NET SDK for the [TCGdex](https://tcgdex.dev) Pokémon TCG API — strongly ty
 models, a fluent query builder over the full REST filter syntax, and first-class
 support for dependency injection, trimming and Native AOT.
 
-Targets **.NET 8** and **.NET 10**. No API key required.
+Targets **.NET 8**, **.NET 10** and **netstandard2.0**. No API key required.
 
 ```bash
 dotnet add package TcgDex.CSharpSdk

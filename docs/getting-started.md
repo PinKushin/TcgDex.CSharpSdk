@@ -265,6 +265,15 @@ from here:
 - **Failures are never cached.** Two consecutive 502s both reach you; a bad
   response cannot pin itself in front of a good one.
 
+**A rate-limited request is an ordinary status error.** A 429, from REST or
+GraphQL, throws `TcgDexApiException` with `Kind = HttpStatus` and `StatusCode`
+429. The SDK does not retry it, and the exception does not carry the
+`Retry-After` header. A resilience handler (below) sees the response before the
+SDK does; the standard one retries a 429 and waits as `Retry-After` says by
+default. Its retries run inside the SDK's `TcgDexOptions.Timeout`, and the
+handler has timeouts of its own, so a long `Retry-After` can be cut short by
+either.
+
 **The SDK ships no retry policy, deliberately.** Retries nobody asked for are how
 a client ends up hammering a free API during exactly the outage it is trying to
 ride out. `AddTcgDex` returns `IHttpClientBuilder` so you can add your own, with
