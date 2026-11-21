@@ -205,12 +205,12 @@ internal sealed class BoundedLru<TKey, TValue>
     }
 
     /// <summary>
-    /// Removes the oldest batch of entries by last access.
+    /// Removes the least recently used entries: one batch, plus any overshoot.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Entries are sorted by access ordinal rather than reduced to a cut-off
-    /// value. Sorting removes exactly the batch size; a cut-off is only cheaper
+    /// value. Sorting removes exactly the count asked for; a cut-off is only cheaper
     /// while nothing ties, and the ordering this once used — a wall-clock
     /// timestamp — tied constantly.
     /// </para>
@@ -250,13 +250,10 @@ internal sealed class BoundedLru<TKey, TValue>
         // once they stop (89 entries against 50, class remarks). Each removes one batch plus whatever its
         // snapshot holds beyond the single entry that overflowed, so a lone overflow still removes exactly one
         // batch. A key another thread removed first still counts toward that, as it is gone. A snapshot already
-        // within the bound means another eviction got there first, and taking a batch anyway would over-evict.
-        // Past that check the count is at least one batch and at most the snapshot, since batch <= max.
-        if (ordered.Length <= _maxEntries)
-        {
-            return;
-        }
-
+        // within the bound, because another eviction or removal got there first, gives fewer than one batch, or
+        // none when the count comes out at or below zero, so racing evictors do not each strip a full batch.
+        // The count never exceeds the snapshot, since batch <= max. There is deliberately no branch for that
+        // case: it is reachable only under a race, so no test could cover it (see the remarks above).
         int evicting = ordered.Length - _maxEntries - 1 + batch;
         int removed = 0;
 

@@ -322,9 +322,10 @@ public sealed class MemoryCacheTests
     public void ConcurrentWrites_DoNotCorruptTheCache()
     {
         // SetAsync completes synchronously, so Task.WhenAll over the calls alone ran them one after another on
-        // this thread, and this test passed against a cache that, written in parallel, kept 89 entries against
-        // a bound of 50. Dedicated threads released by one barrier overlap even on a two-core runner, and the
-        // storm repeats because one storm can miss the race.
+        // this thread. Made parallel, that version found the eviction bug (89 entries against a bound of 50).
+        // This form, on dedicated threads, did not fail in 9 runs against the old eviction, so it is a check
+        // that parallel writes neither throw nor overflow, not the test that pins the bug: BoundedLruCountTests
+        // is (DECISIONS #37, row 17).
         const int Threads = 8;
         const int WritesPerThread = 25;
 

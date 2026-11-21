@@ -91,7 +91,8 @@ public sealed class ConcurrencyTests
     public async Task OneWarmCachingClient_ManyThreadsAtOnce_AreAllServedFromTheCache()
     {
         CardHandler handler = new(Fixture.ReadText("card-pokemon-full.json"));
-        TcgDexCacheOptions fresh = new() { DefaultTimeToLive = TimeSpan.FromHours(1) };
+        // A single card is cached for PricingTimeToLive, not DefaultTimeToLive.
+        TcgDexCacheOptions fresh = new() { PricingTimeToLive = TimeSpan.FromHours(1) };
         using HttpClient http = new(new TcgDexCachingHandler(new MemoryTcgDexResponseCache(), fresh) { InnerHandler = handler });
         TcgDexClient client = new(http, new TcgDexOptions());
 
