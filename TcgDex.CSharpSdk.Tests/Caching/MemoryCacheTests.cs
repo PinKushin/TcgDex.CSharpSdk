@@ -332,20 +332,24 @@ public sealed class MemoryCacheTests
         {
             MemoryTcgDexResponseCache cache = new(maxEntries: 50);
             using Barrier start = new(Threads);
-            Thread[] writers = Enumerable.Range(0, Threads)
-                .Select(t => new Thread(() =>
-                {
-                    start.SignalAndWait();
-
-                    for (int i = 0; i < WritesPerThread; i++)
+            // LongRunning: a dedicated thread each, and a throw fails this test rather than the test host.
+            Task[] writers = Enumerable.Range(0, Threads)
+                .Select(t => Task.Factory.StartNew(
+                    () =>
                     {
-                        cache.SetAsync($"key-{t}-{i}", Response(), TimeSpan.FromHours(1)).AsTask().GetAwaiter().GetResult();
-                    }
-                }))
+                        start.SignalAndWait();
+
+                        for (int i = 0; i < WritesPerThread; i++)
+                        {
+                            cache.SetAsync($"key-{t}-{i}", Response(), TimeSpan.FromHours(1)).AsTask().GetAwaiter().GetResult();
+                        }
+                    },
+                    CancellationToken.None,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default))
                 .ToArray();
 
-            Array.ForEach(writers, w => w.Start());
-            Array.ForEach(writers, w => w.Join());
+            Task.WaitAll(writers);
 
             cache.Count.ShouldBeLessThanOrEqualTo(50, $"round {round}");
             cache.Count.ShouldBeGreaterThan(0);

@@ -249,8 +249,15 @@ internal sealed class BoundedLru<TKey, TValue>
         // snapshot and remove the same oldest keys, so a fixed batch each could leave the store above its bound
         // once they stop (89 entries against 50, class remarks). Each removes one batch plus whatever its
         // snapshot holds beyond the single entry that overflowed, so a lone overflow still removes exactly one
-        // batch. A key another thread removed first still counts toward that, as it is gone.
-        int evicting = Math.Min(Math.Max(batch, ordered.Length - _maxEntries - 1 + batch), ordered.Length);
+        // batch. A key another thread removed first still counts toward that, as it is gone. A snapshot already
+        // within the bound means another eviction got there first, and taking a batch anyway would over-evict.
+        // Past that check the count is at least one batch and at most the snapshot, since batch <= max.
+        if (ordered.Length <= _maxEntries)
+        {
+            return;
+        }
+
+        int evicting = ordered.Length - _maxEntries - 1 + batch;
         int removed = 0;
 
         for (int i = 0; i < evicting; i++)

@@ -72,7 +72,9 @@ public sealed class ConcurrencyTests
     [Test]
     public async Task OneCachingClient_ManyDistinctCardsAtOnce_EachGetsItsCard_AndTheCacheStaysBounded()
     {
-        // 64 keys into a cache of 8, so eviction runs while the requests overlap.
+        // 64 keys into a cache of 8, so eviction runs while the requests overlap. How far they overlap is up to
+        // the thread pool, so this is a smoke test of the client path; BoundedLruCountTests, on dedicated
+        // threads, is the one that pins the eviction bound.
         CardHandler handler = new(Fixture.ReadText("card-pokemon-full.json"));
         MemoryTcgDexResponseCache cache = new(maxEntries: 8);
         using HttpClient http = new(new TcgDexCachingHandler(cache) { InnerHandler = handler });
@@ -89,7 +91,8 @@ public sealed class ConcurrencyTests
     public async Task OneWarmCachingClient_ManyThreadsAtOnce_AreAllServedFromTheCache()
     {
         CardHandler handler = new(Fixture.ReadText("card-pokemon-full.json"));
-        using HttpClient http = new(new TcgDexCachingHandler(new MemoryTcgDexResponseCache()) { InnerHandler = handler });
+        TcgDexCacheOptions fresh = new() { DefaultTimeToLive = TimeSpan.FromHours(1) };
+        using HttpClient http = new(new TcgDexCachingHandler(new MemoryTcgDexResponseCache(), fresh) { InnerHandler = handler });
         TcgDexClient client = new(http, new TcgDexOptions());
 
         _ = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);

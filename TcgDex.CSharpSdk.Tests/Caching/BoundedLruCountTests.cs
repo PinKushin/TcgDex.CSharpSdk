@@ -1,6 +1,7 @@
 namespace TcgDex.Tests.Caching;
 
 using System.Threading;
+using System.Threading.Tasks;
 using TcgDex.Caching;
 
 /// <summary>
@@ -27,9 +28,12 @@ public sealed class BoundedLruCountTests
 
     private static void Storm(BoundedLru<int, int> lru, bool withClear)
     {
+        // LongRunning gives each worker its own thread, so the barrier releases them together, and unlike a raw
+        // Thread a throw is captured and rethrown by WaitAll rather than taking the test host down unnamed.
         using Barrier start = new(Threads);
-        Thread[] workers = Enumerable.Range(0, Threads)
-            .Select(t => new Thread(() =>
+        Task[] workers = Enumerable.Range(0, Threads)
+            .Select(t => Task.Factory.StartNew(
+                () =>
             {
                 start.SignalAndWait();
 
@@ -50,11 +54,13 @@ public sealed class BoundedLruCountTests
                         lru.Set(key, i);
                     }
                 }
-            }))
+            },
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default))
             .ToArray();
 
-        Array.ForEach(workers, w => w.Start());
-        Array.ForEach(workers, w => w.Join());
+        Task.WaitAll(workers);
     }
 
     private static void CounterMatchesTheStore(BoundedLru<int, int> lru)
