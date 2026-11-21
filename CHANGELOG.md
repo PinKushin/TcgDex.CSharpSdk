@@ -26,9 +26,11 @@ something an application can observe — those live in the commit history.
 
 ### Documentation
 
-- `TcgDexClient` now states that one instance may be shared across threads, and `TcgDexCacheOptions` that, unlike
-  `TcgDexOptions`, it is read on every request rather than copied, so it should not be changed once the client is
-  built.
+- `TcgDexClient` now states that one instance may be shared across threads, with what that asks of you: a custom
+  `ITcgDexResponseCache` or `GetTimeToLive` override must be thread-safe, and `Dispose` must not run while requests
+  do. `TcgDexCacheOptions` states that, unlike `TcgDexOptions`, it is read on every request rather than copied, so it
+  should not be changed once the client is built; and `TcgDexOptions` that, with dependency injection, every resolved
+  client reads the same registered instance.
 - The getting-started guide says what a rate-limited request produces: a 429 throws `TcgDexApiException` with
   `Kind = HttpStatus`, is not retried, and carries no `Retry-After`. The README says the .NET Framework tests target
   `net472`; earlier versions are untested.
