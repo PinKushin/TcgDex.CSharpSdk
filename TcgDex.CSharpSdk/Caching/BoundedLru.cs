@@ -29,10 +29,11 @@ using System.Collections.Concurrent;
 /// writes stop it equals the dictionary's count. While they run it lags by the
 /// operations in progress, which costs an eviction slightly early or late.
 /// <see cref="Evict"/> used to re-derive it from the dictionary instead; that
-/// overwrote increments landing between the read and the write, and under
-/// parallel writes the store then stayed above its bound for good (found
-/// 2026-11-21 once <c>ConcurrentWrites_DoNotCorruptTheCache</c> really ran in
-/// parallel: 89 entries against a bound of 50).
+/// overwrote increments landing between the read and the write. Together with
+/// writers that overflowed at once each removing the same fixed batch, the store
+/// then stayed above its bound for good (found 2026-11-21 once
+/// <c>ConcurrentWrites_DoNotCorruptTheCache</c> really ran in parallel: 89 entries
+/// against a bound of 50). Eviction is now sized from the overshoot it sees.
 /// </para>
 /// <para>
 /// <b>Eviction takes a batch, not a single entry.</b> Once the store is at its
@@ -226,20 +227,6 @@ internal sealed class BoundedLru<TKey, TValue>
     /// </remarks>
     private void Evict()
     {
-        // Two writers that overflow together take the same snapshot and remove the same oldest keys, so one
-        // batch each can leave the store over its bound. Keep going until it is not, or nothing more comes out.
-        int removed;
-
-        do
-        {
-            removed = EvictBatch();
-        }
-        while (removed > 0 && Volatile.Read(ref _approximateCount) > _maxEntries);
-    }
-
-    /// <summary>Removes one batch, returning how many entries this call actually removed.</summary>
-    private int EvictBatch()
-    {
         int batch = Math.Max(1, _maxEntries / EvictionBatchDivisor);
         KeyValuePair<TKey, Entry>[] snapshot = _entries.ToArray();
 
@@ -258,7 +245,12 @@ internal sealed class BoundedLru<TKey, TValue>
 
         Array.Sort(ordered, CompareByOrdinal);
 
-        int evicting = Math.Min(batch, ordered.Length);
+        // Sized from the snapshot's overshoot, not a fixed batch: writers that overflow together take the same
+        // snapshot and remove the same oldest keys, so a fixed batch each could leave the store above its bound
+        // once they stop (89 entries against 50, class remarks). Each removes one batch plus whatever its
+        // snapshot holds beyond the single entry that overflowed, so a lone overflow still removes exactly one
+        // batch. A key another thread removed first still counts toward that, as it is gone.
+        int evicting = Math.Min(Math.Max(batch, ordered.Length - _maxEntries - 1 + batch), ordered.Length);
         int removed = 0;
 
         for (int i = 0; i < evicting; i++)
@@ -271,8 +263,6 @@ internal sealed class BoundedLru<TKey, TValue>
 
         // Only what this call removed, so a concurrent store's increment is never overwritten (class remarks).
         Interlocked.Add(ref _approximateCount, -removed);
-
-        return removed;
     }
 
     /// <summary>Orders copied ordinals oldest-accessed first.</summary>

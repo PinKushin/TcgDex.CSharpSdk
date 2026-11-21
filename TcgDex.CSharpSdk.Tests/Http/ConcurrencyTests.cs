@@ -15,14 +15,14 @@ using TcgDex.Models;
 /// </summary>
 /// <remarks>
 /// Every call starts on its own thread-pool thread and waits on one gate, so the
-/// requests really overlap rather than running one after another.
+/// requests overlap rather than running one after another.
 /// </remarks>
 [TestFixture]
 public sealed class ConcurrencyTests
 {
     private const int Callers = 64;
 
-    /// <summary>Answers every request with the same card, counting the requests.</summary>
+    /// <summary>Answers every request with the same card and an ETag, counting the requests.</summary>
     private sealed class CardHandler(string json) : HttpMessageHandler
     {
         private int _requests;
@@ -41,14 +41,14 @@ public sealed class ConcurrencyTests
         }
     }
 
-    private static async Task<Card?[]> CallTogether(TcgDexClient client)
+    private static async Task<Card?[]> CallTogether(TcgDexClient client, Func<int, string> id)
     {
         TaskCompletionSource<bool> gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         Task<Card?>[] calls = Enumerable.Range(0, Callers)
-            .Select(_ => Task.Run(async () =>
+            .Select(i => Task.Run(async () =>
             {
                 await gate.Task;
-                return await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+                return await client.Cards.GetAsync(id(i), CancellationToken.None);
             }))
             .ToArray();
 
@@ -57,28 +57,47 @@ public sealed class ConcurrencyTests
     }
 
     [Test]
-    public async Task OneClient_ManyThreadsAtOnce_EachGetsTheCard()
+    public async Task OneClient_ManyThreadsAtOnce_EachGetsTheCard_InItsOwnRequest()
     {
         CardHandler handler = new(Fixture.ReadText("card-pokemon-full.json"));
         using HttpClient http = new(handler);
         TcgDexClient client = new(http, new TcgDexOptions());
 
-        Card?[] cards = await CallTogether(client);
+        Card?[] cards = await CallTogether(client, _ => "swsh3-136");
 
         cards.ShouldAllBe(c => c != null && c.Id == "swsh3-136");
         handler.Requests.ShouldBe(Callers, "without a cache every call is its own request");
     }
 
     [Test]
-    public async Task OneCachingClient_ManyThreadsAtOnce_EachGetsTheCard()
+    public async Task OneCachingClient_ManyDistinctCardsAtOnce_EachGetsItsCard_AndTheCacheStaysBounded()
+    {
+        // 64 keys into a cache of 8, so eviction runs while the requests overlap.
+        CardHandler handler = new(Fixture.ReadText("card-pokemon-full.json"));
+        MemoryTcgDexResponseCache cache = new(maxEntries: 8);
+        using HttpClient http = new(new TcgDexCachingHandler(cache) { InnerHandler = handler });
+        TcgDexClient client = new(http, new TcgDexOptions());
+
+        Card?[] cards = await CallTogether(client, i => $"card-{i}");
+
+        cards.ShouldAllBe(c => c != null && c.Id == "swsh3-136");
+        handler.Requests.ShouldBe(Callers, "every key is distinct, so none is shared");
+        cache.Count.ShouldBeLessThanOrEqualTo(8);
+    }
+
+    [Test]
+    public async Task OneWarmCachingClient_ManyThreadsAtOnce_AreAllServedFromTheCache()
     {
         CardHandler handler = new(Fixture.ReadText("card-pokemon-full.json"));
         using HttpClient http = new(new TcgDexCachingHandler(new MemoryTcgDexResponseCache()) { InnerHandler = handler });
         TcgDexClient client = new(http, new TcgDexOptions());
 
-        Card?[] cards = await CallTogether(client);
+        _ = await client.Cards.GetAsync("swsh3-136", CancellationToken.None);
+        handler.Requests.ShouldBe(1);
+
+        Card?[] cards = await CallTogether(client, _ => "swsh3-136");
 
         cards.ShouldAllBe(c => c != null && c.Id == "swsh3-136");
-        handler.Requests.ShouldBeInRange(1, Callers);
+        handler.Requests.ShouldBe(1, "a fresh entry answers every concurrent hit without a request");
     }
 }

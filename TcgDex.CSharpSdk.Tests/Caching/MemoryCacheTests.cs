@@ -319,25 +319,37 @@ public sealed class MemoryCacheTests
     // would have duplicated working tests with weaker ones.
 
     [Test]
-    public async Task ConcurrentWrites_DoNotCorruptTheCache()
+    public void ConcurrentWrites_DoNotCorruptTheCache()
     {
-        MemoryTcgDexResponseCache cache = new(maxEntries: 50);
+        // SetAsync completes synchronously, so Task.WhenAll over the calls alone ran them one after another on
+        // this thread, and this test passed against a cache that, written in parallel, kept 89 entries against
+        // a bound of 50. Dedicated threads released by one barrier overlap even on a two-core runner, and the
+        // storm repeats because one storm can miss the race.
+        const int Threads = 8;
+        const int WritesPerThread = 25;
 
-        // SetAsync completes synchronously, so Task.WhenAll over the calls alone would run them one after
-        // another on this thread. Each write starts on its own thread-pool thread behind one gate instead.
-        TaskCompletionSource<bool> gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        Task[] writes = Enumerable.Range(0, 200)
-            .Select(i => Task.Run(async () =>
-            {
-                await gate.Task;
-                await cache.SetAsync($"key-{i}", Response(), TimeSpan.FromHours(1));
-            }))
-            .ToArray();
-        gate.SetResult(true);
-        await Task.WhenAll(writes);
+        for (int round = 0; round < 20; round++)
+        {
+            MemoryTcgDexResponseCache cache = new(maxEntries: 50);
+            using Barrier start = new(Threads);
+            Thread[] writers = Enumerable.Range(0, Threads)
+                .Select(t => new Thread(() =>
+                {
+                    start.SignalAndWait();
 
-        cache.Count.ShouldBeLessThanOrEqualTo(50);
-        cache.Count.ShouldBeGreaterThan(0);
+                    for (int i = 0; i < WritesPerThread; i++)
+                    {
+                        cache.SetAsync($"key-{t}-{i}", Response(), TimeSpan.FromHours(1)).AsTask().GetAwaiter().GetResult();
+                    }
+                }))
+                .ToArray();
+
+            Array.ForEach(writers, w => w.Start());
+            Array.ForEach(writers, w => w.Join());
+
+            cache.Count.ShouldBeLessThanOrEqualTo(50, $"round {round}");
+            cache.Count.ShouldBeGreaterThan(0);
+        }
     }
 
     [Test]

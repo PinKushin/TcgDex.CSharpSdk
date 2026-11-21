@@ -20,7 +20,7 @@ something an application can observe — those live in the commit history.
 - The response cache and the parsed-model cache could stay above `MaxEntries` for good after many concurrent writes:
   two evictions running at once removed the same oldest entries, and the entry count lost writes that landed while
   an eviction ran. Under parallel writes a cache bounded at 50 was measured holding 89. Every add and removal is now
-  counted exactly, and eviction continues until the cache is back within its bound.
+  counted exactly, and an eviction removes as many entries as the cache it sees is over its bound.
 
 ### Documentation
 
