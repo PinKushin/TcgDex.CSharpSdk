@@ -30,6 +30,12 @@ internal sealed record GraphQLError
 {
     /// <summary>Human-readable description of what went wrong.</summary>
     public string? Message { get; init; }
+
+    /// <summary>
+    /// Where in the result the error applies, as field names and list indexes: <c>["cards", 3, "attacks", 1,
+    /// "name"]</c>. Absent for an error that applies to the whole query.
+    /// </summary>
+    public IReadOnlyList<JsonElement>? Path { get; init; }
 }
 
 /// <summary>The <c>data</c> payload for a card search.</summary>

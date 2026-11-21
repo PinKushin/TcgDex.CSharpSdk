@@ -68,7 +68,7 @@ Stable across versions, so you can alert on them.
 | 1000 | Request lifecycle | 1000 sending · 1001 completed · 1002 not found · 1003 failed · 1004 errored · 1005 timed out · 1006 deserialization failed |
 | 1100 | Caching | 1100 hit · 1101 revalidated · 1102 miss · 1103 coalesced · 1104 evicted |
 | 1200 | Configuration | 1200 configured |
-| 1300 | GraphQL | 1300 search completed · 1301 errors · 1302 dropped entries |
+| 1300 | GraphQL | 1300 search completed · 1301 errors · 1302 dropped entries · 1303 cards refetched over REST |
 
 ### Cost when disabled
 

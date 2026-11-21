@@ -62,6 +62,9 @@ internal sealed class GraphQLTransport(
         set { id name symbol logo cardCount { official total } }
         """;
 
+    /// <summary>How the server words a null for a field its schema declares non-null.</summary>
+    private const string NullInNonNullableField = "Cannot return null for non-nullable field ";
+
     private readonly HttpClient _httpClient = httpClient
         ?? throw new ArgumentNullException(nameof(httpClient));
 
@@ -82,6 +85,9 @@ internal sealed class GraphQLTransport(
     /// <param name="filter">Equality filters to apply.</param>
     /// <param name="page">Optional 1-based page number.</param>
     /// <param name="itemsPerPage">Optional page size.</param>
+    /// <param name="refetch">
+    /// Fetches one card by id over REST, in English; used for a card the server could not resolve.
+    /// </param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The matching cards, fully populated.</returns>
     /// <exception cref="TcgDexApiException">The query failed or the server reported errors.</exception>
@@ -89,6 +95,7 @@ internal sealed class GraphQLTransport(
         CardFilter filter,
         int? page,
         int? itemsPerPage,
+        Func<string, CancellationToken, Task<Card?>> refetch,
         CancellationToken cancellationToken)
     {
         // filter, page and itemsPerPage are validated by CardResource, the only
@@ -96,22 +103,15 @@ internal sealed class GraphQLTransport(
         string query = BuildQuery(filter, page, itemsPerPage);
         GraphQLCardsResponse response = await PostAsync(query, cancellationToken).ConfigureAwait(false);
 
+        IReadOnlyList<Card?>? cards = response.Data?.Cards;
+
         // GraphQL answers 200 even when the query failed, so the errors array is
-        // the only reliable failure signal.
+        // the only reliable failure signal. One kind is repaired rather than
+        // thrown: a null inside a card (DECISIONS #49).
         if (response.Errors is { Count: > 0 })
         {
-            string messages = string.Join("; ", response.Errors.Select(e => e.Message));
-
-            _logger.GraphQLErrors(messages);
-
-            throw new TcgDexApiException(
-                $"The TCGdex GraphQL endpoint reported errors: {messages}",
-                TcgDexErrorKind.GraphQLError,
-                _endpoint,
-                HttpStatusCode.OK);
+            cards = await RepairAsync(response.Errors, cards, refetch, cancellationToken).ConfigureAwait(false);
         }
-
-        IReadOnlyList<Card?>? cards = response.Data?.Cards;
 
         if (cards is null)
         {
@@ -134,6 +134,103 @@ internal sealed class GraphQLTransport(
         _logger.GraphQLSearchCompleted(resolved.Length);
 
         return resolved;
+    }
+
+    /// <summary>
+    /// Replaces each card the server could not fully resolve with its REST copy, or throws when any error is
+    /// not of that kind.
+    /// </summary>
+    /// <remarks>
+    /// The case this exists for: the schema types <c>AttacksListItem.name</c> as non-null, some cards have
+    /// unnamed attacks, and the server nulls each such attack and reports it with a path into the card. REST
+    /// types the name as optional and returns the card whole. Every error is checked before anything is fetched,
+    /// so a search that fails anyway does not first cost a request per card.
+    /// </remarks>
+    private async Task<IReadOnlyList<Card?>> RepairAsync(
+        IReadOnlyList<GraphQLError> errors,
+        IReadOnlyList<Card?>? cards,
+        Func<string, CancellationToken, Task<Card?>> refetch,
+        CancellationToken cancellationToken)
+    {
+        SortedSet<int> broken = [];
+
+        foreach (GraphQLError error in errors)
+        {
+            if (cards is null || BrokenCardIndex(error, cards) is not { } index)
+            {
+                throw Failure(errors);
+            }
+
+            broken.Add(index);
+        }
+
+        Card?[] repaired = [.. cards!];
+
+        foreach (int index in broken)
+        {
+            Card card = await refetch(repaired[index]!.Id, cancellationToken).ConfigureAwait(false)
+                ?? throw Failure(errors);
+
+            repaired[index] = WithoutRestOnlyFields(card);
+        }
+
+        _logger.GraphQLCardsRefetched(broken.Count, string.Join(", ", broken.Select(index => repaired[index]!.Id)));
+
+        return repaired;
+    }
+
+    /// <summary>
+    /// The index of the card an error points inside, or <see langword="null"/> when the error is anything else.
+    /// </summary>
+    /// <remarks>
+    /// Repairable means a null the server put <em>inside</em> a card that is still there, so it has an id to
+    /// fetch it by: the message is the non-null violation and the path is <c>["cards", index, field, ...]</c>.
+    /// A null for one of the card's own non-null fields nulls the whole card instead, which leaves no id.
+    /// </remarks>
+    private static int? BrokenCardIndex(GraphQLError error, IReadOnlyList<Card?> cards)
+    {
+        if (error.Message?.StartsWith(NullInNonNullableField, StringComparison.Ordinal) != true
+            || error.Path is not { Count: > 2 } path
+            || path[0].ValueKind != JsonValueKind.String
+            || !path[0].ValueEquals("cards")
+            || path[1].ValueKind != JsonValueKind.Number
+            || !path[1].TryGetInt32(out int index)
+            || index < 0
+            || index >= cards.Count
+            || cards[index] is not { } card
+            || string.IsNullOrWhiteSpace(card.Id))
+        {
+            return null;
+        }
+
+        return index;
+    }
+
+    /// <summary>
+    /// Clears what REST returns and the GraphQL selection does not, so a repaired card has the same shape as
+    /// the rest of the result and <see cref="Card.Pricing"/> stays unpopulated on this path (DECISIONS #49).
+    /// </summary>
+    private static Card WithoutRestOnlyFields(Card card) => card with
+    {
+        Pricing = null,
+        Updated = null,
+        ThirdParty = null,
+        DetailedVariants = [],
+        Boosters = [],
+    };
+
+    /// <summary>Logs the errors and builds the exception that reports them.</summary>
+    private TcgDexApiException Failure(IReadOnlyList<GraphQLError> errors)
+    {
+        string messages = string.Join("; ", errors.Select(e => e.Message));
+
+        _logger.GraphQLErrors(messages);
+
+        return new TcgDexApiException(
+            $"The TCGdex GraphQL endpoint reported errors: {messages}",
+            TcgDexErrorKind.GraphQLError,
+            _endpoint,
+            HttpStatusCode.OK);
     }
 
     private static string BuildQuery(CardFilter filter, int? page, int? itemsPerPage)

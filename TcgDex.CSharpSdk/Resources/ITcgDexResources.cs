@@ -61,6 +61,11 @@ public interface ICardResource
     /// <see cref="Card.Pricing"/> is <b>never populated</b>. When any of those
     /// matter, use the REST path instead.
     /// </para>
+    /// <para>
+    /// A card the server cannot fully resolve, such as one with an unnamed
+    /// attack, is fetched again over REST and returned in its place, still in
+    /// English and without pricing. That costs one extra request per such card.
+    /// </para>
     /// </remarks>
     Task<IReadOnlyList<Card>> SearchDetailedAsync(
         Querying.CardFilter filter,

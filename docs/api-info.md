@@ -511,16 +511,18 @@ serie  (id: ID, filters: SerieFilters): Serie
    the list item, so no card is lost.
 
    It does **not** fail the whole query. An earlier version of this section said it did; that
-   described the SDK, not the server, and was corrected on 2026-10-20. What fails is this SDK's
-   policy: any entry in `errors` makes `SearchDetailedAsync` throw `TcgDexApiException`, rather than
-   hand back a card whose attacks are null. A narrow filter that misses such cards has no errors,
-   which makes this look intermittent. It is determined by whether the result contains an unnamed
-   attack.
+   described the SDK, not the server, and was corrected on 2026-10-20.
+
+   *Re-checked 2026-11-21:* `dp5-65` itself now has named attacks and returns no errors, but a scan
+   of every card by category still found 14 violations (11 Pokémon, 3 Trainer), each with a path
+   such as `["cards", 2162, "attacks", 1, "name"]`, where the index is the card's position in that
+   page of results.
 
    The same cards deserialize without complaint over REST, which types the field as optional.
-   **Consequence:** a caller cannot rely on `SearchDetailedAsync` for broad filters. **Upstream:**
-   this is a schema bug, since `name` should be nullable as it is in REST; the same shape as
-   `Card.rarity` in [`learnings.md`](learnings.md).
+   `SearchDetailedAsync` therefore fetches each such card again over REST and returns it in place
+   (DECISIONS #49); until then any `errors` entry made it throw. **Upstream:** this is a schema bug,
+   since `name` should be nullable as it is in REST; the same shape as `Card.rarity` in
+   [`learnings.md`](learnings.md).
 
 ### Where GraphQL wins
 

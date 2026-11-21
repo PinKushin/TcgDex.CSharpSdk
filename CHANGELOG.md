@@ -15,6 +15,15 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+### Fixed
+
+- `SearchDetailedAsync` no longer fails when a result contains a card with an unnamed attack. The GraphQL schema
+  requires attack names, some cards have none, and the server answers with that attack nulled and an error. Any
+  error used to throw `TcgDexApiException`, so a broad search failed whenever it included one of these cards (14 of
+  them on 2026-11-21). Each such card is now fetched again over REST, which allows the missing name, and returned in
+  its place: in English like the rest of the result, and without pricing, as the GraphQL path has none. A warning
+  with event id 1303 names the cards. Any other GraphQL error still throws.
+
 ## [0.9.1] - 2026-11-08
 
 ### Changed

@@ -205,6 +205,16 @@ internal static partial class TcgDexLog
         Message = "TCGdex GraphQL returned {Count} unresolvable card entr(ies), which were dropped")]
     internal static partial void GraphQLDroppedEntries(this ILogger logger, int count);
 
+    /// <remarks>
+    /// Warning, like 1302: the search succeeded, but only because the SDK worked around the server returning
+    /// null for a field its schema calls non-null (DECISIONS #49). The ids say which cards came from REST.
+    /// </remarks>
+    [LoggerMessage(
+        EventId = 1303,
+        Level = LogLevel.Warning,
+        Message = "TCGdex GraphQL could not resolve {Count} card(s) ({Ids}); they were fetched again over REST")]
+    internal static partial void GraphQLCardsRefetched(this ILogger logger, int count, string ids);
+
     // ----- 1400: data quality -----
 
     /// <remarks>
