@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using TcgDex.Diagnostics;
 using TcgDex.Models;
 using TcgDex.Querying;
+using TcgDex.Resources;
 using TcgDex.Serialization;
 
 /// <summary>
@@ -201,8 +202,7 @@ internal sealed class GraphQLTransport(
             || index < 0
             || index >= cards.Count
             || cards[index] is not { } card
-            || string.IsNullOrWhiteSpace(card.Id)
-            || card.Id is "." or "..")
+            || !ResourceBase.IsPathSegment(card.Id))
         {
             return null;
         }

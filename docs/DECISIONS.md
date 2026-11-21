@@ -1508,8 +1508,9 @@ the name as optional, in its place. It was deferred until after the interface re
 - **Same shape as its neighbours.** Asked what to do with the fields REST returns and GraphQL never selects, the owner
   chose to strip them: `Pricing`, `Updated`, `ThirdParty`, `DetailedVariants` and `Boosters` are cleared, so the
   documented "`Pricing` is never populated on this path" stays true.
-- **Logged.** Event 1303, a warning naming the refetched ids, like 1302 for dropped entries. The REST fetch logs the
-  nameless attack itself as a data-quality warning (1400).
+- **Logged.** Event 1303, a warning naming the refetched ids, like 1302 for dropped entries. The REST fetch also logs the
+  nameless attack as a data-quality warning (1400) when it deserializes the card; a hit in the parsed-model cache
+  returns the card without logging it again.
 - **Cost.** One sequential REST request per affected card, each under its own `Timeout` budget like any REST call,
   so the worst case is (1 + N) × `Timeout`. The caller's token is passed through and cancels a refetch like any
   other request. Searches without such a card are unchanged.
@@ -1519,4 +1520,26 @@ the name as optional, in its place. It was deferred until after the interface re
   against a fixture that has it at card level (the first fixture did not, so that line could not fail).
 - *Verified by manipulation:* skipping the strip, fetching in the client's language, and accepting a path that ends
   at the card each failed exactly the test written for it.
+- **After a second Fable review, of the merged PR (#122):** the id rule is now one predicate,
+  `ResourceBase.IsPathSegment`, shared with the REST path's own guard, so the two cannot drift; two tests whose
+  attack count was the same before and after the repair now also assert the attacks are non-null; the failure cases
+  gained an index exactly one past the end and a path whose first element is not a name; and the 1400 claim above
+  was qualified. *Verified by manipulation:* `>=` to `>` on the index bound, removing the first-element kind check,
+  and keeping the GraphQL attacks on a repaired card each failed exactly the tests written for them.
+
+## 50. Every merge gets three reviewer models, on the head being merged
+
+**Decision (owner, 2026-11-21):** *"every merge needs 3 different models reviewing them, each time."*
+
+**Why.** PR #122 merged with two reviews (Fable and Gemini 3.8 Flash), both of the first commit. The second commit,
+which applied Fable's findings, was never reviewed. A Fable pass on the merged diff then found five risks, among
+them two tests that could not fail; they are fixed under #49 above. The owner's conclusion followed.
+
+**What it means.**
+- Three different reviewer models, none of them the model that wrote the change. The author's own manipulation checks
+  and local gate are still required, but do not count as one of the three.
+- *Each time*: the reviews cover the head commit actually being merged. A commit added after a review, including one
+  that applies review findings, needs the three again before the merge.
+- It extends the review-before-merge practice (#16 made auto-merge the default; auto-merge is enabled only after the
+  reviews and their fixes).
 

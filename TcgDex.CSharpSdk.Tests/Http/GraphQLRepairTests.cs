@@ -160,6 +160,7 @@ public sealed class GraphQLRepairTests
         ]);
         cards.Select(c => c.Id).ShouldBe(["2017sm-5", "x-1", "swsh3-136"]);
         cards[0].Attacks.Count.ShouldBe(2);
+        cards[0].Attacks.ShouldAllBe(a => a != null, "the broken card also has two attacks, one null");
         cards[2].Attacks.ShouldNotBeEmpty();
         cards[2].Attacks.ShouldAllBe(a => a != null);
         log.Entries.Where(e => e.EventId == 1303).ShouldHaveSingleItem().Message
@@ -177,7 +178,10 @@ public sealed class GraphQLRepairTests
             .RespondWith(HttpStatusCode.OK, Search(BothNull, Error(NullName, """["cards",0,"attacks",0,"name"]""") + "," + Error(NullName, """["cards",0,"attacks",1,"name"]""")))
             .RespondWithJsonFile(HttpStatusCode.OK, "card-nameless-attack.json");
 
-        (await SearchAsync(handler)).ShouldHaveSingleItem().Attacks.Count.ShouldBe(2);
+        // The broken card also has two attacks, both null, so the count alone would not show the repair.
+        IReadOnlyList<Attack?> attacks = (await SearchAsync(handler)).ShouldHaveSingleItem().Attacks;
+        attacks.Count.ShouldBe(2);
+        attacks.ShouldAllBe(a => a != null);
 
         handler.Requests.Count.ShouldBe(2);
     }
@@ -196,12 +200,15 @@ public sealed class GraphQLRepairTests
         entry.Level.ShouldBe(LogLevel.Warning);
         entry.Message.ShouldBe("TCGdex GraphQL could not resolve 1 card(s) (2017sm-5); they were fetched again over REST");
         log.Entries.ShouldNotContain(e => e.EventId == 1301, "nothing failed, so no error is logged");
+        log.Entries.ShouldContain(e => e.EventId == 1400, "the REST fetch reports the nameless attack itself");
     }
 
     // ----- what is still a failure -----
 
     [TestCase(NullName, """["cards",0]""", TestName = "A path that ends at the card")]
     [TestCase(NullName, """["cards",5,"attacks",1,"name"]""", TestName = "An index past the end")]
+    [TestCase(NullName, """["cards",1,"attacks",1,"name"]""", TestName = "An index one past the end")]
+    [TestCase(NullName, """[0,0,"attacks",1,"name"]""", TestName = "A path that does not start with a name")]
     [TestCase(NullName, """["cards",-1,"attacks",1,"name"]""", TestName = "A negative index")]
     [TestCase(NullName, """["sets",0,"attacks",1,"name"]""", TestName = "A path outside cards")]
     [TestCase(NullName, """["cards","0","attacks",1,"name"]""", TestName = "An index that is not a number")]
