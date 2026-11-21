@@ -24,8 +24,8 @@ something an application can observe — those live in the commit history.
   error used to throw `TcgDexApiException`, so a broad search failed whenever it included one of these cards (14 of
   them on 2026-11-21). Each such card is now fetched again over REST, which allows the missing name, and returned in
   its place: in English like the rest of the result, and without pricing, as the GraphQL path has none. A warning
-  with event id 1303 names the cards. Any other GraphQL error still throws. If the REST fetch itself fails, its own
-  `TcgDexApiException` is thrown instead.
+  with event id 1303 names the cards. Any other GraphQL error still throws. If the REST fetch itself fails, that
+  failure is thrown instead, as it would be from `GetAsync`.
 
 ## [0.9.1] - 2026-11-08
 
