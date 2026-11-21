@@ -323,8 +323,18 @@ public sealed class MemoryCacheTests
     {
         MemoryTcgDexResponseCache cache = new(maxEntries: 50);
 
-        await Task.WhenAll(Enumerable.Range(0, 200).Select(i =>
-            cache.SetAsync($"key-{i}", Response(), TimeSpan.FromHours(1)).AsTask()));
+        // SetAsync completes synchronously, so Task.WhenAll over the calls alone would run them one after
+        // another on this thread. Each write starts on its own thread-pool thread behind one gate instead.
+        TaskCompletionSource<bool> gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task[] writes = Enumerable.Range(0, 200)
+            .Select(i => Task.Run(async () =>
+            {
+                await gate.Task;
+                await cache.SetAsync($"key-{i}", Response(), TimeSpan.FromHours(1));
+            }))
+            .ToArray();
+        gate.SetResult(true);
+        await Task.WhenAll(writes);
 
         cache.Count.ShouldBeLessThanOrEqualTo(50);
         cache.Count.ShouldBeGreaterThan(0);

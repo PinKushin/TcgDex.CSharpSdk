@@ -15,6 +15,19 @@ something an application can observe — those live in the commit history.
 
 ## [Unreleased]
 
+### Fixed
+
+- The response cache and the parsed-model cache could stay above `MaxEntries` for good after many concurrent writes:
+  two evictions running at once removed the same oldest entries, and the entry count lost writes that landed while
+  an eviction ran. Under parallel writes a cache bounded at 50 was measured holding 89. Every add and removal is now
+  counted exactly, and eviction continues until the cache is back within its bound.
+
+### Documentation
+
+- `TcgDexClient` now states that one instance may be shared across threads, and `TcgDexCacheOptions` that, unlike
+  `TcgDexOptions`, it is read on every request rather than copied, so it should not be changed once the client is
+  built.
+
 ## [0.9.2] - 2026-11-21
 
 ### Fixed

@@ -16,7 +16,14 @@ namespace TcgDex.Caching;
 /// </para>
 /// <para>
 /// Not sealed: <see cref="GetTimeToLive"/> is the extension point for a caller
-/// whose freshness policy differs from the path-based default.
+/// whose freshness policy differs from the path-based default. An override is
+/// called from many requests at once, so it must be thread-safe.
+/// </para>
+/// <para>
+/// <b>Unlike <see cref="TcgDexOptions"/>, these are not copied.</b> The caching
+/// handler keeps this instance and reads it on every request, so set it up before
+/// the client is built and do not change it afterwards: a change made while
+/// requests are running is unsynchronized.
 /// </para>
 /// </remarks>
 public class TcgDexCacheOptions

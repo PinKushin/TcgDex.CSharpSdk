@@ -25,10 +25,14 @@ using System.Collections.Concurrent;
 /// times the entire store operation it was guarding, on every write.
 /// </para>
 /// <para>
-/// The counter is approximate. A store and a concurrent removal can interleave
-/// so it drifts by one or two, which costs an eviction slightly early or
-/// slightly late and nothing else. The drift cannot accumulate:
-/// <see cref="Evict"/> re-derives it from the dictionary each time it runs.
+/// The counter moves by exactly one for every entry added or removed, so once
+/// writes stop it equals the dictionary's count. While they run it lags by the
+/// operations in progress, which costs an eviction slightly early or late.
+/// <see cref="Evict"/> used to re-derive it from the dictionary instead; that
+/// overwrote increments landing between the read and the write, and under
+/// parallel writes the store then stayed above its bound for good (found
+/// 2026-11-21 once <c>ConcurrentWrites_DoNotCorruptTheCache</c> really ran in
+/// parallel: 89 entries against a bound of 50).
 /// </para>
 /// <para>
 /// <b>Eviction takes a batch, not a single entry.</b> Once the store is at its
@@ -186,10 +190,17 @@ internal sealed class BoundedLru<TKey, TValue>
     }
 
     /// <summary>Empties the store.</summary>
+    /// <remarks>
+    /// Entry by entry, through <see cref="Remove"/>, so a store racing the clear
+    /// keeps its count: resetting the counter to zero would forget an entry
+    /// added before the clear and counted after it.
+    /// </remarks>
     internal void Clear()
     {
-        _entries.Clear();
-        Interlocked.Exchange(ref _approximateCount, 0);
+        foreach (TKey key in _entries.Keys)
+        {
+            Remove(key);
+        }
     }
 
     /// <summary>
@@ -215,6 +226,20 @@ internal sealed class BoundedLru<TKey, TValue>
     /// </remarks>
     private void Evict()
     {
+        // Two writers that overflow together take the same snapshot and remove the same oldest keys, so one
+        // batch each can leave the store over its bound. Keep going until it is not, or nothing more comes out.
+        int removed;
+
+        do
+        {
+            removed = EvictBatch();
+        }
+        while (removed > 0 && Volatile.Read(ref _approximateCount) > _maxEntries);
+    }
+
+    /// <summary>Removes one batch, returning how many entries this call actually removed.</summary>
+    private int EvictBatch()
+    {
         int batch = Math.Max(1, _maxEntries / EvictionBatchDivisor);
         KeyValuePair<TKey, Entry>[] snapshot = _entries.ToArray();
 
@@ -234,17 +259,20 @@ internal sealed class BoundedLru<TKey, TValue>
         Array.Sort(ordered, CompareByOrdinal);
 
         int evicting = Math.Min(batch, ordered.Length);
+        int removed = 0;
 
         for (int i = 0; i < evicting; i++)
         {
-            _entries.TryRemove(ordered[i].Key, out _);
+            if (_entries.TryRemove(ordered[i].Key, out _))
+            {
+                removed++;
+            }
         }
 
-        // Re-derived rather than decremented, so any drift the incremental
-        // counter picked up from concurrent writes and removals is corrected
-        // here instead of accumulating. This is the expensive Count call, and it
-        // runs once per batch rather than once per write.
-        Interlocked.Exchange(ref _approximateCount, _entries.Count);
+        // Only what this call removed, so a concurrent store's increment is never overwritten (class remarks).
+        Interlocked.Add(ref _approximateCount, -removed);
+
+        return removed;
     }
 
     /// <summary>Orders copied ordinals oldest-accessed first.</summary>
