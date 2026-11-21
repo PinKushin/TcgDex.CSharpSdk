@@ -30,11 +30,11 @@ using PublicApiGenerator;
 /// which is also what Polly and Serilog do.
 /// </para>
 /// <para>
-/// Runs on <c>net10.0</c> only. The package has three surfaces —
-/// <c>netstandard2.0</c> cannot expose the <see cref="IAsyncEnumerable{T}"/>
-/// members — and one baseline per framework would be three files describing
-/// overlapping sets. <c>net10.0</c> is the richest and a superset of the
-/// others, so a change to anything shared shows up here.
+/// Runs on <c>net10.0</c> only. Package validation (DECISIONS #41) already
+/// checks that the three assets expose the same API, apart from the suppressed
+/// <c>ISpanFormattable</c> difference on three enums, so one baseline covers
+/// them; <c>netstandard2.0</c> gets <see cref="IAsyncEnumerable{T}"/> from
+/// <c>Microsoft.Bcl.AsyncInterfaces</c>.
 /// </para>
 /// </remarks>
 [TestFixture]

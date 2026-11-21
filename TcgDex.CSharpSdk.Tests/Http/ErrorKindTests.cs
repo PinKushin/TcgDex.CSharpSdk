@@ -140,6 +140,16 @@ public sealed class ErrorKindTests
     }
 
     [Test]
+    public async Task Rest_TooManyRequests_IsHttpStatus429()
+    {
+        // What docs/getting-started.md promises a rate-limited caller: no special kind, no retry, status 429.
+        TcgDexApiException error = await RestFailure(Answer((HttpStatusCode)429, string.Empty));
+
+        ShouldBe(error, TcgDexErrorKind.HttpStatus, CardUri);
+        error.StatusCode.ShouldBe((HttpStatusCode)429);
+    }
+
+    [Test]
     public async Task Rest_LanguageNotFound_IsHttpStatusWithLanguageError()
     {
         TcgDexApiException error = await RestFailure(Answer(
