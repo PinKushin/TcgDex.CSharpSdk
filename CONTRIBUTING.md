@@ -67,8 +67,9 @@ dotnet docfx build docfx.json --warningsAsErrors
 
 **Never `--no-build` or `--no-restore`.** They exist for an IDE that has already built and knows
 the binaries are current; from a terminal nothing guarantees that, and a compile error stops
-neither the test run nor the false-green result it produces. The workflows use them only in a
-step that follows a build of the same configuration in the same job.
+neither the test run nor the false-green result it produces. The workflows use `--no-build` only in
+a step that follows a build of the same configuration in the same job, and `--no-restore` only
+after a restore.
 
 ## If your change touches the public API
 
