@@ -1534,20 +1534,17 @@ the name as optional, in its place. It was deferred until after the interface re
   `ResourceBase`, was not taken: both are internal to the one assembly, and `Guard` holds throwing argument checks,
   not predicates.
 
-## 50. Every merge gets three reviewer models, on the head being merged
+## 50. Every merge gets three reviewer models
 
-**Decision (owner, 2026-11-21):** *"every merge needs 3 different models reviewing them, each time."*
+**Decision (owner, 2026-11-21):** *"every merge needs 3 different models reviewing them, each time."* Asked how to
+read it, the owner answered: *"authors own can be one of the 3, manip and local build and tests dont, and reviews on
+the merges, not every single little commit. codex also sucks use gemini."*
 
-**Why.** PR #122 merged with two reviews (Fable and Gemini 3.8 Flash), both of the first commit. The second commit,
-which applied Fable's findings, was never reviewed. A Fable pass on the merged diff then found five risks, among
-them two tests blind to whether the repaired card landed; they are fixed under #49 above. The owner's conclusion followed.
+- Three different models review each merge. The model that wrote the change may be one of them.
+- The author's manipulation checks and local build and tests are still required, but do not count as a review.
+- The reviews are of the merge, not of every commit on the branch.
+- Gemini, not Codex, is the non-Claude reviewer.
 
-**What it means.** The owner said only the sentence quoted above; the first point's second half is the assistant's
-reading of it, not yet confirmed by the owner.
-- Three different reviewer models. *Reading:* none of them the model that wrote the change, and the author's own
-  manipulation checks and local gate, still required, do not count as one of the three.
-- *Each time*: the reviews cover the head commit actually being merged. A commit added after a review, including one
-  that applies review findings, needs the three again before the merge.
-- It extends the review-before-merge practice (#16 enabled auto-merge on the repository; auto-merge is enabled only after the
-  reviews and their fixes).
+**Why.** The owner gave no reason. What preceded it: PR #122 merged with two reviews (Fable and Gemini 3.8 Flash),
+both of its first commit; a Fable pass on the merged diff then found five risks, fixed under #49 above.
 
