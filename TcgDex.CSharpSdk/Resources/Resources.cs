@@ -31,16 +31,15 @@ internal abstract class ResourceBase(TcgDexTransport transport)
     protected static string EscapeName(string name) => EscapeSegment(name, nameof(name));
 
     /// <summary>
-    /// Whether a value can be a path segment: not blank, and not a dot segment.
+    /// Whether a value is a dot segment, which <see cref="EscapeSegment"/> refuses.
     /// </summary>
     /// <remarks>
-    /// <see cref="EscapeSegment"/> throws for anything this rejects; the GraphQL
-    /// repair uses it to skip a card whose id the REST path would refuse.
+    /// The GraphQL repair uses it, with <see cref="string.IsNullOrWhiteSpace"/>,
+    /// to skip a card whose id the REST path would refuse.
     /// </remarks>
     /// <param name="value">The candidate segment.</param>
-    /// <returns><see langword="true"/> when the value can be requested.</returns>
-    internal static bool IsPathSegment(string? value) =>
-        !string.IsNullOrWhiteSpace(value) && value is not ("." or "..");
+    /// <returns><see langword="true"/> for <c>.</c> and <c>..</c>.</returns>
+    internal static bool IsDotSegment(string? value) => value is "." or "..";
 
     /// <summary>
     /// The one rule for caller data in a path: present, escaped, and never a
@@ -57,7 +56,7 @@ internal abstract class ResourceBase(TcgDexTransport transport)
     {
         Guard.NotNullOrWhiteSpaceNamed(value, paramName);
 
-        if (!IsPathSegment(value))
+        if (IsDotSegment(value))
         {
             throw new ArgumentException("A path segment cannot be a dot segment.", paramName);
         }

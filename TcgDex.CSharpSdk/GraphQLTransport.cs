@@ -202,7 +202,8 @@ internal sealed class GraphQLTransport(
             || index < 0
             || index >= cards.Count
             || cards[index] is not { } card
-            || !ResourceBase.IsPathSegment(card.Id))
+            || string.IsNullOrWhiteSpace(card.Id)
+            || ResourceBase.IsDotSegment(card.Id))
         {
             return null;
         }

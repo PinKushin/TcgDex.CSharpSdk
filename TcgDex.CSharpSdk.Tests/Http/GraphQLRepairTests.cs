@@ -200,7 +200,8 @@ public sealed class GraphQLRepairTests
         entry.Level.ShouldBe(LogLevel.Warning);
         entry.Message.ShouldBe("TCGdex GraphQL could not resolve 1 card(s) (2017sm-5); they were fetched again over REST");
         log.Entries.ShouldNotContain(e => e.EventId == 1301, "nothing failed, so no error is logged");
-        log.Entries.ShouldContain(e => e.EventId == 1400, "the REST fetch reports the nameless attack itself");
+        log.Entries.Where(e => e.EventId == 1400).ShouldHaveSingleItem().Message
+            .ShouldBe("TCGdex card 2017sm-5 has malformed data: attack 2 has no name", "the REST fetch reports the nameless attack itself");
     }
 
     // ----- what is still a failure -----

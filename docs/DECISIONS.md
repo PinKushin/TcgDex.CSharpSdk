@@ -1520,8 +1520,9 @@ the name as optional, in its place. It was deferred until after the interface re
   against a fixture that has it at card level (the first fixture did not, so that line could not fail).
 - *Verified by manipulation:* skipping the strip, fetching in the client's language, and accepting a path that ends
   at the card each failed exactly the test written for it.
-- **After a second Fable review, of the merged PR (#122):** the id rule is now one predicate,
-  `ResourceBase.IsPathSegment`, shared with the REST path's own guard, so the two cannot drift; two tests whose
+- **After a second Fable review, of the merged PR (#122):** the dot-segment rule is now one predicate,
+  `ResourceBase.IsDotSegment`, shared with the REST path's own guard (both check blank ids with
+  `string.IsNullOrWhiteSpace`); two tests whose
   attack count was the same before and after the repair now also assert the attacks are non-null; the failure cases
   gained an index exactly one past the end and a path whose first element is not a name; and the 1400 claim above
   was qualified. *Verified by manipulation:* `>=` to `>` on the index bound, removing the first-element kind check,
@@ -1533,7 +1534,7 @@ the name as optional, in its place. It was deferred until after the interface re
 
 **Why.** PR #122 merged with two reviews (Fable and Gemini 3.8 Flash), both of the first commit. The second commit,
 which applied Fable's findings, was never reviewed. A Fable pass on the merged diff then found five risks, among
-them two tests that could not fail; they are fixed under #49 above. The owner's conclusion followed.
+them two tests blind to whether the repaired card landed; they are fixed under #49 above. The owner's conclusion followed.
 
 **What it means.**
 - Three different reviewer models, none of them the model that wrote the change. The author's own manipulation checks
