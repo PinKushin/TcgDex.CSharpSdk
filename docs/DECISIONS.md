@@ -1542,9 +1542,10 @@ the name as optional, in its place. It was deferred until after the interface re
 which applied Fable's findings, was never reviewed. A Fable pass on the merged diff then found five risks, among
 them two tests blind to whether the repaired card landed; they are fixed under #49 above. The owner's conclusion followed.
 
-**What it means.**
-- Three different reviewer models, none of them the model that wrote the change. The author's own manipulation checks
-  and local gate are still required, but do not count as one of the three.
+**What it means.** The owner said only the sentence quoted above; the first point's second half is the assistant's
+reading of it, not yet confirmed by the owner.
+- Three different reviewer models. *Reading:* none of them the model that wrote the change, and the author's own
+  manipulation checks and local gate, still required, do not count as one of the three.
 - *Each time*: the reviews cover the head commit actually being merged. A commit added after a review, including one
   that applies review findings, needs the three again before the merge.
 - It extends the review-before-merge practice (#16 enabled auto-merge on the repository; auto-merge is enabled only after the
