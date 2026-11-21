@@ -25,10 +25,15 @@ using System.Collections.Concurrent;
 /// times the entire store operation it was guarding, on every write.
 /// </para>
 /// <para>
-/// The counter is approximate. A store and a concurrent removal can interleave
-/// so it drifts by one or two, which costs an eviction slightly early or
-/// slightly late and nothing else. The drift cannot accumulate:
-/// <see cref="Evict"/> re-derives it from the dictionary each time it runs.
+/// The counter moves by exactly one for every entry added or removed, so once
+/// writes stop it equals the dictionary's count. While they run it lags by the
+/// operations in progress, which costs an eviction slightly early or late.
+/// <see cref="Evict"/> used to re-derive it from the dictionary instead; that
+/// overwrote increments landing between the read and the write. Together with
+/// writers that overflowed at once each removing the same fixed batch, the store
+/// then stayed above its bound for good (found 2026-11-21 once
+/// <c>ConcurrentWrites_DoNotCorruptTheCache</c> really ran in parallel: 89 entries
+/// against a bound of 50). Eviction is now sized from the overshoot it sees.
 /// </para>
 /// <para>
 /// <b>Eviction takes a batch, not a single entry.</b> Once the store is at its
@@ -186,19 +191,26 @@ internal sealed class BoundedLru<TKey, TValue>
     }
 
     /// <summary>Empties the store.</summary>
+    /// <remarks>
+    /// Entry by entry, through <see cref="Remove"/>, so a store racing the clear
+    /// keeps its count: resetting the counter to zero would forget an entry
+    /// added before the clear and counted after it.
+    /// </remarks>
     internal void Clear()
     {
-        _entries.Clear();
-        Interlocked.Exchange(ref _approximateCount, 0);
+        foreach (TKey key in _entries.Keys)
+        {
+            Remove(key);
+        }
     }
 
     /// <summary>
-    /// Removes the oldest batch of entries by last access.
+    /// Removes the least recently used entries: one batch, plus any overshoot.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Entries are sorted by access ordinal rather than reduced to a cut-off
-    /// value. Sorting removes exactly the batch size; a cut-off is only cheaper
+    /// value. Sorting removes exactly the count asked for; a cut-off is only cheaper
     /// while nothing ties, and the ordering this once used — a wall-clock
     /// timestamp — tied constantly.
     /// </para>
@@ -233,18 +245,28 @@ internal sealed class BoundedLru<TKey, TValue>
 
         Array.Sort(ordered, CompareByOrdinal);
 
-        int evicting = Math.Min(batch, ordered.Length);
+        // Sized from the snapshot's overshoot, not a fixed batch: writers that overflow together take the same
+        // snapshot and remove the same oldest keys, so a fixed batch each could leave the store above its bound
+        // once they stop (89 entries against 50, class remarks). Each removes one batch plus whatever its
+        // snapshot holds beyond the single entry that overflowed, so a lone overflow still removes exactly one
+        // batch. A key another thread removed first still counts toward that, as it is gone. A snapshot already
+        // within the bound, because another eviction or removal got there first, gives fewer than one batch, or
+        // none when the count comes out at or below zero, so racing evictors do not each strip a full batch.
+        // The count never exceeds the snapshot, since batch <= max. There is deliberately no branch for that
+        // case: it is reachable only under a race, so no test could cover it (see the remarks above).
+        int evicting = ordered.Length - _maxEntries - 1 + batch;
+        int removed = 0;
 
         for (int i = 0; i < evicting; i++)
         {
-            _entries.TryRemove(ordered[i].Key, out _);
+            if (_entries.TryRemove(ordered[i].Key, out _))
+            {
+                removed++;
+            }
         }
 
-        // Re-derived rather than decremented, so any drift the incremental
-        // counter picked up from concurrent writes and removals is corrected
-        // here instead of accumulating. This is the expensive Count call, and it
-        // runs once per batch rather than once per write.
-        Interlocked.Exchange(ref _approximateCount, _entries.Count);
+        // Only what this call removed, so a concurrent store's increment is never overwritten (class remarks).
+        Interlocked.Add(ref _approximateCount, -removed);
     }
 
     /// <summary>Orders copied ordinals oldest-accessed first.</summary>

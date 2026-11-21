@@ -319,15 +319,42 @@ public sealed class MemoryCacheTests
     // would have duplicated working tests with weaker ones.
 
     [Test]
-    public async Task ConcurrentWrites_DoNotCorruptTheCache()
+    public void ConcurrentWrites_DoNotCorruptTheCache()
     {
-        MemoryTcgDexResponseCache cache = new(maxEntries: 50);
+        // SetAsync completes synchronously, so Task.WhenAll over the calls alone ran them one after another on
+        // this thread. Made parallel, that version found the eviction bug (89 entries against a bound of 50).
+        // This form, on dedicated threads, did not fail in 9 runs against the old eviction, so it is a check
+        // that parallel writes neither throw nor overflow, not the test that pins the bug: BoundedLruCountTests
+        // is (DECISIONS #37, row 17).
+        const int Threads = 8;
+        const int WritesPerThread = 25;
 
-        await Task.WhenAll(Enumerable.Range(0, 200).Select(i =>
-            cache.SetAsync($"key-{i}", Response(), TimeSpan.FromHours(1)).AsTask()));
+        for (int round = 0; round < 20; round++)
+        {
+            MemoryTcgDexResponseCache cache = new(maxEntries: 50);
+            using Barrier start = new(Threads);
+            // LongRunning: a dedicated thread each, and a throw fails this test rather than the test host.
+            Task[] writers = Enumerable.Range(0, Threads)
+                .Select(t => Task.Factory.StartNew(
+                    () =>
+                    {
+                        start.SignalAndWait();
 
-        cache.Count.ShouldBeLessThanOrEqualTo(50);
-        cache.Count.ShouldBeGreaterThan(0);
+                        for (int i = 0; i < WritesPerThread; i++)
+                        {
+                            cache.SetAsync($"key-{t}-{i}", Response(), TimeSpan.FromHours(1)).AsTask().GetAwaiter().GetResult();
+                        }
+                    },
+                    CancellationToken.None,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default))
+                .ToArray();
+
+            Task.WaitAll(writers);
+
+            cache.Count.ShouldBeLessThanOrEqualTo(50, $"round {round}");
+            cache.Count.ShouldBeGreaterThan(0);
+        }
     }
 
     [Test]

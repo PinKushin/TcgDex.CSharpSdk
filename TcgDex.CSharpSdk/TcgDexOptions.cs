@@ -6,7 +6,9 @@ namespace TcgDex;
 /// <remarks>
 /// <b>Options are read once, when the client is created.</b> Changing a property
 /// afterwards has no effect on a client that already exists; create a new client
-/// to apply new settings.
+/// to apply new settings. With dependency injection, every resolved client reads
+/// the same registered instance again, so leave it unchanged once the container
+/// is built.
 /// </remarks>
 public sealed class TcgDexOptions
 {

@@ -368,9 +368,12 @@ jobs:
       # floors had not moved since 761/759/754 while 92 net10.0 tests landed, among them the mutation
       # rounds' killing tests and the GraphQL repair suite (#121, #122, #123); CI's own count
       # on main before this PR was ubuntu net10.0 853. Plus the two 429 tests added here.
+      # Then by five (net10.0 860, net8.0 854, net472 853): ConcurrencyTests (3), one client
+      # called from 64 threads at once, uncached, cached and evicting, and warm; and
+      # BoundedLruCountTests (2 cases), the eviction counter after racing writes (#127).
       - name: ubuntu net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 855 -Label 'ubuntu net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 860 -Label 'ubuntu net10.0'
 
       - name: ubuntu offline integration tests
         shell: pwsh
@@ -378,16 +381,16 @@ jobs:
 
       - name: macOS net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 855 -Label 'macOS net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 860 -Label 'macOS net10.0'
 
       - name: Windows net472 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 848 -Label 'Windows net472'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 853 -Label 'Windows net472'
 
       - name: Windows net8.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 849 -Label 'Windows net8.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 854 -Label 'Windows net8.0'
 
       - name: Windows net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 855 -Label 'Windows net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 860 -Label 'Windows net10.0'

@@ -125,6 +125,7 @@ public sealed class MemoryTcgDexResponseCache : ITcgDexResponseCache
     }
 
     /// <summary>Empties the cache.</summary>
+    /// <remarks>An entry stored while the clear runs may survive it.</remarks>
     public void Clear() => _entries.Clear();
 
     /// <summary>

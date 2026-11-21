@@ -46,6 +46,16 @@ public interface ITcgDexClient
 /// application with dependency injection, prefer <c>AddTcgDex</c> — it routes
 /// through <c>IHttpClientFactory</c>, which handles this for you.
 /// </para>
+/// <para>
+/// <b>Thread safety.</b> One instance may be shared across threads: every member of
+/// <see cref="Cards"/>, <see cref="Sets"/>, <see cref="Series"/>, <see cref="Random"/>
+/// and <see cref="Catalog"/> may be called concurrently. <see cref="Dispose"/> may
+/// not be called while requests are running. Anything you supply is called
+/// concurrently too, so a custom <see cref="Caching.ITcgDexResponseCache"/> or
+/// <see cref="Caching.TcgDexCacheOptions.GetTimeToLive"/> override must be
+/// thread-safe, and the options objects are not to be changed once the client is
+/// built.
+/// </para>
 /// </remarks>
 public sealed class TcgDexClient : ITcgDexClient, IDisposable
 {
