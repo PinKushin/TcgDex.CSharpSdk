@@ -1510,7 +1510,13 @@ the name as optional, in its place. It was deferred until after the interface re
   documented "`Pricing` is never populated on this path" stays true.
 - **Logged.** Event 1303, a warning naming the refetched ids, like 1302 for dropped entries. The REST fetch logs the
   nameless attack itself as a data-quality warning (1400).
-- **Cost.** One sequential REST request per affected card. Searches without such a card are unchanged.
+- **Cost.** One sequential REST request per affected card, each under its own `Timeout` budget like any REST call,
+  so the worst case is (1 + N) × `Timeout`. The caller's token is passed through and cancels a refetch like any
+  other request. Searches without such a card are unchanged.
+- **After the first review (Fable):** a card REST cannot find now names its id in the exception; ids of `.` and `..`
+  are treated like a blank id, since the REST path would reject them with an `ArgumentException` naming an argument
+  the caller never passed; and tests were added for two broken cards with errors out of order, and for `ThirdParty`
+  against a fixture that has it at card level (the first fixture did not, so that line could not fail).
 - *Verified by manipulation:* skipping the strip, fetching in the client's language, and accepting a path that ends
   at the card each failed exactly the test written for it.
 

@@ -168,8 +168,9 @@ internal sealed class GraphQLTransport(
 
         foreach (int index in broken)
         {
-            Card card = await refetch(repaired[index]!.Id, cancellationToken).ConfigureAwait(false)
-                ?? throw Failure(errors);
+            string id = repaired[index]!.Id;
+            Card card = await refetch(id, cancellationToken).ConfigureAwait(false)
+                ?? throw Failure(errors, $"; and card '{id}', fetched again over REST, was not found there");
 
             repaired[index] = WithoutRestOnlyFields(card);
         }
@@ -185,7 +186,9 @@ internal sealed class GraphQLTransport(
     /// <remarks>
     /// Repairable means a null the server put <em>inside</em> a card that is still there, so it has an id to
     /// fetch it by: the message is the non-null violation and the path is <c>["cards", index, field, ...]</c>.
-    /// A null for one of the card's own non-null fields nulls the whole card instead, which leaves no id.
+    /// A null for one of the card's own non-null fields nulls the whole card instead, which leaves no id. An id
+    /// that cannot be a path segment (blank, <c>.</c> or <c>..</c>) is not fetched either: the REST path would
+    /// reject it with an <see cref="ArgumentException"/> naming an argument the caller never passed.
     /// </remarks>
     private static int? BrokenCardIndex(GraphQLError error, IReadOnlyList<Card?> cards)
     {
@@ -198,7 +201,8 @@ internal sealed class GraphQLTransport(
             || index < 0
             || index >= cards.Count
             || cards[index] is not { } card
-            || string.IsNullOrWhiteSpace(card.Id))
+            || string.IsNullOrWhiteSpace(card.Id)
+            || card.Id is "." or "..")
         {
             return null;
         }
@@ -220,9 +224,11 @@ internal sealed class GraphQLTransport(
     };
 
     /// <summary>Logs the errors and builds the exception that reports them.</summary>
-    private TcgDexApiException Failure(IReadOnlyList<GraphQLError> errors)
+    /// <param name="errors">The errors the server reported.</param>
+    /// <param name="detail">Appended to the messages: why a repair did not happen, if one was tried.</param>
+    private TcgDexApiException Failure(IReadOnlyList<GraphQLError> errors, string detail = "")
     {
-        string messages = string.Join("; ", errors.Select(e => e.Message));
+        string messages = string.Join("; ", errors.Select(e => e.Message)) + detail;
 
         _logger.GraphQLErrors(messages);
 

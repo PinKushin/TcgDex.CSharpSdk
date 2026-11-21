@@ -117,6 +117,56 @@ public sealed class GraphQLRepairTests
     }
 
     [Test]
+    public async Task TheRefetchedCard_DropsItsCardLevelMarketplaceIds()
+    {
+        // A separate fixture: the one above has no card-level thirdParty, so it cannot show this field cleared.
+        Fixture.Load<Card>("card-damage-int.json").ThirdParty.ShouldNotBeNull();
+
+        const string Broken = """
+            {"id":"xy1-1","name":"Venusaur EX","category":"Pokemon","localId":"1","attacks":[null],"set":{"id":"xy1","name":"XY"}}
+            """;
+
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWith(HttpStatusCode.OK, Search(Broken, Error(NullName, """["cards",0,"attacks",0,"name"]""")))
+            .RespondWithJsonFile(HttpStatusCode.OK, "card-damage-int.json");
+
+        (await SearchAsync(handler)).ShouldHaveSingleItem().ThirdParty.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task TwoBrokenCards_AreEachFetchedOnce_InResultOrder_AndLandInTheirOwnPlaces()
+    {
+        const string BrokenFurret = """
+            {"id":"swsh3-136","name":"Furret","category":"Pokemon","localId":"136","attacks":[null],"set":{"id":"swsh3","name":"Darkness Ablaze"}}
+            """;
+        const string Trainer = """
+            {"id":"x-1","name":"Potion","category":"Trainer","localId":"1","set":{"id":"x","name":"X"}}
+            """;
+
+        // The errors arrive last card first; the refetches go in result order.
+        string errors = Error(NullName, """["cards",2,"attacks",0,"name"]""") + "," + Error(NullName, """["cards",0,"attacks",1,"name"]""");
+        RecordingLogger log = new(LogLevel.Trace);
+        RecordingHandler handler = new RecordingHandler()
+            .RespondWith(HttpStatusCode.OK, Search($"{BrokenPikachu},{Trainer},{BrokenFurret}", errors))
+            .RespondWithJsonFile(HttpStatusCode.OK, "card-nameless-attack.json")
+            .RespondWithJsonFile(HttpStatusCode.OK, "card-pokemon-full.json");
+
+        IReadOnlyList<Card> cards = await SearchAsync(handler, logs: log.Factory);
+
+        handler.Requests.Skip(1).Select(r => r.RequestUri!.ToString()).ShouldBe(
+        [
+            "https://api.tcgdex.net/v2/en/cards/2017sm-5",
+            "https://api.tcgdex.net/v2/en/cards/swsh3-136",
+        ]);
+        cards.Select(c => c.Id).ShouldBe(["2017sm-5", "x-1", "swsh3-136"]);
+        cards[0].Attacks.Count.ShouldBe(2);
+        cards[2].Attacks.ShouldNotBeEmpty();
+        cards[2].Attacks.ShouldAllBe(a => a != null);
+        log.Entries.Where(e => e.EventId == 1303).ShouldHaveSingleItem().Message
+            .ShouldBe("TCGdex GraphQL could not resolve 2 card(s) (2017sm-5, swsh3-136); they were fetched again over REST");
+    }
+
+    [Test]
     public async Task SeveralErrorsInOneCard_RefetchItOnce()
     {
         const string BothNull = """
@@ -182,14 +232,17 @@ public sealed class GraphQLRepairTests
         handler.Requests.Count.ShouldBe(1);
     }
 
-    [Test]
-    public void AnErrorInACardWithABlankId_StillThrows_WithoutARefetch()
+    [TestCase(" ")]
+    [TestCase(".")]
+    [TestCase("..")]
+    public void AnErrorInACardWhoseIdCannotBeAPathSegment_StillThrows_WithoutARefetch(string id)
     {
-        const string Blank = """
-            {"id":" ","name":"Pikachu","category":"Pokemon","localId":"5","attacks":[null],"set":{"id":"2017sm","name":"McDonald's Collection 2017"}}
+        // The REST path rejects these with an ArgumentException naming `id`, which the caller never passed.
+        string unfetchable = $$$"""
+            {"id":"{{{id}}}","name":"Pikachu","category":"Pokemon","localId":"5","attacks":[null],"set":{"id":"2017sm","name":"McDonald's Collection 2017"}}
             """;
         RecordingHandler handler = new RecordingHandler()
-            .RespondWith(HttpStatusCode.OK, Search(Blank, Error(NullName, """["cards",0,"attacks",0,"name"]""")));
+            .RespondWith(HttpStatusCode.OK, Search(unfetchable, Error(NullName, """["cards",0,"attacks",0,"name"]""")));
 
         Should.ThrowAsync<TcgDexApiException>(() => SearchAsync(handler)).Result.Kind.ShouldBe(TcgDexErrorKind.GraphQLError);
         handler.Requests.Count.ShouldBe(1);
@@ -230,6 +283,7 @@ public sealed class GraphQLRepairTests
 
         error.Kind.ShouldBe(TcgDexErrorKind.GraphQLError);
         error.Message.ShouldContain(NullName);
+        error.Message.ShouldContain("card '2017sm-5', fetched again over REST, was not found there");
         handler.Requests.Count.ShouldBe(2);
     }
 

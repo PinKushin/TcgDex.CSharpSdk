@@ -268,6 +268,11 @@ REST leg reads such a card as of 0.2.0; the GraphQL leg cannot. This poisons
 Pikachu, Eevee, Charizard, Mewtwo and Snorlax. Gyarados (71, all named attacks) is
 the largest name that runs both legs clean.
 
+*Since DECISIONS #49* the GraphQL leg no longer fails on such a card: it fetches
+the card again over REST, so a Pikachu search would succeed at the cost of one
+extra request per affected card. That would measure the repair rather than
+GraphQL, so Gyarados is still the right name for this comparison.
+
 ### What is not measured, and why
 
 Listed so the gaps are deliberate rather than accidental. Anything here is a
