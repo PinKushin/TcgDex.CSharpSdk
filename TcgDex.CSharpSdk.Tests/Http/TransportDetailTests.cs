@@ -82,17 +82,28 @@ public sealed class TransportDetailTests
         // System.Text.Json words this differently by version (8.x: "missing
         // required properties, including the following: name"; 10.x: "missing
         // required properties including: 'name'"), so only the parts both say.
-        message.ShouldContain("missing required properties");
-        message.ShouldContain("name");
+        message.ShouldMatch("missing required properties.*(: name|'name')");
         message.ShouldEndWith(" The first entry that fails is $[1] (id 'a-2').");
     }
 
-    [Test]
-    public void ListEntryWithoutAnId_IsNamedByIndexAlone()
-    {
-        string message = ListFailure("""[{"localId":"1","name":"Furret"}]""");
+    // No id, an id that is not a string, an entry that is not an object, and an id GetString refuses (a lone
+    // surrogate): each is still named, by index alone, and none escapes as anything but TcgDexApiException.
+    [TestCase("""[{"localId":"1","name":"Furret"}]""")]
+    [TestCase("""[{"id":5,"localId":"1","name":"Furret"}]""")]
+    [TestCase("""[1]""")]
+    [TestCase("""[{"id":"\ud800","localId":"1"}]""")]
+    public void ListEntryWithoutAUsableId_IsNamedByIndexAlone(string body)
+        => ListFailure(body).ShouldEndWith(" The first entry that fails is $[0].");
 
-        message.ShouldEndWith(" The first entry that fails is $[0].");
+    [Test]
+    public void ListEntryId_LosesControlCharactersAndIsCapped()
+    {
+        // The id is server text going into a message that goes into logs: a newline would forge a log line.
+        string longId = new('x', 100);
+
+        string message = ListFailure($$"""[{"id":"a\nb{{longId}}","localId":"1"}]""");
+
+        message.ShouldEndWith($" The first entry that fails is $[0] (id 'ab{new string('x', 62)}...').");
     }
 
     [TestCase("<html>nope</html>")]

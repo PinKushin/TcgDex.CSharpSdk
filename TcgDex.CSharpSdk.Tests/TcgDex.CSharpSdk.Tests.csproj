@@ -86,12 +86,11 @@
 
   <ItemGroup Condition="'$(TcgDexTestNetStandard)' == 'true'">
     <ProjectReference Include="..\TcgDex.CSharpSdk\TcgDex.CSharpSdk.csproj" SetTargetFramework="TargetFramework=netstandard2.0" />
-    <!-- The reference's packages flow from the library's net10.0 group, not its netstandard2.0 one, so the
-         packages a real consumer of that asset receives are listed here (TcgDex.CSharpSdk.csproj). -->
-    <PackageReference Include="System.Text.Json" />
-    <PackageReference Include="System.Net.Http.Json" />
+    <!-- The reference's packages flow from the library's net10.0 group, not its netstandard2.0 one, so the two
+         that asset needs and .NET 10 does not ship are listed here. System.Text.Json, System.Net.Http.Json and
+         System.Diagnostics.DiagnosticSource are not: .NET 10's own copies win at runtime, as they do for a real
+         consumer of that asset, and referencing them is NU1510. -->
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" />
-    <PackageReference Include="System.Diagnostics.DiagnosticSource" />
     <PackageReference Include="Microsoft.Bcl.TimeProvider" />
   </ItemGroup>
 

@@ -20,8 +20,9 @@
        get. DependencyLineTests asserts this per leg.
 
        TcgDexTestNetStandard (the CI lane that runs the net10.0 tests against the netstandard2.0 asset, DECISIONS #37
-       row 19) moves net10.0 onto the netstandard2.0 lines too, so that lane sees the graph a net6.0 or net7.0
-       consumer of that asset gets. -->
+       row 19) moves net10.0 onto the netstandard2.0 lines too, so that lane gets the Microsoft.Extensions 8.0.x
+       line a consumer of that asset gets. Packages the runtime ships, such as System.Text.Json, are the
+       runtime's own there, as they are for that consumer. -->
   <ItemGroup Condition="'$(TargetFramework)' != 'net10.0' Or '$(TcgDexTestNetStandard)' == 'true'">
     <PackageVersion Include="Microsoft.Extensions.Http" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />

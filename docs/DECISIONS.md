@@ -1575,8 +1575,12 @@ outside contributors, which this repository does not have yet.
 
 **Row 19, a lane.** CI job `netstandard-on-core-test` runs the net10.0 suite against the netstandard2.0 asset
 (`-p:TcgDexTestNetStandard=true`). A `SetTargetFramework` reference alone did not compile: the reference's packages
-flow from the library's net10.0 group, so `TimeProvider` was missing. The lane therefore lists the netstandard2.0
-packages itself and, in `Directory.Packages.props`, moves net10.0 onto the 8.0.x lines that asset ships with. On the
+flow from the library's net10.0 group, so `TimeProvider` was missing. The lane therefore references the two
+netstandard2.0 packages .NET 10 does not ship (`Microsoft.Bcl.TimeProvider`, `Microsoft.Bcl.AsyncInterfaces`; the
+in-box ones are NU1510 and lose to the runtime's copies anyway) and, in `Directory.Packages.props`, moves net10.0 onto
+the Microsoft.Extensions 8.0.x line that asset ships with. System.Text.Json is .NET 10's there, as it is for a real
+consumer of that asset on a modern runtime. The list-entry message also caps the server's `id` at 64 characters and
+drops control characters, since it goes to logs, and names the entry by index alone when `GetString` refuses the id. On the
 first run, 859 of 864 passed; the 5 that failed asserted the net10.0 asset (the `SocketsHttpHandler` that `Create`
 builds there, and the 10.x Microsoft.Extensions line), and branch on `TCGDEX_NETSTANDARD_ASSET` now as they did on
 `NETFRAMEWORK`. `EachLeg_LoadsTheLibraryAssetItIsMeantToTest` is the control: each leg asserts the library's

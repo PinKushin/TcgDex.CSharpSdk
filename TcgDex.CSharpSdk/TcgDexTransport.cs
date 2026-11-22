@@ -551,8 +551,6 @@ internal sealed class TcgDexTransport
             return string.Empty;
         }
 
-        JsonTypeInfo entryType = _jsonOptions.GetTypeInfo(typeof(T).GetGenericArguments()[0]);
-
         try
         {
             using JsonDocument document = JsonDocument.Parse(new ReadOnlyMemory<byte>(body.Array, body.Offset, body.Count));
@@ -561,6 +559,9 @@ internal sealed class TcgDexTransport
                 return string.Empty;
             }
 
+            // Every generic T that reaches here is IReadOnlyList<X> of a model in the JSON context, so X is in
+            // it too.
+            JsonTypeInfo entryType = _jsonOptions.GetTypeInfo(typeof(T).GetGenericArguments()[0]);
             int index = 0;
             foreach (JsonElement entry in document.RootElement.EnumerateArray())
             {
@@ -570,13 +571,7 @@ internal sealed class TcgDexTransport
                 }
                 catch (JsonException)
                 {
-                    string id = entry.ValueKind == JsonValueKind.Object
-                        && entry.TryGetProperty("id", out JsonElement value)
-                        && value.ValueKind == JsonValueKind.String
-                            ? $" (id '{value.GetString()}')"
-                            : string.Empty;
-
-                    return $" The first entry that fails is $[{index}]{id}.";
+                    return $" The first entry that fails is $[{index}]{DescribeId(entry)}.";
                 }
 
                 index++;
@@ -589,5 +584,42 @@ internal sealed class TcgDexTransport
             // The body is not JSON at all; the message already says so.
             return string.Empty;
         }
+    }
+
+    /// <summary>
+    /// The entry's <c>id</c>, made safe to put in an exception message, or an empty string.
+    /// </summary>
+    /// <remarks>
+    /// The id is the server's text, and the message goes to logs: control characters (a newline forging a log
+    /// line) are dropped and the length is capped.
+    /// </remarks>
+    private static string DescribeId(JsonElement entry)
+    {
+        const int MaxIdLength = 64;
+
+        if (entry.ValueKind != JsonValueKind.Object
+            || !entry.TryGetProperty("id", out JsonElement value)
+            || value.ValueKind != JsonValueKind.String)
+        {
+            return string.Empty;
+        }
+
+        string id;
+        try
+        {
+            id = value.GetString() ?? string.Empty;
+        }
+        catch (InvalidOperationException)
+        {
+            // Invalid UTF-8 or a lone surrogate, which JsonDocument accepts and GetString does not. The index
+            // still names the entry.
+            return string.Empty;
+        }
+
+        id = new string(id.Where(c => !char.IsControl(c)).ToArray());
+
+        return id.Length > MaxIdLength
+            ? $" (id '{id.Substring(0, MaxIdLength)}...')"
+            : $" (id '{id}')";
     }
 }
