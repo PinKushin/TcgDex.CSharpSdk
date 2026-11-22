@@ -24,9 +24,10 @@ something an application can observe — those live in the commit history.
 
 ### Changed
 
-- A response that does not deserialize now says why in the exception message, not only in `InnerException`: the
-  field that is missing or wrong. For a list it also names the first entry that fails, by position and `id`, for
-  example `The first entry that fails is $[1] (id 'a-2').` The whole call still fails, as before.
+- A response that does not deserialize, over REST or GraphQL, now says why in the exception message, not only in
+  `InnerException`: the field that is missing or wrong. For a REST list it also names the first entry that fails, by position and `id`, for
+  example `The first entry that fails is $[1] (id 'a-2').` The `id` is left out when the entry has no usable one, and
+  is shortened to printable ASCII of at most 64 characters. The whole call still fails, as before.
 
 ## [0.9.3] - 2026-11-21
 
