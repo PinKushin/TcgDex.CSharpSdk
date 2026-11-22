@@ -522,13 +522,103 @@ internal sealed class TcgDexTransport
 
             // Callers should need to catch only one exception type, so a
             // malformed body (an HTML error page from a proxy, say) is reported
-            // as an API failure rather than leaking JsonException.
+            // as an API failure rather than leaking JsonException. Its message is
+            // kept because it names the field that broke, and for a list the
+            // entry is named too (DECISIONS #37 row 11).
             throw new TcgDexApiException(
-                $"The response from '{uri}' was not valid JSON for {typeof(T).Name}.",
+                $"The response from '{uri}' was not valid JSON for {typeof(T).Name}: {ex.Message}{DescribeBrokenEntry<T>(body)}",
                 TcgDexErrorKind.InvalidResponse,
                 uri,
                 HttpStatusCode.OK,
                 innerException: ex);
         }
+    }
+
+    /// <summary>
+    /// For a list response, names the first entry that does not deserialize.
+    /// </summary>
+    /// <remarks>
+    /// System.Text.Json reports no path for a missing <c>required</c> property, so
+    /// without this a list of 20,000 cards fails with "missing 'name'" and nothing
+    /// to say which card. Runs only on the failure path, so the second parse costs
+    /// nothing on a good response.
+    /// </remarks>
+    /// <returns>A sentence naming the entry, or an empty string when there is none to name.</returns>
+    private string DescribeBrokenEntry<T>(ArraySegment<byte> body)
+    {
+        if (!typeof(T).IsGenericType)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(new ReadOnlyMemory<byte>(body.Array, body.Offset, body.Count));
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return string.Empty;
+            }
+
+            // Not guarded: every generic T that reaches here is IReadOnlyList<X> of a model in the JSON context,
+            // so X is in it too, and GetTypeInfo cannot throw.
+            JsonTypeInfo entryType = _jsonOptions.GetTypeInfo(typeof(T).GetGenericArguments()[0]);
+            int index = 0;
+            foreach (JsonElement entry in document.RootElement.EnumerateArray())
+            {
+                try
+                {
+                    _ = JsonSerializer.Deserialize(entry, entryType);
+                }
+                catch (JsonException)
+                {
+                    return $" The first entry that fails is $[{index}]{DescribeId(entry)}.";
+                }
+
+                index++;
+            }
+
+            return string.Empty;
+        }
+        catch (JsonException)
+        {
+            // The body is not JSON at all; the message already says so.
+            return string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// The entry's <c>id</c>, made safe to put in an exception message, or an empty string.
+    /// </summary>
+    /// <remarks>
+    /// The id is the server's text, and the message goes to logs, so only printable ASCII other than the quote
+    /// survives: no line break or Unicode separator to forge a log line, no bidi override, no half of a
+    /// surrogate pair, no quote closing its own. Real TCGdex ids (<c>swsh3-136</c>) are untouched. The length is
+    /// capped.
+    /// </remarks>
+    private static string DescribeId(JsonElement entry)
+    {
+        const int MaxIdLength = 64;
+
+        string? id;
+        try
+        {
+            id = entry.TryGetProperty("id", out JsonElement value) ? value.GetString() : null;
+        }
+        catch (InvalidOperationException)
+        {
+            // An entry that is not an object, an id that is not a string, or text JsonDocument accepts and
+            // GetString or the property lookup refuses (invalid UTF-8, a lone surrogate). The index still names
+            // the entry.
+            return string.Empty;
+        }
+
+        string safe = new((id ?? string.Empty).Where(c => c is >= ' ' and <= '~' and not '\'').ToArray());
+
+        return safe.Length switch
+        {
+            0 => string.Empty,
+            > MaxIdLength => $" (id '{safe.Substring(0, MaxIdLength)}...')",
+            _ => $" (id '{safe}')",
+        };
     }
 }

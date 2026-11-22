@@ -64,6 +64,66 @@ public sealed class TransportDetailTests
         exception.Message.ShouldContain("https://api.tcgdex.net/v2/en/cards/swsh3-136");
     }
 
+    // '~' in a body stands for a backslash, so JSON escapes such as ~u2028 stay escapes in this file rather
+    // than becoming the characters themselves.
+    private static string ListFailure(string body)
+        => Should.ThrowAsync<TcgDexApiException>(async () =>
+            await CreateClient(new RecordingHandler().RespondWith(HttpStatusCode.OK, body.Replace('~', '\\')))
+                .Cards.ListAsync(CancellationToken.None)).Result.Message;
+
+    [Test]
+    public void ListEntryMissingARequiredField_NamesTheEntryAndTheField()
+    {
+        // DECISIONS #37 row 11: one card without a name still fails the whole
+        // list, by decision, so the message is what makes it actionable. It has
+        // to say which entry ($[1], the second) and which field, or the caller
+        // has a 20,000-card response and no idea what to report upstream.
+        string message = ListFailure(
+            """[{"id":"a-1","localId":"1","name":"Furret"},{"id":"a-2","localId":"2"}]""");
+
+        // System.Text.Json words this differently by version (8.x: "missing
+        // required properties, including the following: name"; 10.x: "missing
+        // required properties including: 'name'"), so only the parts both say.
+        message.ShouldMatch(@"missing required properties.*(: name\b|'name')");
+        message.ShouldEndWith(" The first entry that fails is $[1] (id 'a-2').");
+    }
+
+    // No id, an id that is not a string, an entry that is not an object, an id GetString refuses (a lone
+    // surrogate), and an id with nothing printable: each is still named, by index alone, and none escapes as
+    // anything but TcgDexApiException.
+    [TestCase("""[{"localId":"1","name":"Furret"}]""")]
+    [TestCase("""[{"id":5,"localId":"1","name":"Furret"}]""")]
+    [TestCase("""[1]""")]
+    [TestCase("""[{"id":"\ud800","localId":"1"}]""")]
+    [TestCase("""[{"id":"~u2028~u202e","localId":"1"}]""")]
+    public void ListEntryWithoutAUsableId_IsNamedByIndexAlone(string body)
+        => ListFailure(body).ShouldEndWith(" The first entry that fails is $[0].");
+
+    // A lone-surrogate property name on either side of the id. Whether the property lookup reaches it, and
+    // whether it then throws, depends on scan order; either way the entry is named and the exception stays
+    // TcgDexApiException.
+    [TestCase("""[{"~ud800":1,"id":"a","localId":"1"}]""")]
+    [TestCase("""[{"id":"a","~ud800":1,"localId":"1"}]""")]
+    public void ListEntryWithAnUnreadablePropertyName_IsStillNamed(string body)
+        => ListFailure(body).ShouldContain(" The first entry that fails is $[0]");
+
+    [Test]
+    public void ListEntryId_KeepsOnlyPrintableAsciiAndIsCapped()
+    {
+        // The id is server text going into a message that goes into logs: a newline or U+2028 would forge a log
+        // line, a quote would close the message's own, and an emoji cut at the cap would leave half a surrogate pair.
+        string longId = new('x', 100);
+
+        string message = ListFailure($$"""[{"id":"a~n~u2028'~ud83d~ude00b{{longId}}","localId":"1"}]""");
+
+        message.ShouldEndWith($" The first entry that fails is $[0] (id 'ab{new string('x', 62)}...').");
+    }
+
+    [TestCase("<html>nope</html>")]
+    [TestCase("""{"not":"a list"}""")]
+    public void ListBodyThatIsNotAnArray_NamesNoEntry(string body)
+        => ListFailure(body).ShouldNotContain("first entry");
+
     [Test]
     public void MissingRequiredResource_NamesThePath()
     {

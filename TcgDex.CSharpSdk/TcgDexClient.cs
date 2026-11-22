@@ -135,8 +135,8 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
         TcgDexOptions resolved = options ?? new TcgDexOptions();
 
         // One category for the whole SDK, so a consumer can filter everything it
-        // emits with a single rule on "TcgDex".
-        ILogger logger = loggerFactory?.CreateLogger(TcgDexLog.Category) ?? NullLogger.Instance;
+        // emits with a single rule.
+        ILogger logger = loggerFactory?.CreateLogger(TcgDexLogging.CategoryName) ?? NullLogger.Instance;
 
         TcgDexTransport transport = new(httpClient, resolved, logger, sharedDeserialized);
         GraphQLTransport graphQL = new(httpClient, resolved, logger);
@@ -287,7 +287,7 @@ public sealed class TcgDexClient : ITcgDexClient, IDisposable
                 timeProvider: null,
                 maxResponseBytes: resolved.MaxResponseBytes,
                 new TcgDexCachingState(),
-                loggerFactory?.CreateLogger(TcgDexLog.Category))
+                loggerFactory?.CreateLogger(TcgDexLogging.CategoryName))
             {
                 InnerHandler = handler,
             };
