@@ -399,4 +399,5 @@ public sealed class GraphQLTests
                 cancellationToken: CancellationToken.None)).Result;
 
         exception.Message.ShouldContain("not valid JSON");
+        exception.Message.ShouldContain("Path: $");
     }}

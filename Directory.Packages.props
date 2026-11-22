@@ -17,14 +17,18 @@
 
        Conditioned on net10.0 alone, so every other TFM, including the net472
        test leg, resolves the 8.0.x line that netstandard2.0 consumers actually
-       get. DependencyLineTests asserts this per leg. -->
-  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
+       get. DependencyLineTests asserts this per leg.
+
+       TcgDexTestNetStandard (the CI lane that runs the net10.0 tests against the netstandard2.0 asset, DECISIONS #37
+       row 19) moves net10.0 onto the netstandard2.0 lines too, so that lane sees the graph a net6.0 or net7.0
+       consumer of that asset gets. -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0' Or '$(TcgDexTestNetStandard)' == 'true'">
     <PackageVersion Include="Microsoft.Extensions.Http" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.2" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0' And '$(TcgDexTestNetStandard)' != 'true'">
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.14" />
@@ -40,7 +44,7 @@
        green on all three targets. **CI cannot catch this**, because the harm
        lands on a consumer who does not exist yet. So major bumps are ignored in
        .github/dependabot.yml, while patches and minors flow. -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' Or '$(TcgDexTestNetStandard)' == 'true'">
     <PackageVersion Include="System.Text.Json" Version="8.0.6" />
     <PackageVersion Include="System.Net.Http.Json" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />

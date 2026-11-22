@@ -71,8 +71,28 @@
     <None Include="PublicApi.approved.cs" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(TcgDexTestNetStandard)' != 'true'">
     <ProjectReference Include="..\TcgDex.CSharpSdk\TcgDex.CSharpSdk.csproj" />
+  </ItemGroup>
+
+  <!-- -p:TcgDexTestNetStandard=true runs the suite against the netstandard2.0 asset instead, on whatever runtime
+       the test target is. A net6.0 or net7.0 app resolves that asset and runs it on .NET Core, which the net472
+       leg never does (DECISIONS #37 row 19). CI runs it on net10.0. -->
+  <!-- Tests that assert what one asset does differently (the handler Create builds, the Microsoft.Extensions line)
+       branch on this, as they already do on NETFRAMEWORK. -->
+  <PropertyGroup Condition="'$(TcgDexTestNetStandard)' == 'true'">
+    <DefineConstants>$(DefineConstants);TCGDEX_NETSTANDARD_ASSET</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TcgDexTestNetStandard)' == 'true'">
+    <ProjectReference Include="..\TcgDex.CSharpSdk\TcgDex.CSharpSdk.csproj" SetTargetFramework="TargetFramework=netstandard2.0" />
+    <!-- The reference's packages flow from the library's net10.0 group, not its netstandard2.0 one, so the
+         packages a real consumer of that asset receives are listed here (TcgDex.CSharpSdk.csproj). -->
+    <PackageReference Include="System.Text.Json" />
+    <PackageReference Include="System.Net.Http.Json" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" />
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" />
+    <PackageReference Include="Microsoft.Bcl.TimeProvider" />
   </ItemGroup>
 
   <!-- Recorded live-API responses. Contract tests deserialize these so model

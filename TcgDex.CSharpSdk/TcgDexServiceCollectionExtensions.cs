@@ -259,6 +259,6 @@ public static class TcgDexServiceCollectionExtensions
                 timeProvider: null,
                 provider.GetRequiredService<TcgDexOptions>().MaxResponseBytes,
                 provider.GetRequiredService<TcgDexCachingState>(),
-                provider.GetService<ILoggerFactory>()?.CreateLogger(TcgDexLog.Category)));
+                provider.GetService<ILoggerFactory>()?.CreateLogger(TcgDexLogging.CategoryName)));
     }
 }

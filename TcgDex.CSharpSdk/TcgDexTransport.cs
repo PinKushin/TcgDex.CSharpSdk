@@ -522,13 +522,72 @@ internal sealed class TcgDexTransport
 
             // Callers should need to catch only one exception type, so a
             // malformed body (an HTML error page from a proxy, say) is reported
-            // as an API failure rather than leaking JsonException.
+            // as an API failure rather than leaking JsonException. Its message is
+            // kept because it names the field that broke, and for a list the
+            // entry is named too (DECISIONS #37 row 11).
             throw new TcgDexApiException(
-                $"The response from '{uri}' was not valid JSON for {typeof(T).Name}.",
+                $"The response from '{uri}' was not valid JSON for {typeof(T).Name}: {ex.Message}{DescribeBrokenEntry<T>(body)}",
                 TcgDexErrorKind.InvalidResponse,
                 uri,
                 HttpStatusCode.OK,
                 innerException: ex);
+        }
+    }
+
+    /// <summary>
+    /// For a list response, names the first entry that does not deserialize.
+    /// </summary>
+    /// <remarks>
+    /// System.Text.Json reports no path for a missing <c>required</c> property, so
+    /// without this a list of 20,000 cards fails with "missing 'name'" and nothing
+    /// to say which card. Runs only on the failure path, so the second parse costs
+    /// nothing on a good response.
+    /// </remarks>
+    /// <returns>A sentence naming the entry, or an empty string when there is none to name.</returns>
+    private string DescribeBrokenEntry<T>(ArraySegment<byte> body)
+    {
+        if (!typeof(T).IsGenericType)
+        {
+            return string.Empty;
+        }
+
+        JsonTypeInfo entryType = _jsonOptions.GetTypeInfo(typeof(T).GetGenericArguments()[0]);
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(new ReadOnlyMemory<byte>(body.Array, body.Offset, body.Count));
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return string.Empty;
+            }
+
+            int index = 0;
+            foreach (JsonElement entry in document.RootElement.EnumerateArray())
+            {
+                try
+                {
+                    _ = JsonSerializer.Deserialize(entry, entryType);
+                }
+                catch (JsonException)
+                {
+                    string id = entry.ValueKind == JsonValueKind.Object
+                        && entry.TryGetProperty("id", out JsonElement value)
+                        && value.ValueKind == JsonValueKind.String
+                            ? $" (id '{value.GetString()}')"
+                            : string.Empty;
+
+                    return $" The first entry that fails is $[{index}]{id}.";
+                }
+
+                index++;
+            }
+
+            return string.Empty;
+        }
+        catch (JsonException)
+        {
+            // The body is not JSON at all; the message already says so.
+            return string.Empty;
         }
     }
 }

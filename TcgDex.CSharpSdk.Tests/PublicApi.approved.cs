@@ -61,6 +61,10 @@ namespace TcgDex.Diagnostics
     {
         public const string SourceName = "TcgDex.CSharpSdk";
     }
+    public static class TcgDexLogging
+    {
+        public const string CategoryName = "TcgDex";
+    }
 }
 namespace TcgDex
 {

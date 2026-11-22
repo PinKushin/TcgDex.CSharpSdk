@@ -386,7 +386,7 @@ internal sealed class GraphQLTransport(
         catch (JsonException ex)
         {
             throw new TcgDexApiException(
-                "The GraphQL response was not valid JSON.",
+                $"The GraphQL response was not valid JSON: {ex.Message}",
                 TcgDexErrorKind.InvalidResponse,
                 _endpoint,
                 HttpStatusCode.OK,

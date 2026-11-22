@@ -28,8 +28,8 @@ using TcgDexClient client = TcgDexClient.Create(loggerFactory: myLoggerFactory);
 TcgDexClient client = new(httpClient, options, myLoggerFactory);
 ```
 
-Everything is logged under the single category **`TcgDex`**, so one rule
-configures all of it:
+Everything is logged under the single category **`TcgDex`**
+(`TcgDexLogging.CategoryName` in code), so one rule configures all of it:
 
 ```json
 {

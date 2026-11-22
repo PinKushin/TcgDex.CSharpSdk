@@ -142,6 +142,40 @@ jobs:
           name: macos-test-results
           path: ./TestResults/*.trx
 
+  # The netstandard2.0 asset on .NET Core. A net6.0 or net7.0 app resolves that asset and runs it on
+  # Core, which the net472 leg never does (DECISIONS #37 row 19). -p:TcgDexTestNetStandard=true points
+  # the net10.0 tests at it, with the 8.0.x packages that asset ships with (the test csproj and
+  # Directory.Packages.props). EachLeg_LoadsTheLibraryAssetItIsMeantToTest fails if it resolves any
+  # other asset. One `dotnet test`, which builds: the property changes what the test project
+  # references, so nothing built without it can be reused.
+  netstandard-on-core-test:
+    name: Unit test netstandard2.0 on .NET 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+            11.0.x
+
+      - name: Unit tests against the netstandard2.0 asset
+        run: >
+          dotnet test TcgDex.CSharpSdk.Tests/TcgDex.CSharpSdk.Tests.csproj
+          --configuration Release --framework net10.0
+          -p:TcgDexTestNetStandard=true -warnaserror
+          --logger "trx;LogFileName=netstandard-on-core-tests.trx"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: netstandard-on-core-test-results
+          path: ./TestResults/*.trx
+
   # The netstandard2.0 assembly is a contract that never executes on its own, so
   # without this job it ships build-verified and never run. .NET Framework
   # resolves that asset, which makes a net472 run the only way to execute
@@ -287,7 +321,7 @@ jobs:
   # hide - without needing an edit every time a test is added.
   verify-test-coverage:
     name: Verify test coverage across all lanes
-    needs: [build-and-test, macos-test, framework-test]
+    needs: [build-and-test, macos-test, framework-test, netstandard-on-core-test]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -371,9 +405,16 @@ jobs:
       # Then by five (net10.0 860, net8.0 854, net472 853): ConcurrencyTests (3), one client
       # called from 64 threads at once, uncached, cached and evicting, and warm; and
       # BoundedLruCountTests (2 cases), the eviction counter after racing writes (#127).
+      # Then by five (net10.0 865, net8.0 859, net472 858): the list-entry messages (4, DECISIONS #37
+      # row 11) and EachLeg_LoadsTheLibraryAssetItIsMeantToTest (row 19). The new netstandard2.0-on-.NET 10
+      # lane runs the net10.0 suite, so its floor matches net10.0's.
       - name: ubuntu net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 860 -Label 'ubuntu net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 865 -Label 'ubuntu net10.0'
+
+      - name: ubuntu netstandard2.0 on net10.0 unit tests
+        shell: pwsh
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName netstandard-on-core-tests.trx -Floor 865 -Label 'netstandard2.0 on net10.0'
 
       - name: ubuntu offline integration tests
         shell: pwsh
@@ -381,16 +422,16 @@ jobs:
 
       - name: macOS net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 860 -Label 'macOS net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 865 -Label 'macOS net10.0'
 
       - name: Windows net472 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 853 -Label 'Windows net472'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 858 -Label 'Windows net472'
 
       - name: Windows net8.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 854 -Label 'Windows net8.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 859 -Label 'Windows net8.0'
 
       - name: Windows net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 860 -Label 'Windows net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 865 -Label 'Windows net10.0'

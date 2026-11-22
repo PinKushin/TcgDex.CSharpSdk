@@ -64,6 +64,42 @@ public sealed class TransportDetailTests
         exception.Message.ShouldContain("https://api.tcgdex.net/v2/en/cards/swsh3-136");
     }
 
+    private static string ListFailure(string body)
+        => Should.ThrowAsync<TcgDexApiException>(async () =>
+            await CreateClient(new RecordingHandler().RespondWith(HttpStatusCode.OK, body))
+                .Cards.ListAsync(CancellationToken.None)).Result.Message;
+
+    [Test]
+    public void ListEntryMissingARequiredField_NamesTheEntryAndTheField()
+    {
+        // DECISIONS #37 row 11: one card without a name still fails the whole
+        // list, by decision, so the message is what makes it actionable. It has
+        // to say which entry ($[1], the second) and which field, or the caller
+        // has a 20,000-card response and no idea what to report upstream.
+        string message = ListFailure(
+            """[{"id":"a-1","localId":"1","name":"Furret"},{"id":"a-2","localId":"2"}]""");
+
+        // System.Text.Json words this differently by version (8.x: "missing
+        // required properties, including the following: name"; 10.x: "missing
+        // required properties including: 'name'"), so only the parts both say.
+        message.ShouldContain("missing required properties");
+        message.ShouldContain("name");
+        message.ShouldEndWith(" The first entry that fails is $[1] (id 'a-2').");
+    }
+
+    [Test]
+    public void ListEntryWithoutAnId_IsNamedByIndexAlone()
+    {
+        string message = ListFailure("""[{"localId":"1","name":"Furret"}]""");
+
+        message.ShouldEndWith(" The first entry that fails is $[0].");
+    }
+
+    [TestCase("<html>nope</html>")]
+    [TestCase("""{"not":"a list"}""")]
+    public void ListBodyThatIsNotAnArray_NamesNoEntry(string body)
+        => ListFailure(body).ShouldNotContain("first entry");
+
     [Test]
     public void MissingRequiredResource_NamesThePath()
     {

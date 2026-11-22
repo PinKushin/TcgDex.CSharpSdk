@@ -230,12 +230,14 @@ public sealed class ClientLifetimeTests
         object httpClient = httpClientField.GetValue(client).ShouldNotBeNull();
         object handler = handlerField.GetValue(httpClient).ShouldNotBeNull();
 
-#if NETFRAMEWORK
+#if NETFRAMEWORK || TCGDEX_NETSTANDARD_ASSET
         // .NET Framework resolves the netstandard2.0 asset, where
         // SocketsHttpHandler does not exist. Connection recycling is delivered
         // there through ServicePoint.ConnectionLeaseTimeout instead, and Brotli
         // is unavailable — so this asserts the other half of the SDK's #if
-        // rather than skipping the framework.
+        // rather than skipping the framework. The same asset on .NET Core (the
+        // netstandard2.0 lane) builds the same handler, and there the lease
+        // timeout does nothing, as Create's remarks say.
         HttpClientHandler frameworkHandler = handler.ShouldBeOfType<HttpClientHandler>();
 
         frameworkHandler.AutomaticDecompression
@@ -330,7 +332,7 @@ public sealed class ClientLifetimeTests
             .ShouldBeOfType<TcgDex.Caching.TcgDexCachingHandler>()
             .InnerHandler;
 
-#if NETFRAMEWORK
+#if NETFRAMEWORK || TCGDEX_NETSTANDARD_ASSET
         inner.ShouldBeOfType<HttpClientHandler>().AutomaticDecompression
             .ShouldBe(DecompressionMethods.GZip | DecompressionMethods.Deflate);
 #else
