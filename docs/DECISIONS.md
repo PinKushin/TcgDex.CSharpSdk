@@ -1561,7 +1561,9 @@ that parsed, with a warning, is option A that #49 rejected for GraphQL: a card s
 And no live response has ever lacked a card `name`; row 11 was a stub measurement. What changed is the message. It
 carries System.Text.Json's own (the field), and for a list response the first entry that fails, by index and `id`,
 because System.Text.Json gives no path for a missing `required` property. That second parse runs only on the failure
-path. The GraphQL transport's message carries System.Text.Json's too.
+path. The `id` is the server's text in a message that goes to logs, so only printable ASCII other than `'` is kept
+(no line break, Unicode separator, bidi override or half surrogate pair), capped at 64 characters; an entry whose id
+is missing, not a string, or unreadable is named by index alone. The GraphQL transport's message carries System.Text.Json's too.
 
 **Row 17e, a public constant.** `TcgDexLogging.CategoryName`, beside `TcgDexActivity.SourceName`. The README already
 promised the string, so it was a contract; the constant puts it in `PublicApi.approved.cs`, where a rename fails the

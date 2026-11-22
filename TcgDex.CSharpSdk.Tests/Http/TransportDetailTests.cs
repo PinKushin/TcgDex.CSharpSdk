@@ -64,9 +64,11 @@ public sealed class TransportDetailTests
         exception.Message.ShouldContain("https://api.tcgdex.net/v2/en/cards/swsh3-136");
     }
 
+    // '~' in a body stands for a backslash, so JSON escapes such as ~u2028 stay escapes in this file rather
+    // than becoming the characters themselves.
     private static string ListFailure(string body)
         => Should.ThrowAsync<TcgDexApiException>(async () =>
-            await CreateClient(new RecordingHandler().RespondWith(HttpStatusCode.OK, body))
+            await CreateClient(new RecordingHandler().RespondWith(HttpStatusCode.OK, body.Replace('~', '\\')))
                 .Cards.ListAsync(CancellationToken.None)).Result.Message;
 
     [Test]
@@ -82,26 +84,38 @@ public sealed class TransportDetailTests
         // System.Text.Json words this differently by version (8.x: "missing
         // required properties, including the following: name"; 10.x: "missing
         // required properties including: 'name'"), so only the parts both say.
-        message.ShouldMatch("missing required properties.*(: name|'name')");
+        message.ShouldMatch(@"missing required properties.*(: name\b|'name')");
         message.ShouldEndWith(" The first entry that fails is $[1] (id 'a-2').");
     }
 
-    // No id, an id that is not a string, an entry that is not an object, and an id GetString refuses (a lone
-    // surrogate): each is still named, by index alone, and none escapes as anything but TcgDexApiException.
+    // No id, an id that is not a string, an entry that is not an object, an id GetString refuses (a lone
+    // surrogate), and an id with nothing printable: each is still named, by index alone, and none escapes as
+    // anything but TcgDexApiException.
     [TestCase("""[{"localId":"1","name":"Furret"}]""")]
     [TestCase("""[{"id":5,"localId":"1","name":"Furret"}]""")]
     [TestCase("""[1]""")]
     [TestCase("""[{"id":"\ud800","localId":"1"}]""")]
+    [TestCase("""[{"id":"~u2028~u202e","localId":"1"}]""")]
     public void ListEntryWithoutAUsableId_IsNamedByIndexAlone(string body)
         => ListFailure(body).ShouldEndWith(" The first entry that fails is $[0].");
 
     [Test]
-    public void ListEntryId_LosesControlCharactersAndIsCapped()
+    public void ListEntryWithAnUnreadablePropertyName_StillNamesItsId()
     {
-        // The id is server text going into a message that goes into logs: a newline would forge a log line.
+        // A review read the property lookup as throwing on a lone-surrogate name it scans past; measured, it
+        // does not, so the id is still read. Kept so a change that made it throw shows up here.
+        ListFailure("""[{"~ud800":1,"id":"a","localId":"1"}]""")
+            .ShouldEndWith(" The first entry that fails is $[0] (id 'a').");
+    }
+
+    [Test]
+    public void ListEntryId_KeepsOnlyPrintableAsciiAndIsCapped()
+    {
+        // The id is server text going into a message that goes into logs: a newline or U+2028 would forge a log
+        // line, a quote would close the message's own, and an emoji cut at the cap would leave half a surrogate pair.
         string longId = new('x', 100);
 
-        string message = ListFailure($$"""[{"id":"a\nb{{longId}}","localId":"1"}]""");
+        string message = ListFailure($$"""[{"id":"a~n~u2028'~ud83d~ude00b{{longId}}","localId":"1"}]""");
 
         message.ShouldEndWith($" The first entry that fails is $[0] (id 'ab{new string('x', 62)}...').");
     }

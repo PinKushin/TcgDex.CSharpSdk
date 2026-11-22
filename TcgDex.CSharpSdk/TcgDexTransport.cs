@@ -559,8 +559,8 @@ internal sealed class TcgDexTransport
                 return string.Empty;
             }
 
-            // Every generic T that reaches here is IReadOnlyList<X> of a model in the JSON context, so X is in
-            // it too.
+            // Not guarded: every generic T that reaches here is IReadOnlyList<X> of a model in the JSON context,
+            // so X is in it too, and GetTypeInfo cannot throw.
             JsonTypeInfo entryType = _jsonOptions.GetTypeInfo(typeof(T).GetGenericArguments()[0]);
             int index = 0;
             foreach (JsonElement entry in document.RootElement.EnumerateArray())
@@ -590,36 +590,35 @@ internal sealed class TcgDexTransport
     /// The entry's <c>id</c>, made safe to put in an exception message, or an empty string.
     /// </summary>
     /// <remarks>
-    /// The id is the server's text, and the message goes to logs: control characters (a newline forging a log
-    /// line) are dropped and the length is capped.
+    /// The id is the server's text, and the message goes to logs, so only printable ASCII other than the quote
+    /// survives: no line break or Unicode separator to forge a log line, no bidi override, no half of a
+    /// surrogate pair, no quote closing its own. Real TCGdex ids (<c>swsh3-136</c>) are untouched. The length is
+    /// capped.
     /// </remarks>
     private static string DescribeId(JsonElement entry)
     {
         const int MaxIdLength = 64;
 
-        if (entry.ValueKind != JsonValueKind.Object
-            || !entry.TryGetProperty("id", out JsonElement value)
-            || value.ValueKind != JsonValueKind.String)
-        {
-            return string.Empty;
-        }
-
-        string id;
+        string? id;
         try
         {
-            id = value.GetString() ?? string.Empty;
+            id = entry.TryGetProperty("id", out JsonElement value) ? value.GetString() : null;
         }
         catch (InvalidOperationException)
         {
-            // Invalid UTF-8 or a lone surrogate, which JsonDocument accepts and GetString does not. The index
-            // still names the entry.
+            // An entry that is not an object, an id that is not a string, or text JsonDocument accepts and
+            // GetString or the property lookup refuses (invalid UTF-8, a lone surrogate). The index still names
+            // the entry.
             return string.Empty;
         }
 
-        id = new string(id.Where(c => !char.IsControl(c)).ToArray());
+        string safe = new((id ?? string.Empty).Where(c => c is >= ' ' and <= '~' and not '\'').ToArray());
 
-        return id.Length > MaxIdLength
-            ? $" (id '{id.Substring(0, MaxIdLength)}...')"
-            : $" (id '{id}')";
+        return safe.Length switch
+        {
+            0 => string.Empty,
+            > MaxIdLength => $" (id '{safe.Substring(0, MaxIdLength)}...')",
+            _ => $" (id '{safe}')",
+        };
     }
 }
