@@ -406,16 +406,16 @@ jobs:
       # Then by five (net10.0 860, net8.0 854, net472 853): ConcurrencyTests (3), one client
       # called from 64 threads at once, uncached, cached and evicting, and warm; and
       # BoundedLruCountTests (2 cases), the eviction counter after racing writes (#127).
-      # Then by eleven (net10.0 871, net8.0 865, net472 864): the list-entry messages (10, DECISIONS #37
+      # Then by twelve (net10.0 872, net8.0 866, net472 865): the list-entry messages (11, DECISIONS #37
       # row 11, #51) and EachLeg_LoadsTheLibraryAssetItIsMeantToTest (row 19). The new netstandard2.0-on-.NET 10
       # lane runs the net10.0 suite, so its floor matches net10.0's.
       - name: ubuntu net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 871 -Label 'ubuntu net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName unit-tests.trx -Floor 872 -Label 'ubuntu net10.0'
 
       - name: ubuntu netstandard2.0 on net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName netstandard-on-core-tests.trx -Floor 871 -Label 'netstandard2.0 on net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName netstandard-on-core-tests.trx -Floor 872 -Label 'netstandard2.0 on net10.0'
 
       - name: ubuntu offline integration tests
         shell: pwsh
@@ -423,16 +423,16 @@ jobs:
 
       - name: macOS net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 871 -Label 'macOS net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName macos-tests.trx -Floor 872 -Label 'macOS net10.0'
 
       - name: Windows net472 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 864 -Label 'Windows net472'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net472_*.trx' -Floor 865 -Label 'Windows net472'
 
       - name: Windows net8.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 865 -Label 'Windows net8.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net8.0_*.trx' -Floor 866 -Label 'Windows net8.0'
 
       - name: Windows net10.0 unit tests
         shell: pwsh
-        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 871 -Label 'Windows net10.0'
+        run: ./scripts/Assert-TestCount.ps1 -ResultsDirectory ./all-test-results -FileName 'framework-tests_net10.0_*.trx' -Floor 872 -Label 'Windows net10.0'

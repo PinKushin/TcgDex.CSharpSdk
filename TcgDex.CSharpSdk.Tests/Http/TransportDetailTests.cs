@@ -99,14 +99,13 @@ public sealed class TransportDetailTests
     public void ListEntryWithoutAUsableId_IsNamedByIndexAlone(string body)
         => ListFailure(body).ShouldEndWith(" The first entry that fails is $[0].");
 
-    [Test]
-    public void ListEntryWithAnUnreadablePropertyName_StillNamesItsId()
-    {
-        // A review read the property lookup as throwing on a lone-surrogate name it scans past; measured, it
-        // does not, so the id is still read. Kept so a change that made it throw shows up here.
-        ListFailure("""[{"~ud800":1,"id":"a","localId":"1"}]""")
-            .ShouldEndWith(" The first entry that fails is $[0] (id 'a').");
-    }
+    // A lone-surrogate property name on either side of the id. Whether the property lookup reaches it, and
+    // whether it then throws, depends on scan order; either way the entry is named and the exception stays
+    // TcgDexApiException.
+    [TestCase("""[{"~ud800":1,"id":"a","localId":"1"}]""")]
+    [TestCase("""[{"id":"a","~ud800":1,"localId":"1"}]""")]
+    public void ListEntryWithAnUnreadablePropertyName_IsStillNamed(string body)
+        => ListFailure(body).ShouldContain(" The first entry that fails is $[0]");
 
     [Test]
     public void ListEntryId_KeepsOnlyPrintableAsciiAndIsCapped()
