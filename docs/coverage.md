@@ -343,14 +343,43 @@ Line numbers are those of `05a1bb2`.
 |---|---|---|
 | `TcgPlayerPricingConverter.cs:69` | Statement (`continue` removed) | Equivalent. `isUpdated` is false whenever `isUnit` is true, so control reaches the shape check. Only a string or null `unit` gets this far, since `GetString()` on the line above throws on anything else. Both are scalars, so `Skip()` does nothing and the loop continues as before. |
 | `TcgPlayerPricingConverter.cs:75` | Statement (`continue` removed) | Equivalent. `ReadTimestamp` leaves the reader on a token that `Skip()` does nothing on: the scalar it read, or the closing `}` or `]` of an object or array it skipped. Neither is `StartObject`, so the shape check skips and continues as before. |
+| `ValueDictionary.cs:131` | Conditional (false) | Equivalent. `EqualityComparer<TValue>.Default.GetHashCode(null)` is 0, the value the branch supplies, for nullable value types and reference types alike. |
+| `ValueList.cs:107` | Conditional (false) | Equivalent, for the same reason. |
 
 Both `continue` rows hold under stream deserialization too, where a reader that is not on its final
 block would make `Skip()` throw. System.Text.Json buffers a custom converter's whole value before
 calling it. Checked by hand: `DeserializeAsync` with a 16-byte `DefaultBufferSize`, on a pricing
 block with a null printing, an object-valued `updated` and an unknown scalar, succeeds on every
 target against the original and against both mutants.
-| `ValueDictionary.cs:131` | Conditional (false) | Equivalent. `EqualityComparer<TValue>.Default.GetHashCode(null)` is 0, the value the branch supplies, for nullable value types and reference types alike. |
-| `ValueList.cs:107` | Conditional (false) | Equivalent, for the same reason. |
+
+### Sixth round: the 0.9.4 code
+
+GitHub Actions run 45430223849 on `efe7c67` (0.9.4, 95.39%) had three files below their best score
+in the twelve runs before it. Survivors were compared by trimmed source line, mutator and
+replacement against the union of those runs. None was new; every one either survived the file's
+best run or arrived with new code.
+
+- `TcgDexCachingHandler.cs` (94.44%, best 94.50%): the same six survivors, all written off above.
+  The score moved because the file has one mutant fewer.
+- `GraphQLTransport.cs` (96.59%, best 100%): three survivors in the REST repair added by
+  `92dc1f4`. All three now have a killing test: the empty errors array
+  (`AnEmptyErrorsArray_RepairsNothing`; the older `GraphQLTests` test for it had stopped failing
+  once an empty array led to a repair instead of a throw, so it was removed), and the two
+  `ConfigureAwait` calls on the refetch (`GraphQL_ResumesOffTheCallersContext_AfterARestRefetch`).
+- `TcgDexTransport.cs` (91.13%, best 93.07%): the list-entry message added by `9fa7aae`. Six of
+  its survivors now have a killing test: the three empty-string returns that name no entry, the
+  two edges of the printable-ASCII filter, and the length cap at exactly 64. The rest are the rows
+  in the first table, renumbered, and the one below.
+
+Each test was checked by hand as above. The empty-errors mutant cannot be written as Stryker writes
+it, because SonarAnalyzer's S3981 rejects `Count >= 0` at build time; it was checked as the
+equivalent `Errors is not null`.
+
+Line numbers are those of `efe7c67`.
+
+| File:line | Mutator | Why it is not killed |
+|---|---|---|
+| `TcgDexTransport.cs:580` | String (`""` to text), NoCoverage | No input is known. It is reached only by a list that System.Text.Json rejects as a whole while `JsonDocument` parses it and every entry deserializes on its own. The line is a fallback, so such a list still gets the plain message. |
 
 ## What coverage does not tell you
 

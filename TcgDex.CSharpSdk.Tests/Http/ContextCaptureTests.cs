@@ -371,6 +371,38 @@ public sealed class ContextCaptureTests
     }
 
     [Test]
+    public async Task GraphQL_ResumesOffTheCallersContext_AfterARestRefetch()
+    {
+        // The search answers at once with a card GraphQL could not resolve; only the REST refetch of it is held
+        // open, so the awaits on the refetch and on the repair are the ones that suspend.
+        const string Search = """
+            {"data":{"cards":[{"id":"2017sm-5","name":"Pikachu","category":"Pokemon","localId":"5","attacks":[null],"set":{"id":"2017sm","name":"S"}}]},
+             "errors":[{"message":"Cannot return null for non-nullable field AttacksListItem.name.","path":["cards",0,"attacks",0,"name"]}]}
+            """;
+        string rest = Fixture.ReadText("card-nameless-attack.json");
+        TaskCompletionSource<bool> gate = new();
+        RefetchHandler handler = new(Search, rest, gate.Task);
+        using TcgDexClient client = new(new HttpClient(handler), new TcgDexOptions());
+
+        Task work = await AssertNoPostsAsync(
+            () => client.Cards.SearchDetailedAsync(new CardFilter { Name = "Pikachu" }, cancellationToken: CancellationToken.None),
+            gate);
+
+        ((Task<IReadOnlyList<Card>>)work).Result.ShouldHaveSingleItem().Attacks.Count.ShouldBe(2);
+    }
+
+    /// <summary>Answers the GraphQL POST at once and the REST GET after the gate opens.</summary>
+    private sealed class RefetchHandler(string search, string card, Task gate) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+            => request.Method == HttpMethod.Post
+                ? Task.FromResult(Json(HttpStatusCode.OK, search))
+                : AfterAsync(gate, () => Task.FromResult(Json(HttpStatusCode.OK, card)));
+    }
+
+    [Test]
     public async Task AStream_ResumesOffTheCallersContext_AfterAPage()
     {
         Handler handler = new(() => Json(HttpStatusCode.OK, "[]"), gated: true);

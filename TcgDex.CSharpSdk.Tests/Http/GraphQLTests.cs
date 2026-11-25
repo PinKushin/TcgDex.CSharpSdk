@@ -264,26 +264,7 @@ public sealed class GraphQLTests
         query.ShouldContain("pagination:{page:1,itemsPerPage:1}");
     }
 
-    // ----- boundaries that fire on empty collections -----
-
-    [Test]
-    public async Task AnEmptyErrorsArray_IsNotTreatedAsAFailure()
-    {
-        // `Errors is { Count: > 0 }` versus `>= 0`. A server that returns an
-        // empty errors array alongside good data is reporting success, and
-        // treating that as a failure would break every such response. Only a
-        // present-but-empty array distinguishes the two — null and non-empty
-        // both behave the same either way.
-        RecordingHandler handler = new RecordingHandler().RespondWith(
-            HttpStatusCode.OK,
-            """{"data":{"cards":[]},"errors":[]}""");
-
-        IReadOnlyList<Card> cards = await CreateClient(handler).Cards.SearchDetailedAsync(
-            new CardFilter { Name = "Furret" },
-            cancellationToken: CancellationToken.None);
-
-        cards.ShouldBeEmpty();
-    }
+    // An empty errors array: GraphQLRepairTests.AnEmptyErrorsArray_RepairsNothing.
 
     [Test]
     public void ReportedErrors_AreJoinedIntoTheException()

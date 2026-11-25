@@ -66,10 +66,12 @@ public sealed class TransportDetailTests
 
     // '~' in a body stands for a backslash, so JSON escapes such as ~u2028 stay escapes in this file rather
     // than becoming the characters themselves.
-    private static string ListFailure(string body)
+    private static string ListFailure(string body) => ListException(body).Message;
+
+    private static TcgDexApiException ListException(string body)
         => Should.ThrowAsync<TcgDexApiException>(async () =>
             await CreateClient(new RecordingHandler().RespondWith(HttpStatusCode.OK, body.Replace('~', '\\')))
-                .Cards.ListAsync(CancellationToken.None)).Result.Message;
+                .Cards.ListAsync(CancellationToken.None)).Result;
 
     [Test]
     public void ListEntryMissingARequiredField_NamesTheEntryAndTheField()
@@ -119,10 +121,43 @@ public sealed class TransportDetailTests
         message.ShouldEndWith($" The first entry that fails is $[0] (id 'ab{new string('x', 62)}...').");
     }
 
+    [Test]
+    public void ListEntryId_KeepsTheEdgesOfPrintableAscii()
+    {
+        // ' ' and '~' are the first and last characters the filter keeps; '~u007e' becomes ~, a '~' in the JSON.
+        ListFailure("""[{"id":" a~u007e","localId":"1"}]""")
+            .ShouldEndWith(" The first entry that fails is $[0] (id ' a~').");
+    }
+
+    [Test]
+    public void ListEntryId_AtExactlyTheCap_IsNotShortened()
+    {
+        string id = new('x', 64);
+
+        ListFailure($$"""[{"id":"{{id}}","localId":"1"}]""")
+            .ShouldEndWith($" The first entry that fails is $[0] (id '{id}').");
+    }
+
+    // The message ends with System.Text.Json's own: nothing is appended when there is no entry to name.
     [TestCase("<html>nope</html>")]
     [TestCase("""{"not":"a list"}""")]
     public void ListBodyThatIsNotAnArray_NamesNoEntry(string body)
-        => ListFailure(body).ShouldNotContain("first entry");
+    {
+        TcgDexApiException exception = ListException(body);
+
+        exception.Message.ShouldEndWith(": " + exception.InnerException.ShouldBeOfType<JsonException>().Message);
+    }
+
+    [Test]
+    public void ASingleResourceMissingARequiredField_NamesNoEntry()
+    {
+        // Only a list has entries to name; a single card's message stops at System.Text.Json's.
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, """{"id":"a-1","localId":"1"}""");
+
+        TcgDexApiException exception = Failing(handler);
+
+        exception.Message.ShouldEndWith(": " + exception.InnerException.ShouldBeOfType<JsonException>().Message);
+    }
 
     [Test]
     public void MissingRequiredResource_NamesThePath()
