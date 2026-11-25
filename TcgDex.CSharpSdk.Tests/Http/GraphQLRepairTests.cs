@@ -204,6 +204,21 @@ public sealed class GraphQLRepairTests
             .ShouldBe("TCGdex card 2017sm-5 has malformed data: attack 2 has no name", "the REST fetch reports the nameless attack itself");
     }
 
+    // An empty errors array is success: no repair runs, so nothing is logged as refetched, and a null cards list
+    // is not copied (which would throw NullReferenceException) but read as no cards.
+    [TestCase($$"""{"data":{"cards":[{{Furret}}]},"errors":[]}""", 1)]
+    [TestCase("""{"data":{"cards":null},"errors":[]}""", 0)]
+    public async Task AnEmptyErrorsArray_RepairsNothing(string body, int expected)
+    {
+        RecordingLogger log = new(LogLevel.Trace);
+        RecordingHandler handler = new RecordingHandler().RespondWith(HttpStatusCode.OK, body);
+
+        (await SearchAsync(handler, logs: log.Factory)).Count.ShouldBe(expected);
+
+        log.Entries.ShouldNotContain(e => e.EventId == 1303);
+        handler.Requests.Count.ShouldBe(1);
+    }
+
     // ----- what is still a failure -----
 
     [TestCase(NullName, """["cards",0]""", TestName = "A path that ends at the card")]

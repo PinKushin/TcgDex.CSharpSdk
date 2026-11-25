@@ -164,20 +164,25 @@ jobs:
           printf '\000{}' > selftest-input.bin
 
           # Positive: every input throws, so one execution must leave a file.
+          # Its output is the deliberate crash: a stack trace and "ERROR:
+          # libFuzzer: deadly signal". Printed inline, that line reads exactly
+          # like a real finding to anyone searching the log for one, so it is
+          # kept out of the log and shown only when this check fails.
           ( cd selftest-findings && TCGDEX_FUZZ_SELFTEST=1 \
             ../libfuzzer-dotnet \
               --target_path=../fuzz-out/TcgDex.CSharpSdk.Fuzz \
-              -runs=1 ../selftest-input.bin ) || true
+              -runs=1 ../selftest-input.bin ) > selftest.log 2>&1 || true
 
           found=$(find selftest-findings/findings -type f 2>/dev/null | wc -l)
 
           if [ "$found" -eq 0 ]; then
+            cat selftest.log
             echo "::error::The fuzz harness did not record a finding when every input throws."
             echo "A clean weekly run would therefore be meaningless: no crash could be reported."
             exit 1
           fi
 
-          echo "selftest wrote $found finding(s)"
+          echo "selftest wrote $found finding(s); its expected crash output is not shown"
 
           # Control: same input, flag unset, must write nothing.
           rm -rf control-findings && mkdir -p control-findings
@@ -188,13 +193,13 @@ jobs:
           leaked=$(find control-findings/findings -type f 2>/dev/null | wc -l)
 
           if [ "$leaked" -ne 0 ]; then
-            echo "::error::The control run wrote $leaked file(s) with $TCGDEX_FUZZ_SELFTEST unset."
+            echo "::error::The control run wrote $leaked file(s) with \$TCGDEX_FUZZ_SELFTEST unset."
             echo "The file seen above is then not evidence the harness works."
             exit 1
           fi
 
           echo "control wrote 0 findings, as required"
-          rm -rf selftest-findings control-findings selftest-input.bin
+          rm -rf selftest-findings control-findings selftest-input.bin selftest.log
 
       - name: Fuzz
         # The fallback applies ONLY to scheduled runs. A workflow_dispatch always
