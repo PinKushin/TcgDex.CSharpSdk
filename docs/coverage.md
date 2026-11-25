@@ -364,8 +364,9 @@ best run or arrived with new code.
 - `GraphQLTransport.cs` (96.59%, best 100%): three survivors in the REST repair added by
   `92dc1f4`. All three now have a killing test: the empty errors array
   (`AnEmptyErrorsArray_RepairsNothing`; the older `GraphQLTests` test for it had stopped failing
-  once an empty array led to a repair instead of a throw, so it was removed), and the two
-  `ConfigureAwait` calls on the refetch (`GraphQL_ResumesOffTheCallersContext_AfterARestRefetch`).
+  once an empty array led to a repair instead of a throw, so it was removed), and the
+  `ConfigureAwait` calls on the refetch and on the repair
+  (`GraphQL_ResumesOffTheCallersContext_AfterARestRefetch`).
 - `TcgDexTransport.cs` (91.13%, best 93.07%): the list-entry message added by `9fa7aae`. Six of
   its survivors now have a killing test: the three empty-string returns that name no entry, the
   two edges of the printable-ASCII filter, and the length cap at exactly 64. The rest are the rows
